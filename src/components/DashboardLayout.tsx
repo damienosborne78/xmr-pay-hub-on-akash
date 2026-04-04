@@ -2,12 +2,13 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { BrandLogo } from '@/components/BrandLogo';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
+import { PrivacyBanner } from '@/components/PrivacyBanner';
 import { useStore } from '@/lib/store';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift } from 'lucide-react';
 
 const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
