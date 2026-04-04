@@ -72,7 +72,8 @@ function DashboardSidebar() {
           <SidebarGroupContent>{renderNav(toolsNav)}</SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupContent>{renderNav(bottomNav)}</SidebarGroupContent>
+          {!collapsed && <SidebarGroupLabel className="text-muted-foreground text-xs px-3 mb-1">Config</SidebarGroupLabel>}
+          <SidebarGroupContent>{renderNav(configNav)}</SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <div className="mt-auto p-4 border-t border-sidebar-border">
