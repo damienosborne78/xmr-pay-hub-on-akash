@@ -4,8 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -31,6 +32,57 @@ export default function SettingsPage() {
 
       <FadeIn delay={0.05}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Cold Wallet Auto-Sweep</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">Automatically sweep funds to your cold wallet when balance exceeds threshold. Zero custodial risk.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Enable Auto-Sweep</p>
+              <p className="text-xs text-muted-foreground">Instant sweep upon payment confirmation</p>
+            </div>
+            <Switch checked={merchant.autoSweepEnabled} onCheckedChange={v => updateMerchant({ autoSweepEnabled: v })} />
+          </div>
+          {merchant.autoSweepEnabled && (
+            <div className="space-y-4 pt-2 border-t border-border">
+              <div className="space-y-2">
+                <Label className="text-foreground">Cold Wallet Address</Label>
+                <Input value={merchant.coldWalletAddress} onChange={e => updateMerchant({ coldWalletAddress: e.target.value })} className="bg-background border-border font-mono text-xs" placeholder="Your XMR cold wallet address" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-foreground">Sweep Threshold</Label>
+                  <span className="text-sm font-mono text-primary">{merchant.autoSweepThreshold} XMR</span>
+                </div>
+                <Slider value={[merchant.autoSweepThreshold]} onValueChange={v => updateMerchant({ autoSweepThreshold: v[0] })} min={0.01} max={10} step={0.01} className="py-2" />
+                <p className="text-xs text-muted-foreground">Sweep when balance exceeds this amount</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </FadeIn>
+
+      <FadeIn delay={0.08}>
+        <div className="p-6 rounded-xl bg-card border border-border space-y-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Fiat Hedging</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">Auto-convert a percentage of incoming XMR to stablecoins to protect against price drops.</p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-foreground">Hedge Percentage</Label>
+              <span className="text-sm font-mono text-primary">{merchant.fiatHedgePercent}%</span>
+            </div>
+            <Slider value={[merchant.fiatHedgePercent]} onValueChange={v => updateMerchant({ fiatHedgePercent: v[0] })} min={0} max={100} step={5} className="py-2" />
+            <p className="text-xs text-muted-foreground">{merchant.fiatHedgePercent === 0 ? 'No hedging — 100% held in XMR' : `${merchant.fiatHedgePercent}% auto-converted to USDT, ${100 - merchant.fiatHedgePercent}% held in XMR`}</p>
+          </div>
+        </div>
+      </FadeIn>
+
+      <FadeIn delay={0.1}>
+        <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Webhook Configuration</h2>
           <div className="space-y-2">
             <Label className="text-foreground">Webhook URL</Label>
@@ -40,12 +92,12 @@ export default function SettingsPage() {
         </div>
       </FadeIn>
 
-      <FadeIn delay={0.1}>
+      <FadeIn delay={0.12}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Settlement</h2>
           <div className="space-y-2">
-            <Label className="text-foreground">Cold Wallet Address</Label>
-            <Input value={merchant.settlementAddress} onChange={e => updateMerchant({ settlementAddress: e.target.value })} className="bg-background border-border font-mono text-xs" placeholder="Your XMR wallet address for auto-settlement" />
+            <Label className="text-foreground">Settlement Address</Label>
+            <Input value={merchant.settlementAddress} onChange={e => updateMerchant({ settlementAddress: e.target.value })} className="bg-background border-border font-mono text-xs" placeholder="Your XMR wallet address for settlement" />
           </div>
           <div className="flex items-center justify-between pt-2">
             <div>

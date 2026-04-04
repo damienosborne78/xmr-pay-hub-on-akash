@@ -10,9 +10,14 @@ import OnboardingPage from "./pages/OnboardingPage";
 import DashboardLayout from "./components/DashboardLayout";
 import OverviewPage from "./pages/dashboard/OverviewPage";
 import InvoicesPage from "./pages/dashboard/InvoicesPage";
+import SubscriptionsPage from "./pages/dashboard/SubscriptionsPage";
 import PaymentsPage from "./pages/dashboard/PaymentsPage";
+import PosPage from "./pages/dashboard/PosPage";
+import PaymentLinksPage from "./pages/dashboard/PaymentLinksPage";
+import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import InvoicePage from "./pages/InvoicePage";
+import PayPage from "./pages/PayPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,10 +36,16 @@ const App = () => (
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<OverviewPage />} />
             <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="payments" element={<PaymentsPage />} />
+            <Route path="pos" element={<PosPage />} />
+            <Route path="links" element={<PaymentLinksPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="/invoice/:id" element={<InvoicePage />} />
+          <Route path="/pay/:amount/:label" element={<PayPage />} />
+          <Route path="/pay/:amount" element={<PayPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

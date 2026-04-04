@@ -4,15 +4,25 @@ import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useStore } from '@/lib/store';
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, Menu } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2 } from 'lucide-react';
 
-const navItems = [
+const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Invoices', url: '/dashboard/invoices', icon: FileText },
+  { title: 'Subscriptions', url: '/dashboard/subscriptions', icon: RefreshCw },
   { title: 'Payments', url: '/dashboard/payments', icon: Clock },
+];
+
+const toolsNav = [
+  { title: 'PoS Terminal', url: '/dashboard/pos', icon: MonitorSmartphone },
+  { title: 'Payment Links', url: '/dashboard/links', icon: Link2 },
+  { title: 'Analytics', url: '/dashboard/analytics', icon: BarChart3 },
+];
+
+const bottomNav = [
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
 ];
 
@@ -23,6 +33,26 @@ function DashboardSidebar() {
   const navigate = useNavigate();
   const logout = useStore(s => s.logout);
 
+  const renderNav = (items: typeof mainNav) => (
+    <SidebarMenu>
+      {items.map(item => (
+        <SidebarMenuItem key={item.title}>
+          <SidebarMenuButton asChild>
+            <NavLink
+              to={item.url}
+              end={item.url === '/dashboard'}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+              activeClassName="bg-sidebar-accent text-primary font-medium"
+            >
+              <item.icon className="w-4 h-4 shrink-0" />
+              {!collapsed && <span>{item.title}</span>}
+            </NavLink>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  );
+
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
       <div className="p-4 border-b border-sidebar-border">
@@ -30,25 +60,15 @@ function DashboardSidebar() {
       </div>
       <SidebarContent className="py-4">
         <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map(item => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === '/dashboard'}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                      activeClassName="bg-sidebar-accent text-primary font-medium"
-                    >
-                      <item.icon className="w-4 h-4 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
+          {!collapsed && <SidebarGroupLabel className="text-muted-foreground text-xs px-3 mb-1">Main</SidebarGroupLabel>}
+          <SidebarGroupContent>{renderNav(mainNav)}</SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          {!collapsed && <SidebarGroupLabel className="text-muted-foreground text-xs px-3 mb-1">Tools</SidebarGroupLabel>}
+          <SidebarGroupContent>{renderNav(toolsNav)}</SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupContent>{renderNav(bottomNav)}</SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <div className="mt-auto p-4 border-t border-sidebar-border">
