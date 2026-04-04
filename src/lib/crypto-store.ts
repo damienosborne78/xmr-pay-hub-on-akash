@@ -51,7 +51,7 @@ export async function decryptData(buffer: ArrayBuffer, passphrase: string): Prom
   const iv = data.slice(16, 28);
   const ciphertext = data.slice(28);
   const key = await deriveKey(passphrase, salt);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer }, key, ciphertext.buffer as ArrayBuffer);
   return new TextDecoder().decode(decrypted);
 }
 
