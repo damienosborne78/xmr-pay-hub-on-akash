@@ -1,0 +1,83 @@
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { BrandLogo } from '@/components/BrandLogo';
+import { NavLink } from '@/components/NavLink';
+import { Button } from '@/components/ui/button';
+import { useStore } from '@/lib/store';
+import {
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
+} from '@/components/ui/sidebar';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, Menu } from 'lucide-react';
+
+const navItems = [
+  { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
+  { title: 'Invoices', url: '/dashboard/invoices', icon: FileText },
+  { title: 'Payments', url: '/dashboard/payments', icon: Clock },
+  { title: 'Settings', url: '/dashboard/settings', icon: Settings },
+];
+
+function DashboardSidebar() {
+  const { state } = useSidebar();
+  const collapsed = state === 'collapsed';
+  const location = useLocation();
+  const navigate = useNavigate();
+  const logout = useStore(s => s.logout);
+
+  return (
+    <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
+      <div className="p-4 border-b border-sidebar-border">
+        <BrandLogo collapsed={collapsed} />
+      </div>
+      <SidebarContent className="py-4">
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map(item => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
+                      end={item.url === '/dashboard'}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                      activeClassName="bg-sidebar-accent text-primary font-medium"
+                    >
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <div className="mt-auto p-4 border-t border-sidebar-border">
+        <button
+          onClick={() => { logout(); navigate('/'); }}
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive transition-colors text-sm"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>Log Out</span>}
+        </button>
+      </div>
+    </Sidebar>
+  );
+}
+
+export default function DashboardLayout() {
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <DashboardSidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-14 flex items-center border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
+            <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+          </header>
+          <main className="flex-1 p-6 overflow-auto">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
