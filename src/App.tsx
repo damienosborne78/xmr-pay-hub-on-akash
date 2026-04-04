@@ -16,6 +16,10 @@ import PosPage from "./pages/dashboard/PosPage";
 import PaymentLinksPage from "./pages/dashboard/PaymentLinksPage";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
+import IntegrationsPage from "./pages/dashboard/IntegrationsPage";
+import LocalizationPage from "./pages/dashboard/LocalizationPage";
+import WhiteLabelPage from "./pages/dashboard/WhiteLabelPage";
+import PayoutsPage from "./pages/dashboard/PayoutsPage";
 import InvoicePage from "./pages/InvoicePage";
 import PayPage from "./pages/PayPage";
 import NotFound from "./pages/NotFound";
@@ -41,6 +45,10 @@ const App = () => (
             <Route path="pos" element={<PosPage />} />
             <Route path="links" element={<PaymentLinksPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="payouts" element={<PayoutsPage />} />
+            <Route path="localization" element={<LocalizationPage />} />
+            <Route path="white-label" element={<WhiteLabelPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="/invoice/:id" element={<InvoicePage />} />

@@ -7,7 +7,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2 } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark } from 'lucide-react';
 
 const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
@@ -20,9 +20,13 @@ const toolsNav = [
   { title: 'PoS Terminal', url: '/dashboard/pos', icon: MonitorSmartphone },
   { title: 'Payment Links', url: '/dashboard/links', icon: Link2 },
   { title: 'Analytics', url: '/dashboard/analytics', icon: BarChart3 },
+  { title: 'Integrations', url: '/dashboard/integrations', icon: Plug },
+  { title: 'Payouts', url: '/dashboard/payouts', icon: Landmark },
 ];
 
-const bottomNav = [
+const configNav = [
+  { title: 'Localization', url: '/dashboard/localization', icon: Globe },
+  { title: 'White-Label', url: '/dashboard/white-label', icon: Paintbrush },
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
 ];
 
@@ -68,7 +72,8 @@ function DashboardSidebar() {
           <SidebarGroupContent>{renderNav(toolsNav)}</SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupContent>{renderNav(bottomNav)}</SidebarGroupContent>
+          {!collapsed && <SidebarGroupLabel className="text-muted-foreground text-xs px-3 mb-1">Config</SidebarGroupLabel>}
+          <SidebarGroupContent>{renderNav(configNav)}</SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <div className="mt-auto p-4 border-t border-sidebar-border">
