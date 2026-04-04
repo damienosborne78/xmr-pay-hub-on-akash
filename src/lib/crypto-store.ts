@@ -35,9 +35,10 @@ export async function encryptData(data: string, passphrase: string): Promise<Arr
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(passphrase, salt);
   const enc = new TextEncoder();
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(data) as ArrayBuffer);
+  const plaintext = enc.encode(data);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext.buffer as ArrayBuffer);
   // Format: [salt(16) | iv(12) | ciphertext]
-  const result = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+  const result = new Uint8Array(salt.byteLength + iv.byteLength + encrypted.byteLength);
   result.set(salt, 0);
   result.set(iv, salt.length);
   result.set(new Uint8Array(encrypted), salt.length + iv.length);
