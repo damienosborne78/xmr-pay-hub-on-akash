@@ -2,12 +2,13 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { BrandLogo } from '@/components/BrandLogo';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
+import { PrivacyBanner } from '@/components/PrivacyBanner';
 import { useStore } from '@/lib/store';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift } from 'lucide-react';
 
 const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
@@ -19,6 +20,7 @@ const mainNav = [
 const toolsNav = [
   { title: 'PoS Terminal', url: '/dashboard/pos', icon: MonitorSmartphone },
   { title: 'Payment Links', url: '/dashboard/links', icon: Link2 },
+  { title: 'Referrals', url: '/dashboard/referrals', icon: Gift },
   { title: 'Analytics', url: '/dashboard/analytics', icon: BarChart3 },
   { title: 'Integrations', url: '/dashboard/integrations', icon: Plug },
   { title: 'Payouts', url: '/dashboard/payouts', icon: Landmark },
@@ -95,8 +97,9 @@ export default function DashboardLayout() {
       <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
+          <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <PrivacyBanner />
           </header>
           <main className="flex-1 p-6 overflow-auto">
             <Outlet />

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Invoice, Merchant, Subscription, PaymentLink, mockInvoices, mockMerchant, mockSubscriptions, mockPaymentLinks, generateSubaddress, usdToXmr } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, mockInvoices, mockMerchant, mockSubscriptions, mockPaymentLinks, mockReferrals, mockReferralPayouts, generateSubaddress, usdToXmr } from './mock-data';
 
 interface AppState {
   isAuthenticated: boolean;
@@ -7,6 +7,8 @@ interface AppState {
   invoices: Invoice[];
   subscriptions: Subscription[];
   paymentLinks: PaymentLink[];
+  referrals: Referral[];
+  referralPayouts: ReferralPayout[];
   login: () => void;
   logout: () => void;
   createInvoice: (description: string, fiatAmount: number, subscriptionId?: string) => Invoice;
@@ -17,6 +19,7 @@ interface AppState {
   cancelSubscription: (id: string) => void;
   createPaymentLink: (slug: string, fiatAmount: number, label: string) => PaymentLink;
   deletePaymentLink: (id: string) => void;
+  simulateReferralPayout: () => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -25,6 +28,8 @@ export const useStore = create<AppState>((set, get) => ({
   invoices: mockInvoices,
   subscriptions: mockSubscriptions,
   paymentLinks: mockPaymentLinks,
+  referrals: mockReferrals,
+  referralPayouts: mockReferralPayouts,
 
   login: () => set({ isAuthenticated: true }),
   logout: () => set({ isAuthenticated: false }),
@@ -112,5 +117,19 @@ export const useStore = create<AppState>((set, get) => ({
 
   deletePaymentLink: (id: string) => {
     set(state => ({ paymentLinks: state.paymentLinks.filter(l => l.id !== id) }));
+  },
+
+  simulateReferralPayout: () => {
+    const state = get();
+    const totalCommission = state.referrals.reduce((s, r) => s + r.monthlyCommission, 0);
+    const xmrAmount = usdToXmr(totalCommission);
+    const payout: ReferralPayout = {
+      id: 'rp_' + Math.random().toString(36).slice(2, 8),
+      date: new Date().toISOString(),
+      xmrAmount,
+      referralCount: state.referrals.length,
+      status: 'paid',
+    };
+    set(state => ({ referralPayouts: [payout, ...state.referralPayouts] }));
   },
 }));

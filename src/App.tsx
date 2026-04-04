@@ -20,6 +20,7 @@ import IntegrationsPage from "./pages/dashboard/IntegrationsPage";
 import LocalizationPage from "./pages/dashboard/LocalizationPage";
 import WhiteLabelPage from "./pages/dashboard/WhiteLabelPage";
 import PayoutsPage from "./pages/dashboard/PayoutsPage";
+import ReferralsPage from "./pages/dashboard/ReferralsPage";
 import InvoicePage from "./pages/InvoicePage";
 import PayPage from "./pages/PayPage";
 import NotFound from "./pages/NotFound";
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="payouts" element={<PayoutsPage />} />
+            <Route path="referrals" element={<ReferralsPage />} />
             <Route path="localization" element={<LocalizationPage />} />
             <Route path="white-label" element={<WhiteLabelPage />} />
             <Route path="settings" element={<SettingsPage />} />

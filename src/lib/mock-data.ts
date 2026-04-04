@@ -37,6 +37,27 @@ export interface Merchant {
   autoSweepThreshold: number;
   coldWalletAddress: string;
   fiatHedgePercent: number;
+  privacyModeEnabled: boolean;
+  privacyPassphrase: string;
+  privacyBackupEmail: string;
+  referralCode: string;
+  referralsEnabled: boolean;
+}
+
+export interface Referral {
+  id: string;
+  username: string;
+  level: number;
+  joinedAt: string;
+  monthlyCommission: number;
+}
+
+export interface ReferralPayout {
+  id: string;
+  date: string;
+  xmrAmount: number;
+  referralCount: number;
+  status: 'paid' | 'pending';
 }
 
 export interface Subscription {
@@ -77,9 +98,26 @@ export const mockMerchant: Merchant = {
   autoSweepThreshold: 0.5,
   coldWalletAddress: '',
   fiatHedgePercent: 0,
+  privacyModeEnabled: false,
+  privacyPassphrase: '',
+  privacyBackupEmail: '',
+  referralCode: 'demo01',
+  referralsEnabled: true,
 };
 
 const now = new Date();
+
+export const mockReferrals: Referral[] = [
+  { id: 'ref_001', username: 'alice_store', level: 1, joinedAt: new Date(now.getTime() - 86400000 * 30).toISOString(), monthlyCommission: 7.25 },
+  { id: 'ref_002', username: 'bob_coffee', level: 1, joinedAt: new Date(now.getTime() - 86400000 * 20).toISOString(), monthlyCommission: 29.00 },
+  { id: 'ref_003', username: 'carols_craft', level: 2, joinedAt: new Date(now.getTime() - 86400000 * 15).toISOString(), monthlyCommission: 2.90 },
+  { id: 'ref_004', username: 'dave_digital', level: 3, joinedAt: new Date(now.getTime() - 86400000 * 5).toISOString(), monthlyCommission: 1.45 },
+];
+
+export const mockReferralPayouts: ReferralPayout[] = [
+  { id: 'rp_001', date: new Date(now.getTime() - 86400000 * 30).toISOString(), xmrAmount: 0.182, referralCount: 2, status: 'paid' },
+  { id: 'rp_002', date: new Date(now.getTime() - 86400000 * 1).toISOString(), xmrAmount: 0.243, referralCount: 4, status: 'pending' },
+];
 export const mockInvoices: Invoice[] = [
   {
     id: 'inv_a1b2c3',
