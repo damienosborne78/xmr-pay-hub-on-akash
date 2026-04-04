@@ -48,6 +48,7 @@ const App = () => (
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="payouts" element={<PayoutsPage />} />
+            <Route path="referrals" element={<ReferralsPage />} />
             <Route path="localization" element={<LocalizationPage />} />
             <Route path="white-label" element={<WhiteLabelPage />} />
             <Route path="settings" element={<SettingsPage />} />
