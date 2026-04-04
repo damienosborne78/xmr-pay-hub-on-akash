@@ -20,6 +20,7 @@ const mainNav = [
 const toolsNav = [
   { title: 'PoS Terminal', url: '/dashboard/pos', icon: MonitorSmartphone },
   { title: 'Payment Links', url: '/dashboard/links', icon: Link2 },
+  { title: 'Referrals', url: '/dashboard/referrals', icon: Gift },
   { title: 'Analytics', url: '/dashboard/analytics', icon: BarChart3 },
   { title: 'Integrations', url: '/dashboard/integrations', icon: Plug },
   { title: 'Payouts', url: '/dashboard/payouts', icon: Landmark },
