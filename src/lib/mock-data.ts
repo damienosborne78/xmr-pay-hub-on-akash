@@ -37,6 +37,27 @@ export interface Merchant {
   autoSweepThreshold: number;
   coldWalletAddress: string;
   fiatHedgePercent: number;
+  privacyModeEnabled: boolean;
+  privacyPassphrase: string;
+  privacyBackupEmail: string;
+  referralCode: string;
+  referralsEnabled: boolean;
+}
+
+export interface Referral {
+  id: string;
+  username: string;
+  level: number;
+  joinedAt: string;
+  monthlyCommission: number;
+}
+
+export interface ReferralPayout {
+  id: string;
+  date: string;
+  xmrAmount: number;
+  referralCount: number;
+  status: 'paid' | 'pending';
 }
 
 export interface Subscription {
