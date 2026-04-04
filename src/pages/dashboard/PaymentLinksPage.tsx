@@ -1,0 +1,118 @@
+import { useState } from 'react';
+import { useStore } from '@/lib/store';
+import { formatUSD } from '@/lib/mock-data';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { FadeIn } from '@/components/FadeIn';
+import { Plus, Copy, Trash2, ExternalLink, Link2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+export default function PaymentLinksPage() {
+  const paymentLinks = useStore(s => s.paymentLinks);
+  const createPaymentLink = useStore(s => s.createPaymentLink);
+  const deletePaymentLink = useStore(s => s.deletePaymentLink);
+  const [open, setOpen] = useState(false);
+  const [slug, setSlug] = useState('');
+  const [amount, setAmount] = useState('');
+  const [label, setLabel] = useState('');
+
+  const handleCreate = () => {
+    if (!slug || !amount || !label || isNaN(Number(amount))) return;
+    createPaymentLink(slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'), Number(amount), label);
+    toast.success('Payment link created!');
+    setOpen(false);
+    setSlug(''); setAmount(''); setLabel('');
+  };
+
+  const baseUrl = window.location.origin;
+
+  const copyLink = (link: typeof paymentLinks[0]) => {
+    navigator.clipboard.writeText(`${baseUrl}/pay/${link.fiatAmount}/${link.slug}`);
+    toast.success('Link copied!');
+  };
+
+  return (
+    <div className="space-y-6">
+      <FadeIn>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Payment Links</h1>
+            <p className="text-muted-foreground text-sm">Shareable links — no code required</p>
+          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-orange hover:opacity-90"><Plus className="w-4 h-4 mr-2" /> New Link</Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader><DialogTitle className="text-foreground">Create Payment Link</DialogTitle></DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div className="space-y-2">
+                  <Label className="text-foreground">Label</Label>
+                  <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="Buy Me a Coffee" className="bg-background border-border" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Amount (USD)</Label>
+                  <Input value={amount} onChange={e => setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="4.99" className="bg-background border-border" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">URL Slug</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs font-mono">/pay/$/</span>
+                    <Input value={slug} onChange={e => setSlug(e.target.value)} placeholder="coffee" className="bg-background border-border font-mono text-sm" />
+                  </div>
+                </div>
+                <Button onClick={handleCreate} className="w-full bg-gradient-orange hover:opacity-90">Create Link</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </FadeIn>
+
+      <FadeIn delay={0.05}>
+        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+          <div className="flex items-start gap-3">
+            <Link2 className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Payment Links API</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Share simple links like <span className="font-mono text-primary">{baseUrl}/pay/49.99/coffee</span> — customers get a checkout page instantly. Embed as buttons on any website.
+              </p>
+            </div>
+          </div>
+        </div>
+      </FadeIn>
+
+      <FadeIn delay={0.1}>
+        <div className="grid gap-4">
+          {paymentLinks.map(link => (
+            <div key={link.id} className="p-5 rounded-xl bg-card border border-border hover:border-primary/20 transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-foreground font-medium">{link.label}</p>
+                  <p className="text-primary font-mono text-sm mt-1">/pay/{link.fiatAmount}/{link.slug}</p>
+                  <p className="text-muted-foreground text-xs mt-1">{link.uses} uses · Created {new Date(link.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl font-bold text-foreground">{formatUSD(link.fiatAmount)}</span>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-primary" onClick={() => copyLink(link)}>
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-primary" onClick={() => window.open(`/pay/${link.fiatAmount}/${link.slug}`, '_blank')}>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-destructive" onClick={() => { deletePaymentLink(link.id); toast.info('Link deleted'); }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </FadeIn>
+    </div>
+  );
+}
