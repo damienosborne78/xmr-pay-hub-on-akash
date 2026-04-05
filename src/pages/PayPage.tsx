@@ -1,22 +1,64 @@
 import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { formatUSD, formatXMR, usdToXmr, generateSubaddress, XMR_USD_RATE } from '@/lib/mock-data';
+import { formatUSD, formatXMR, usdToXmr, XMR_USD_RATE } from '@/lib/mock-data';
+import { useStore } from '@/lib/store';
+import { createSubaddress } from '@/lib/monero-rpc';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MoneroLogo } from '@/components/BrandLogo';
-import { Check, Clock, Copy } from 'lucide-react';
+import { Check, Clock, Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function PayPage() {
   const { amount, label } = useParams();
   const fiatAmount = parseFloat(amount || '0');
   const xmrAmount = usdToXmr(fiatAmount);
-  const [subaddress] = useState(generateSubaddress);
-  const [paid, setPaid] = useState(false);
+  const getRpcConfig = useStore(s => s.getRpcConfig);
+  const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
+  const createInvoice = useStore(s => s.createInvoice);
+  const invoices = useStore(s => s.invoices);
+
+  const [invoiceId, setInvoiceId] = useState<string | null>(null);
+  const [subaddress, setSubaddress] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [timeLeft, setTimeLeft] = useState(3600);
   const [copied, setCopied] = useState(false);
 
+  const invoice = invoices.find(i => i.id === invoiceId);
+  const paid = invoice?.status === 'paid';
+
+  // Create invoice with real subaddress on mount
+  useEffect(() => {
+    if (!fiatAmount || fiatAmount <= 0) { setLoading(false); return; }
+
+    const init = async () => {
+      try {
+        const inv = await createInvoice(
+          label ? decodeURIComponent(label).replace(/-/g, ' ') : 'Payment Link',
+          fiatAmount
+        );
+        setInvoiceId(inv.id);
+        setSubaddress(inv.subaddress);
+      } catch (e) {
+        setError((e as Error).message || 'Failed to create payment address. Check RPC connection.');
+      }
+      setLoading(false);
+    };
+    init();
+  }, [fiatAmount]);
+
+  // Poll for payment
+  useEffect(() => {
+    if (!invoiceId || paid) return;
+    const interval = setInterval(() => {
+      pollInvoicePayment(invoiceId);
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [invoiceId, paid]);
+
+  // Countdown
   useEffect(() => {
     if (paid || timeLeft <= 0) return;
     const t = setInterval(() => setTimeLeft(v => v - 1), 1000);
@@ -41,6 +83,28 @@ export default function PayPage() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground text-sm">Creating payment address via RPC...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center space-y-3 max-w-sm">
+          <p className="text-destructive font-medium">Connection Error</p>
+          <p className="text-muted-foreground text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -60,6 +124,12 @@ export default function PayPage() {
               </div>
               <h2 className="text-2xl font-bold text-foreground">Payment Confirmed</h2>
               <p className="text-muted-foreground">{formatUSD(fiatAmount)} received — thank you!</p>
+              {invoice?.txid && (
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-[10px] text-muted-foreground mb-1">TX ID</p>
+                  <p className="font-mono text-[10px] text-foreground break-all">{invoice.txid}</p>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -90,9 +160,9 @@ export default function PayPage() {
                 </div>
               </div>
 
-              <Button onClick={() => setPaid(true)} className="w-full bg-gradient-orange hover:opacity-90">
-                Simulate Payment
-              </Button>
+              <p className="text-[10px] text-muted-foreground text-center">
+                Checking for payment every 12 seconds via monero-wallet-rpc...
+              </p>
             </>
           )}
 

@@ -14,12 +14,14 @@ import { Progress } from '@/components/ui/progress';
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
   const invoices = useStore(s => s.invoices);
-  const simulatePayment = useStore(s => s.simulatePayment);
+  const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
   const invoice = invoices.find(i => i.id === id);
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
   const [copiedTxKey, setCopiedTxKey] = useState(false);
+  const [polling, setPolling] = useState(false);
 
+  // Countdown timer
   useEffect(() => {
     if (!invoice || invoice.status !== 'pending') return;
     const interval = setInterval(() => {
@@ -31,6 +33,26 @@ export default function InvoicePage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [invoice]);
+
+  // Poll for payment every 12 seconds
+  useEffect(() => {
+    if (!invoice || !id) return;
+    if (invoice.status === 'paid' || invoice.status === 'expired' || invoice.status === 'overpaid') return;
+
+    const poll = async () => {
+      setPolling(true);
+      try {
+        await pollInvoicePayment(id);
+      } catch (e) {
+        console.error('Poll error:', e);
+      }
+      setPolling(false);
+    };
+
+    poll(); // initial poll
+    const interval = setInterval(poll, 12000);
+    return () => clearInterval(interval);
+  }, [id, invoice?.status]);
 
   if (!invoice) {
     return (
@@ -56,11 +78,6 @@ export default function InvoicePage() {
     setCopiedTxKey(true);
     toast.success('Transaction proof key copied!');
     setTimeout(() => setCopiedTxKey(false), 2000);
-  };
-
-  const handleSimulate = () => {
-    simulatePayment(invoice.id);
-    toast.success('🎉 Payment received!', { description: `${formatXMR(invoice.xmrAmount)} confirmed via native RPC` });
   };
 
   const statusColor = (s: string) => {
@@ -92,13 +109,16 @@ export default function InvoicePage() {
                   <p className="text-[10px] text-muted-foreground font-mono mt-0.5">subaddr idx: {invoice.subaddressIndex}</p>
                 )}
               </div>
-              <Badge variant="outline" className={statusColor(invoice.status)}>
-                {invoice.status === 'paid' && <Check className="w-3 h-3 mr-1" />}
-                {invoice.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                {(invoice.status === 'seen_on_chain' || invoice.status === 'confirming') && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                {(invoice.status === 'expired' || invoice.status === 'underpaid') && <AlertTriangle className="w-3 h-3 mr-1" />}
-                {invoice.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {polling && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+                <Badge variant="outline" className={statusColor(invoice.status)}>
+                  {invoice.status === 'paid' && <Check className="w-3 h-3 mr-1" />}
+                  {invoice.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
+                  {(invoice.status === 'seen_on_chain' || invoice.status === 'confirming') && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                  {(invoice.status === 'expired' || invoice.status === 'underpaid') && <AlertTriangle className="w-3 h-3 mr-1" />}
+                  {invoice.status}
+                </Badge>
+              </div>
             </div>
             <div className="text-center">
               <p className="text-3xl font-bold text-foreground">{formatUSD(invoice.fiatAmount)}</p>
@@ -108,7 +128,7 @@ export default function InvoicePage() {
             </div>
           </div>
 
-          {invoice.status === 'pending' && (
+          {(invoice.status === 'pending' || invoice.status === 'seen_on_chain' || invoice.status === 'confirming') && (
             <>
               <div className="p-6 flex flex-col items-center">
                 <div className="bg-foreground p-3 rounded-xl mb-4">
@@ -124,15 +144,32 @@ export default function InvoicePage() {
                   {copied ? <Check className="w-3 h-3 mr-1.5" /> : <Copy className="w-3 h-3 mr-1.5" />}
                   {copied ? 'Copied' : 'Copy Address'}
                 </Button>
-                {timeLeft && (
-                  <p className="text-xs text-muted-foreground">Expires in <span className="text-warning font-mono">{timeLeft}</span></p>
+
+                {invoice.status === 'confirming' && invoice.confirmations !== undefined && (
+                  <div className="w-full mt-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                      <span>Confirmations</span>
+                      <span className="font-mono text-foreground">{invoice.confirmations}/10</span>
+                    </div>
+                    <Progress value={Math.min(100, (invoice.confirmations / 10) * 100)} className="h-1.5" />
+                  </div>
+                )}
+
+                {invoice.txid && (
+                  <div className="w-full mt-3 bg-muted/30 rounded-lg p-3">
+                    <p className="text-[10px] text-muted-foreground mb-1">TX ID</p>
+                    <p className="font-mono text-[10px] text-foreground break-all">{invoice.txid}</p>
+                  </div>
+                )}
+
+                {timeLeft && invoice.status === 'pending' && (
+                  <p className="text-xs text-muted-foreground mt-4">Expires in <span className="text-warning font-mono">{timeLeft}</span></p>
                 )}
               </div>
-              <div className="px-6 pb-6">
-                <Button onClick={handleSimulate} className="w-full bg-gradient-orange hover:opacity-90 glow-orange-sm">
-                  ⚡ Simulate Payment (Native RPC)
-                </Button>
-                <p className="text-[10px] text-muted-foreground text-center mt-2">Demo — simulates get_transfers detection + confirmation</p>
+              <div className="px-6 pb-4">
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Checking for payment every 12 seconds via monero-wallet-rpc...
+                </p>
               </div>
             </>
           )}
@@ -158,7 +195,6 @@ export default function InvoicePage() {
                 )}
               </div>
 
-              {/* Transaction Details */}
               {invoice.txid && (
                 <div className="space-y-2 pt-3 border-t border-border">
                   <p className="text-xs font-medium text-foreground">Transaction Proof</p>
@@ -189,6 +225,16 @@ export default function InvoicePage() {
               </div>
               <h3 className="text-lg font-bold text-foreground mb-1">Invoice Expired</h3>
               <p className="text-sm text-muted-foreground">This invoice is no longer valid.</p>
+            </div>
+          )}
+
+          {invoice.status === 'underpaid' && (
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8 text-destructive" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-1">Underpaid</h3>
+              <p className="text-sm text-muted-foreground">The amount received is less than required. Please send the remaining balance.</p>
             </div>
           )}
         </div>
