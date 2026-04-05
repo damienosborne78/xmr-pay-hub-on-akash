@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -16,14 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BrowserWalletSetup from '@/components/BrowserWalletSetup';
+import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 
-const REMOTE_NODES = [
-  { label: 'Seth for Privacy', url: 'node.sethforprivacy.com:18089' },
-  { label: 'HashVault', url: 'nodes.hashvault.pro:18081' },
-  { label: 'Cake Wallet', url: 'xmr-node.cakewallet.com:18081' },
-  { label: 'MoneroWorld', url: 'node.moneroworld.com:18089' },
-  { label: 'XMR.to', url: 'opennode.xmr-tw.org:18089' },
-];
+
 
 export default function SettingsPage() {
   const merchant = useStore(s => s.merchant);
@@ -103,11 +98,17 @@ export default function SettingsPage() {
 
   const handleAutoSelectNode = async () => {
     setAutoSelecting(true);
-    // Simulate latency test
-    await new Promise(r => setTimeout(r, 1200));
-    const fastest = REMOTE_NODES[Math.floor(Math.random() * REMOTE_NODES.length)];
-    updateMerchant({ remoteNodeUrl: fastest.url });
-    toast.success(`Selected fastest node: ${fastest.label}`);
+    try {
+      const result = await findFastestNode();
+      if (result) {
+        updateMerchant({ remoteNodeUrl: result.node.url, remoteNodeSsl: result.node.ssl });
+        toast.success(`Selected fastest node: ${result.status.label} (${result.status.latencyMs}ms)`);
+      } else {
+        toast.error('Could not connect to any remote node');
+      }
+    } catch {
+      toast.error('Node test failed');
+    }
     setAutoSelecting(false);
   };
 
