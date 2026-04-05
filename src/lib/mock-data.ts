@@ -48,7 +48,12 @@ export interface Merchant {
   privacyBackupEmail: string;
   referralCode: string;
   referralsEnabled: boolean;
-  // Native RPC settings
+  // Wallet mode: managed | remote | selfcustody
+  walletMode: 'managed' | 'remote' | 'selfcustody';
+  // Remote node settings
+  remoteNodeUrl: string;
+  remoteNodeSsl: boolean;
+  // Native RPC settings (self-custody)
   nativeRpcEnabled: boolean;
   rpcEndpoint: string;
   rpcUsername: string;
@@ -116,6 +121,9 @@ export const mockMerchant: Merchant = {
   privacyBackupEmail: '',
   referralCode: 'demo01',
   referralsEnabled: true,
+  walletMode: 'managed',
+  remoteNodeUrl: '',
+  remoteNodeSsl: false,
   nativeRpcEnabled: true,
   rpcEndpoint: 'http://127.0.0.1:18082',
   rpcUsername: 'monero',
