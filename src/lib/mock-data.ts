@@ -127,6 +127,11 @@ export const defaultMerchant: Merchant = {
   rpcPassword: '',
   rpcWalletFilename: '',
   rpcConnected: false,
+  viewOnlyAddress: '',
+  viewOnlyViewKey: '',
+  viewOnlyRestoreHeight: 0,
+  viewOnlyNodeUrl: '',
+  viewOnlySetupComplete: false,
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
