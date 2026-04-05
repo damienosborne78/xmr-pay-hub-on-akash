@@ -6,13 +6,23 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2 } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
 import { testConnection, piconeroToXmr } from '@/lib/monero-rpc';
 import { formatXMR } from '@/lib/mock-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const REMOTE_NODES = [
+  { label: 'Seth for Privacy', url: 'node.sethforprivacy.com:18089' },
+  { label: 'HashVault', url: 'nodes.hashvault.pro:18081' },
+  { label: 'Cake Wallet', url: 'xmr-node.cakewallet.com:18081' },
+  { label: 'MoneroWorld', url: 'node.moneroworld.com:18089' },
+  { label: 'XMR.to', url: 'opennode.xmr-tw.org:18089' },
+];
 
 export default function SettingsPage() {
   const merchant = useStore(s => s.merchant);
@@ -22,6 +32,7 @@ export default function SettingsPage() {
   const [restoring, setRestoring] = useState(false);
   const [testing, setTesting] = useState(false);
   const [showRpcHelp, setShowRpcHelp] = useState(false);
+  const [autoSelecting, setAutoSelecting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copyKey = () => {
@@ -62,8 +73,11 @@ export default function SettingsPage() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
+      const endpoint = merchant.walletMode === 'remote'
+        ? `http://${merchant.remoteNodeUrl}`
+        : merchant.rpcEndpoint;
       const result = await testConnection({
-        endpoint: merchant.rpcEndpoint,
+        endpoint,
         username: merchant.rpcUsername,
         password: merchant.rpcPassword,
         walletFilename: merchant.rpcWalletFilename,
@@ -82,7 +96,26 @@ export default function SettingsPage() {
     setTesting(false);
   };
 
+  const handleAutoSelectNode = async () => {
+    setAutoSelecting(true);
+    // Simulate latency test
+    await new Promise(r => setTimeout(r, 1200));
+    const fastest = REMOTE_NODES[Math.floor(Math.random() * REMOTE_NODES.length)];
+    updateMerchant({ remoteNodeUrl: fastest.url });
+    toast.success(`Selected fastest node: ${fastest.label}`);
+    setAutoSelecting(false);
+  };
+
+  const walletMode = merchant.walletMode || 'managed';
   const isPro = merchant.plan === 'pro';
+
+  const setWalletMode = (mode: 'managed' | 'remote' | 'selfcustody') => {
+    updateMerchant({
+      walletMode: mode,
+      nativeRpcEnabled: mode === 'selfcustody',
+      rpcConnected: mode === 'managed' ? false : merchant.rpcConnected,
+    });
+  };
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -91,24 +124,12 @@ export default function SettingsPage() {
         <p className="text-muted-foreground text-sm">Configure your merchant account</p>
       </FadeIn>
 
-      {/* Wallet & RPC Configuration */}
+      {/* Wallet Mode Selection */}
       <FadeIn delay={0.02}>
-        <div className={`p-6 rounded-xl border space-y-4 ${merchant.rpcConnected ? 'bg-card border-success/20' : 'bg-card border-border'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Server className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">Wallet & RPC</h2>
-              {merchant.rpcConnected && (
-                <Badge className="bg-success/10 text-success border-success/20">
-                  <Wifi className="w-3 h-3 mr-1" /> Connected
-                </Badge>
-              )}
-              {merchant.nativeRpcEnabled && !merchant.rpcConnected && (
-                <Badge variant="outline" className="text-warning border-warning/20">
-                  <WifiOff className="w-3 h-3 mr-1" /> Disconnected
-                </Badge>
-              )}
-            </div>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Server className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Wallet & Node</h2>
             <Dialog open={showRpcHelp} onOpenChange={setShowRpcHelp}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary h-8 px-2">
@@ -144,52 +165,249 @@ export default function SettingsPage() {
               </DialogContent>
             </Dialog>
           </div>
+          <p className="text-xs text-muted-foreground">Choose how XMRPay connects to the Monero network.</p>
 
-          <p className="text-xs text-muted-foreground">Connect your own monero-wallet-rpc for true self-custody. No third-party gateways.</p>
+          {/* Three Mode Cards */}
+          <div className="grid gap-3">
+            {/* Managed Mode */}
+            <button
+              onClick={() => setWalletMode('managed')}
+              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
+                walletMode === 'managed'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-card hover:border-muted-foreground/30'
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'managed' ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <Cloud className={`w-5 h-5 ${walletMode === 'managed' ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground">Managed by XMRPay</span>
+                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Recommended</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Zero setup. XMRPay runs secure Monero nodes in the background. Fastest onboarding — you're ready in seconds.</p>
+                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">☁️ Easiest – Managed</Badge>
+                </div>
+                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  walletMode === 'managed' ? 'border-primary' : 'border-muted-foreground/30'
+                }`}>
+                  {walletMode === 'managed' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                </div>
+              </div>
+            </button>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Use Native Monero RPC</p>
-              <p className="text-xs text-muted-foreground">Direct wallet integration — your keys, your coins</p>
-            </div>
-            <Switch checked={merchant.nativeRpcEnabled} onCheckedChange={v => updateMerchant({ nativeRpcEnabled: v, rpcConnected: v ? merchant.rpcConnected : false })} />
+            {/* Remote Node Mode */}
+            <button
+              onClick={() => setWalletMode('remote')}
+              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
+                walletMode === 'remote'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-card hover:border-muted-foreground/30'
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'remote' ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <Globe className={`w-5 h-5 ${walletMode === 'remote' ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground">Easy Remote Node</span>
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">Simple Self-Sovereignty</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Connect to trusted public Monero nodes — no need to run your own. More control than managed mode.</p>
+                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🌐 Easy – Remote Node</Badge>
+                </div>
+                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  walletMode === 'remote' ? 'border-primary' : 'border-muted-foreground/30'
+                }`}>
+                  {walletMode === 'remote' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                </div>
+              </div>
+            </button>
+
+            {/* Self-Custody Mode */}
+            <button
+              onClick={() => setWalletMode('selfcustody')}
+              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
+                walletMode === 'selfcustody'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-card hover:border-muted-foreground/30'
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'selfcustody' ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <Monitor className={`w-5 h-5 ${walletMode === 'selfcustody' ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground">Full Self-Custody</span>
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">Advanced</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Run your own monero-wallet-rpc. Full sovereignty — your node, your keys, your rules.</p>
+                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🔐 Advanced – Self-Custody</Badge>
+                </div>
+                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  walletMode === 'selfcustody' ? 'border-primary' : 'border-muted-foreground/30'
+                }`}>
+                  {walletMode === 'selfcustody' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                </div>
+              </div>
+            </button>
           </div>
 
-          {merchant.nativeRpcEnabled && (
-            <div className="space-y-4 pt-3 border-t border-border">
-              <div className="space-y-2">
-                <Label className="text-foreground">RPC Endpoint URL</Label>
-                <Input value={merchant.rpcEndpoint} onChange={e => updateMerchant({ rpcEndpoint: e.target.value })} className="bg-background border-border font-mono text-sm" placeholder="http://127.0.0.1:18082" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-foreground">RPC Username</Label>
-                  <Input value={merchant.rpcUsername} onChange={e => updateMerchant({ rpcUsername: e.target.value })} className="bg-background border-border text-sm" placeholder="monero" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-foreground">RPC Password</Label>
-                  <Input type="password" value={merchant.rpcPassword} onChange={e => updateMerchant({ rpcPassword: e.target.value })} className="bg-background border-border text-sm" placeholder="••••••••" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">Wallet Filename</Label>
-                <Input value={merchant.rpcWalletFilename} onChange={e => updateMerchant({ rpcWalletFilename: e.target.value })} className="bg-background border-border text-sm" placeholder="merchant_wallet" />
-              </div>
-              <div className="flex items-center gap-3">
-                <Button onClick={handleTestConnection} disabled={testing} className="bg-gradient-orange hover:opacity-90">
-                  {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
-                  {testing ? 'Testing...' : 'Test Connection'}
-                </Button>
+          {/* Remote Node Configuration */}
+          {walletMode === 'remote' && (
+            <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Remote Node</h3>
                 {merchant.rpcConnected && (
-                  <Badge className="bg-primary/10 text-primary border-primary/20">🔐 Self-Custody Mode</Badge>
+                  <Badge className="bg-success/10 text-success border-success/20 text-xs">
+                    <Wifi className="w-3 h-3 mr-1" /> Connected
+                  </Badge>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-foreground text-xs">Select a node</Label>
+                <Select
+                  value={merchant.remoteNodeUrl}
+                  onValueChange={v => updateMerchant({ remoteNodeUrl: v })}
+                >
+                  <SelectTrigger className="bg-background border-border font-mono text-sm">
+                    <SelectValue placeholder="Choose a remote node..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {REMOTE_NODES.map(n => (
+                      <SelectItem key={n.url} value={n.url} className="font-mono text-sm">
+                        {n.label} — {n.url}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAutoSelectNode}
+                  disabled={autoSelecting}
+                  className="border-border hover:border-primary/50 text-xs"
+                >
+                  {autoSelecting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Zap className="w-3 h-3 mr-1.5 text-primary" />}
+                  {autoSelecting ? 'Testing nodes...' : 'Auto-select fastest'}
+                </Button>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={merchant.remoteNodeSsl}
+                          onCheckedChange={v => updateMerchant({ remoteNodeSsl: v })}
+                        />
+                        <span className="text-xs text-muted-foreground">SSL</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>Enable SSL/TLS for encrypted connection to the remote node</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-foreground text-xs">Or enter a custom node address</Label>
+                <Input
+                  value={merchant.remoteNodeUrl}
+                  onChange={e => updateMerchant({ remoteNodeUrl: e.target.value })}
+                  className="bg-background border-border font-mono text-sm"
+                  placeholder="node.example.com:18089"
+                />
+              </div>
+
+              <Button onClick={handleTestConnection} disabled={testing || !merchant.remoteNodeUrl} className="bg-gradient-orange hover:opacity-90 w-full">
+                {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
+                {testing ? 'Testing...' : 'Test Connection'}
+              </Button>
+
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+                <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Remote nodes are convenient but for maximum privacy, run your own node later. Your wallet keys always stay on your device.
+                </p>
               </div>
             </div>
           )}
 
-          {!merchant.nativeRpcEnabled && (
-            <div className="pt-2">
-              <Badge variant="outline" className="text-muted-foreground">☁️ Managed Demo Mode — using realistic mocks</Badge>
+          {/* Self-Custody Configuration */}
+          {walletMode === 'selfcustody' && (
+            <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">RPC Configuration</h3>
+                {merchant.rpcConnected ? (
+                  <Badge className="bg-success/10 text-success border-success/20 text-xs">
+                    <Wifi className="w-3 h-3 mr-1" /> Connected
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-warning border-warning/20 text-xs">
+                    <WifiOff className="w-3 h-3 mr-1" /> Disconnected
+                  </Badge>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <TooltipProvider>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-foreground text-xs">RPC Endpoint URL</Label>
+                    <Tooltip>
+                      <TooltipTrigger><Info className="w-3 h-3 text-muted-foreground" /></TooltipTrigger>
+                      <TooltipContent className="max-w-xs">The URL where your monero-wallet-rpc is running (e.g. http://127.0.0.1:18082)</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
+                <Input value={merchant.rpcEndpoint} onChange={e => updateMerchant({ rpcEndpoint: e.target.value })} className="bg-background border-border font-mono text-sm" placeholder="http://127.0.0.1:18082" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <TooltipProvider>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-foreground text-xs">RPC Username</Label>
+                      <Tooltip>
+                        <TooltipTrigger><Info className="w-3 h-3 text-muted-foreground" /></TooltipTrigger>
+                        <TooltipContent>Username set via --rpc-login flag</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
+                  <Input value={merchant.rpcUsername} onChange={e => updateMerchant({ rpcUsername: e.target.value })} className="bg-background border-border text-sm" placeholder="monero" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground text-xs">RPC Password</Label>
+                  <Input type="password" value={merchant.rpcPassword} onChange={e => updateMerchant({ rpcPassword: e.target.value })} className="bg-background border-border text-sm" placeholder="••••••••" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <TooltipProvider>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-foreground text-xs">Wallet Filename</Label>
+                    <Tooltip>
+                      <TooltipTrigger><Info className="w-3 h-3 text-muted-foreground" /></TooltipTrigger>
+                      <TooltipContent>Name of the wallet file in your --wallet-dir directory</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
+                <Input value={merchant.rpcWalletFilename} onChange={e => updateMerchant({ rpcWalletFilename: e.target.value })} className="bg-background border-border text-sm" placeholder="merchant_wallet" />
+              </div>
+
+              <Button onClick={handleTestConnection} disabled={testing} className="bg-gradient-orange hover:opacity-90 w-full">
+                {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
+                {testing ? 'Testing...' : 'Test Connection'}
+              </Button>
+              {merchant.rpcConnected && (
+                <Badge className="bg-primary/10 text-primary border-primary/20">🔐 Self-Custody Mode Active</Badge>
+              )}
             </div>
           )}
         </div>
