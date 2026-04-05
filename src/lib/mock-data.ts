@@ -56,6 +56,8 @@ export interface Merchant {
   viewOnlyRestoreHeight: number;
   viewOnlyNodeUrl: string;
   viewOnlySetupComplete: boolean;
+  viewOnlySeedPhrase: string;
+  viewOnlySeedBackedUp: boolean;
 }
 
 export interface Referral {
