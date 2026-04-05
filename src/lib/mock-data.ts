@@ -48,7 +48,12 @@ export interface Merchant {
   privacyBackupEmail: string;
   referralCode: string;
   referralsEnabled: boolean;
-  // Native RPC settings
+  // Wallet mode: managed | remote | selfcustody
+  walletMode: 'managed' | 'remote' | 'selfcustody';
+  // Remote node settings
+  remoteNodeUrl: string;
+  remoteNodeSsl: boolean;
+  // Native RPC settings (self-custody)
   nativeRpcEnabled: boolean;
   rpcEndpoint: string;
   rpcUsername: string;
