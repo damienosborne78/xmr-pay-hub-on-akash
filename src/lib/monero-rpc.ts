@@ -157,6 +157,62 @@ export async function createSubaddress(config: RpcConfig, label: string): Promis
   };
 }
 
+export async function validateAddress(config: RpcConfig, address: string): Promise<{ valid: boolean; integrated: boolean; subaddress: boolean; nettype: string }> {
+  const result = await jsonRpcCall<{
+    valid: boolean;
+    integrated: boolean;
+    subaddress: boolean;
+    nettype: string;
+  }>(config, 'validate_address', { address });
+  return result;
+}
+
+/**
+ * Create a subaddress with validation and retry + failover.
+ * Returns only addresses that pass validate_address.
+ */
+export async function createValidatedSubaddress(
+  config: RpcConfig,
+  label: string,
+  failoverConfigs?: RpcConfig[]
+): Promise<{ address: string; addressIndex: number }> {
+  const configs = [config, ...(failoverConfigs || [])];
+
+  for (const cfg of configs) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const sub = await createSubaddress(cfg, label);
+        console.log('[MoneroRPC] create_address response:', JSON.stringify(sub));
+
+        // Validate the returned address
+        try {
+          const validation = await validateAddress(cfg, sub.address);
+          console.log('[MoneroRPC] validate_address response:', JSON.stringify(validation));
+
+          if (validation.valid && validation.subaddress) {
+            if (validation.nettype !== 'mainnet') {
+              console.warn(`[MoneroRPC] Address is ${validation.nettype}, not mainnet. Retrying...`);
+              continue;
+            }
+            return { address: sub.address, addressIndex: sub.addressIndex };
+          }
+          console.warn('[MoneroRPC] Address failed validation, retrying...', validation);
+        } catch (valErr) {
+          // validate_address may not be available on all nodes — if create_address succeeded, trust the RPC
+          console.warn('[MoneroRPC] validate_address call failed, trusting create_address result:', valErr);
+          if (sub.address.length === 95 && sub.address.startsWith('8')) {
+            return { address: sub.address, addressIndex: sub.addressIndex };
+          }
+        }
+      } catch (e) {
+        console.error(`[MoneroRPC] create_address attempt ${attempt + 1} failed on ${cfg.endpoint}:`, e);
+      }
+    }
+  }
+
+  throw new Error('Could not generate valid Monero subaddress after multiple attempts. Please try again or switch node.');
+}
+
 export async function getBalance(config: RpcConfig): Promise<RpcBalance> {
   const result = await jsonRpcCall<{
     balance: number;

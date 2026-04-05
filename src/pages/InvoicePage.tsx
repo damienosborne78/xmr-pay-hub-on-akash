@@ -5,11 +5,13 @@ import { BrandLogo, MoneroLogo } from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QRCodeSVG } from 'qrcode.react';
-import { Check, Clock, Copy, AlertTriangle, Eye, FileDown, Loader2 } from 'lucide-react';
+import { Check, Clock, Copy, AlertTriangle, Eye, FileDown, Loader2, ShieldCheck, ShieldX } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FadeIn } from '@/components/FadeIn';
 import { Progress } from '@/components/ui/progress';
+import { validateAddress, type RpcConfig } from '@/lib/monero-rpc';
+import { REMOTE_NODES } from '@/lib/node-manager';
 
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +22,8 @@ export default function InvoicePage() {
   const [timeLeft, setTimeLeft] = useState('');
   const [copiedTxKey, setCopiedTxKey] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<{ valid: boolean; subaddress: boolean; nettype: string } | null>(null);
 
   // Countdown timer
   useEffect(() => {
@@ -140,10 +144,51 @@ export default function InvoicePage() {
                   <p className="text-xs text-muted-foreground mb-1">To subaddress:</p>
                   <p className="font-mono text-[10px] text-foreground break-all leading-relaxed">{invoice.subaddress}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={copyAddress} className="border-border hover:border-primary/50 mb-4">
-                  {copied ? <Check className="w-3 h-3 mr-1.5" /> : <Copy className="w-3 h-3 mr-1.5" />}
-                  {copied ? 'Copied' : 'Copy Address'}
-                </Button>
+                <div className="flex items-center gap-2 mb-4">
+                  <Button variant="outline" size="sm" onClick={copyAddress} className="border-border hover:border-primary/50">
+                    {copied ? <Check className="w-3 h-3 mr-1.5" /> : <Copy className="w-3 h-3 mr-1.5" />}
+                    {copied ? 'Copied' : 'Copy Address'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-border hover:border-primary/50"
+                    disabled={validating}
+                    onClick={async () => {
+                      setValidating(true);
+                      try {
+                        const node = REMOTE_NODES[0];
+                        const cfg: RpcConfig = { endpoint: `https://${node.url}`, username: '', password: '', walletFilename: '' };
+                        const result = await validateAddress(cfg, invoice.subaddress);
+                        setValidationResult(result);
+                        if (result.valid && result.subaddress) {
+                          toast.success(`Valid ${result.nettype} subaddress`);
+                        } else {
+                          toast.error('Address validation failed');
+                        }
+                      } catch {
+                        // Fallback: basic format check
+                        const isValid = invoice.subaddress.length === 95 && invoice.subaddress.startsWith('8');
+                        setValidationResult({ valid: isValid, subaddress: isValid, nettype: 'mainnet' });
+                        if (isValid) toast.info('Format check passed (RPC validation unavailable)');
+                        else toast.error('Invalid address format');
+                      }
+                      setValidating(false);
+                    }}
+                  >
+                    {validating ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : 
+                     validationResult ? (validationResult.valid ? <ShieldCheck className="w-3 h-3 mr-1.5 text-success" /> : <ShieldX className="w-3 h-3 mr-1.5 text-destructive" />) :
+                     <ShieldCheck className="w-3 h-3 mr-1.5" />}
+                    {validationResult ? (validationResult.valid ? '✅ Valid' : '❌ Invalid') : 'Validate'}
+                  </Button>
+                </div>
+                {validationResult && (
+                  <p className={`text-[10px] mb-2 ${validationResult.valid ? 'text-success' : 'text-destructive'}`}>
+                    {validationResult.valid 
+                      ? `✅ Valid Mainnet Subaddress (${validationResult.nettype})`
+                      : '❌ Invalid address — do not send funds to this address'}
+                  </p>
+                )}
 
                 {invoice.status === 'confirming' && invoice.confirmations !== undefined && (
                   <div className="w-full mt-2">

@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, usdToXmr } from './mock-data';
-import { createSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
-import { generateSubaddress } from './wallet-generator';
+import { createSubaddress, createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 
 interface AppState {
@@ -148,25 +147,31 @@ export const useStore = create<AppState>((set, get) => ({
     let subaddress = '';
     let subaddressIndex: number | undefined;
 
-    if (m.walletMode === 'viewonly' && m.viewOnlyAddress && m.viewOnlyViewKey) {
-      // Generate subaddress locally using view key (no RPC needed)
-      const nextIndex = m.viewOnlySubaddressIndex || 1;
-      const result = await generateSubaddress(m.viewOnlyViewKey, m.viewOnlyAddress, nextIndex);
+    // Always use real RPC create_address with validation + failover
+    const config = get().getRpcConfig();
+
+    // Build failover configs from other remote nodes
+    const failoverConfigs: RpcConfig[] = REMOTE_NODES
+      .filter(n => {
+        const currentEndpoint = config.endpoint;
+        const nodeEndpoint = `https://${n.url}`;
+        return nodeEndpoint !== currentEndpoint;
+      })
+      .slice(0, 2)
+      .map(n => ({
+        endpoint: `https://${n.url}`,
+        username: '',
+        password: '',
+        walletFilename: '',
+      }));
+
+    try {
+      const result = await createValidatedSubaddress(config, `Invoice: ${description}`, failoverConfigs);
       subaddress = result.address;
       subaddressIndex = result.addressIndex;
-      // Increment the counter
-      get().updateMerchant({ viewOnlySubaddressIndex: nextIndex + 1 });
-    } else {
-      // Use RPC for managed/remote/selfcustody modes
-      const config = get().getRpcConfig();
-      try {
-        const result = await createSubaddress(config, `Invoice: ${description}`);
-        subaddress = result.address;
-        subaddressIndex = result.addressIndex;
-      } catch (e) {
-        console.error('Failed to create subaddress via RPC:', e);
-        throw new Error('Could not create subaddress. Check your wallet connection in Settings → Wallet & Node.');
-      }
+    } catch (e) {
+      console.error('Failed to create validated subaddress:', e);
+      throw new Error('Could not generate valid Monero address. Please try again or switch node in Settings → Wallet & Node.');
     }
 
     const invoice: Invoice = {

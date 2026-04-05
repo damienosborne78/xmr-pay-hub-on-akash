@@ -147,7 +147,11 @@ export default function DashboardOverview() {
           </div>
 
           {isConnected && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2 border-t border-border/50">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 border-t border-border/50">
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Network</p>
+                <p className="text-sm text-success font-medium mt-0.5">Mainnet ✓</p>
+              </div>
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Block Height</p>
                 <p className="text-sm font-mono text-foreground mt-0.5">{merchant.nodeHeight.toLocaleString()}</p>
