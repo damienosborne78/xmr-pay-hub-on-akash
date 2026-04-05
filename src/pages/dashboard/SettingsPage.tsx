@@ -117,7 +117,7 @@ export default function SettingsPage() {
   const setWalletMode = (mode: 'managed' | 'remote' | 'selfcustody' | 'viewonly') => {
     if (mode === 'viewonly') {
       if (!merchant.viewOnlySetupComplete) {
-        setShowViewOnlyWizard(true);
+        setShowBrowserWalletSetup(true);
         return;
       }
       updateMerchant({
