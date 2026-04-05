@@ -98,11 +98,17 @@ export default function SettingsPage() {
 
   const handleAutoSelectNode = async () => {
     setAutoSelecting(true);
-    // Simulate latency test
-    await new Promise(r => setTimeout(r, 1200));
-    const fastest = REMOTE_NODES[Math.floor(Math.random() * REMOTE_NODES.length)];
-    updateMerchant({ remoteNodeUrl: fastest.url });
-    toast.success(`Selected fastest node: ${fastest.label}`);
+    try {
+      const result = await findFastestNode();
+      if (result) {
+        updateMerchant({ remoteNodeUrl: result.node.url, remoteNodeSsl: result.node.ssl });
+        toast.success(`Selected fastest node: ${result.status.label} (${result.status.latencyMs}ms)`);
+      } else {
+        toast.error('Could not connect to any remote node');
+      }
+    } catch {
+      toast.error('Node test failed');
+    }
     setAutoSelecting(false);
   };
 
