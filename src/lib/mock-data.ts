@@ -14,12 +14,18 @@ export interface Invoice {
   fiatCurrency: string;
   xmrAmount: number;
   subaddress: string;
-  status: 'pending' | 'paid' | 'expired';
+  subaddressIndex?: number;
+  status: 'pending' | 'seen_on_chain' | 'confirming' | 'paid' | 'underpaid' | 'overpaid' | 'expired';
+  confirmations?: number;
   createdAt: string;
   paidAt?: string;
   description: string;
   expiresAt: string;
   subscriptionId?: string;
+  txid?: string;
+  txKey?: string;
+  customerNote?: string;
+  cartId?: string;
 }
 
 export interface Merchant {
@@ -42,6 +48,13 @@ export interface Merchant {
   privacyBackupEmail: string;
   referralCode: string;
   referralsEnabled: boolean;
+  // Native RPC settings
+  nativeRpcEnabled: boolean;
+  rpcEndpoint: string;
+  rpcUsername: string;
+  rpcPassword: string;
+  rpcWalletFilename: string;
+  rpcConnected: boolean;
 }
 
 export interface Referral {
@@ -103,6 +116,12 @@ export const mockMerchant: Merchant = {
   privacyBackupEmail: '',
   referralCode: 'demo01',
   referralsEnabled: true,
+  nativeRpcEnabled: true,
+  rpcEndpoint: 'http://127.0.0.1:18082',
+  rpcUsername: 'monero',
+  rpcPassword: '',
+  rpcWalletFilename: 'merchant_wallet',
+  rpcConnected: false,
 };
 
 const now = new Date();

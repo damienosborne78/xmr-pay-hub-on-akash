@@ -35,13 +35,16 @@ export const useStore = create<AppState>((set, get) => ({
   logout: () => set({ isAuthenticated: false }),
 
   createInvoice: (description: string, fiatAmount: number, subscriptionId?: string) => {
+    const subaddressData = { address: generateSubaddress(), index: Math.floor(Math.random() * 1000) + 10 };
     const invoice: Invoice = {
       id: 'inv_' + Math.random().toString(36).slice(2, 8),
       fiatAmount,
       fiatCurrency: 'USD',
       xmrAmount: usdToXmr(fiatAmount),
-      subaddress: generateSubaddress(),
+      subaddress: subaddressData.address,
+      subaddressIndex: subaddressData.index,
       status: 'pending',
+      confirmations: 0,
       createdAt: new Date().toISOString(),
       description,
       expiresAt: new Date(Date.now() + 3600000).toISOString(),
@@ -52,10 +55,18 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   simulatePayment: (invoiceId: string) => {
+    // Simulate: seen_on_chain → confirming → paid
     set(state => ({
       invoices: state.invoices.map(inv =>
         inv.id === invoiceId
-          ? { ...inv, status: 'paid' as const, paidAt: new Date().toISOString() }
+          ? {
+              ...inv,
+              status: 'paid' as const,
+              confirmations: 10,
+              paidAt: new Date().toISOString(),
+              txid: Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
+              txKey: Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
+            }
           : inv
       ),
     }));
