@@ -134,6 +134,8 @@ export const defaultMerchant: Merchant = {
   viewOnlyRestoreHeight: 0,
   viewOnlyNodeUrl: '',
   viewOnlySetupComplete: false,
+  viewOnlySeedPhrase: '',
+  viewOnlySeedBackedUp: false,
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
