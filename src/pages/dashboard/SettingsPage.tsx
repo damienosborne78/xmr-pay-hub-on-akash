@@ -18,13 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import BrowserWalletSetup from '@/components/BrowserWalletSetup';
 import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 
-const REMOTE_NODES = [
-  { label: 'Seth for Privacy', url: 'node.sethforprivacy.com:18089' },
-  { label: 'HashVault', url: 'nodes.hashvault.pro:18081' },
-  { label: 'Cake Wallet', url: 'xmr-node.cakewallet.com:18081' },
-  { label: 'MoneroWorld', url: 'node.moneroworld.com:18089' },
-  { label: 'XMR.to', url: 'opennode.xmr-tw.org:18089' },
-];
+
 
 export default function SettingsPage() {
   const merchant = useStore(s => s.merchant);
