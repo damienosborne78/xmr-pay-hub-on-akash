@@ -15,7 +15,7 @@ import { formatXMR } from '@/lib/mock-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import ViewOnlyWalletWizard from '@/components/ViewOnlyWalletWizard';
+import BrowserWalletSetup from '@/components/BrowserWalletSetup';
 
 const REMOTE_NODES = [
   { label: 'Seth for Privacy', url: 'node.sethforprivacy.com:18089' },
@@ -34,7 +34,10 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState(false);
   const [showRpcHelp, setShowRpcHelp] = useState(false);
   const [autoSelecting, setAutoSelecting] = useState(false);
-  const [showViewOnlyWizard, setShowViewOnlyWizard] = useState(false);
+  const [showBrowserWalletSetup, setShowBrowserWalletSetup] = useState(false);
+  const [showViewKey, setShowViewKey] = useState(false);
+  const [showSeedPhrase, setShowSeedPhrase] = useState(false);
+  const [seedConfirmReveal, setSeedConfirmReveal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copyKey = () => {
@@ -114,7 +117,7 @@ export default function SettingsPage() {
   const setWalletMode = (mode: 'managed' | 'remote' | 'selfcustody' | 'viewonly') => {
     if (mode === 'viewonly') {
       if (!merchant.viewOnlySetupComplete) {
-        setShowViewOnlyWizard(true);
+        setShowBrowserWalletSetup(true);
         return;
       }
       updateMerchant({
@@ -181,8 +184,38 @@ export default function SettingsPage() {
           </div>
           <p className="text-xs text-muted-foreground">Choose how XMRPay connects to the Monero network.</p>
 
-          {/* Three Mode Cards */}
+          {/* Four Mode Cards */}
           <div className="grid gap-3">
+            {/* In-Browser Wallet Mode — FIRST */}
+            <button
+              onClick={() => setWalletMode('viewonly')}
+              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
+                walletMode === 'viewonly'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-card hover:border-muted-foreground/30'
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'viewonly' ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <Smartphone className={`w-5 h-5 ${walletMode === 'viewonly' ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground">In-Browser Wallet</span>
+                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Recommended</Badge>
+                    <Badge className="bg-success/10 text-success border-success/20 text-[10px]">New</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Instant setup — wallet is created automatically in your browser. Self-custody with zero downloads. Works on any device.</p>
+                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🔐 Lightweight • Self-Custody • Max Privacy</Badge>
+                </div>
+                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  walletMode === 'viewonly' ? 'border-primary' : 'border-muted-foreground/30'
+                }`}>
+                  {walletMode === 'viewonly' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                </div>
+              </div>
+            </button>
+
             {/* Managed Mode */}
             <button
               onClick={() => setWalletMode('managed')}
@@ -199,7 +232,6 @@ export default function SettingsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-foreground">Managed by XMRPay</span>
-                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Recommended</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Zero setup. XMRPay runs secure Monero nodes in the background. Fastest onboarding — you're ready in seconds.</p>
                   <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">☁️ Easiest – Managed</Badge>
@@ -228,7 +260,6 @@ export default function SettingsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-foreground">Easy Remote Node</span>
-                    <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">Simple Self-Sovereignty</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Connect to trusted public Monero nodes — no need to run your own. More control than managed mode.</p>
                   <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🌐 Easy – Remote Node</Badge>
@@ -269,73 +300,95 @@ export default function SettingsPage() {
                 </div>
               </div>
             </button>
-
-            {/* View-Only Wallet Mode */}
-            <button
-              onClick={() => setWalletMode('viewonly')}
-              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
-                walletMode === 'viewonly'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border bg-card hover:border-muted-foreground/30'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'viewonly' ? 'bg-primary/10' : 'bg-muted'}`}>
-                  <Smartphone className={`w-5 h-5 ${walletMode === 'viewonly' ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-foreground">In-Browser View-Only Wallet</span>
-                    <Badge className="bg-success/10 text-success border-success/20 text-[10px]">New</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Monitor payments with just your view key — no wallet software needed. Works on phones, tablets, and laptops. Spend key requested only for sweeps.</p>
-                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">👁️ Lightweight Browser Mode – Fast receiving, max privacy</Badge>
-                </div>
-                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  walletMode === 'viewonly' ? 'border-primary' : 'border-muted-foreground/30'
-                }`}>
-                  {walletMode === 'viewonly' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                </div>
-              </div>
-            </button>
           </div>
 
-          {/* View-Only Wizard Dialog */}
-          <Dialog open={showViewOnlyWizard} onOpenChange={setShowViewOnlyWizard}>
-            <DialogContent className="bg-card border-border max-w-lg">
-              <DialogHeader><DialogTitle className="text-foreground">Set Up View-Only Wallet</DialogTitle></DialogHeader>
-              <ViewOnlyWalletWizard
-                onComplete={() => {
-                  setShowViewOnlyWizard(false);
-                }}
-                onCancel={() => setShowViewOnlyWizard(false)}
+          {/* Browser Wallet Setup Dialog */}
+          <Dialog open={showBrowserWalletSetup} onOpenChange={setShowBrowserWalletSetup}>
+            <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle className="text-foreground">Create Your Browser Wallet</DialogTitle></DialogHeader>
+              <BrowserWalletSetup
+                onComplete={() => setShowBrowserWalletSetup(false)}
+                onCancel={() => setShowBrowserWalletSetup(false)}
               />
             </DialogContent>
           </Dialog>
 
-          {/* View-Only Active Status */}
+          {/* View-Only Active Status — full wallet management */}
           {walletMode === 'viewonly' && merchant.viewOnlySetupComplete && (
             <div className="p-5 rounded-xl bg-card border border-border space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">View-Only Wallet</h3>
+                <h3 className="text-sm font-semibold text-foreground">Browser Wallet</h3>
                 <Badge className="bg-success/10 text-success border-success/20 text-xs">
                   <Eye className="w-3 h-3 mr-1" /> Active
                 </Badge>
               </div>
 
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Address</span>
-                  <span className="font-mono text-foreground">{merchant.viewOnlyAddress.slice(0, 8)}...{merchant.viewOnlyAddress.slice(-8)}</span>
+              {/* Primary Address — always visible */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Primary Address</label>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-[11px] text-foreground bg-background border border-border rounded-lg p-3 flex-1 break-all leading-relaxed">{merchant.viewOnlyAddress}</p>
+                  <Button variant="outline" size="icon" className="shrink-0 border-border hover:border-primary/50 h-8 w-8" onClick={() => { navigator.clipboard.writeText(merchant.viewOnlyAddress); toast.success('Address copied'); }}>
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Remote Node</span>
-                  <span className="font-mono text-foreground">{merchant.viewOnlyNodeUrl}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Restore Height</span>
-                  <span className="font-mono text-foreground">{merchant.viewOnlyRestoreHeight || 'Genesis'}</span>
-                </div>
+              </div>
+
+              {/* Private View Key — behind reveal */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Private View Key</label>
+                {showViewKey ? (
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-[11px] text-foreground bg-background border border-border rounded-lg p-3 flex-1 break-all leading-relaxed">{merchant.viewOnlyViewKey}</p>
+                    <Button variant="outline" size="icon" className="shrink-0 border-border h-8 w-8" onClick={() => setShowViewKey(false)}>
+                      <EyeOff className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setShowViewKey(true)} className="border-border hover:border-primary/50 text-xs">
+                    <Eye className="w-3.5 h-3.5 mr-1.5" /> Reveal View Key
+                  </Button>
+                )}
+              </div>
+
+              {/* Seed Phrase — extra confirmation */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Seed Phrase</label>
+                {showSeedPhrase && merchant.viewOnlySeedPhrase ? (
+                  <div className="space-y-2">
+                    <div className="p-3 rounded-lg bg-background border border-border">
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                        {merchant.viewOnlySeedPhrase.split(' ').map((word, i) => (
+                          <div key={i} className="flex items-center gap-1 text-xs">
+                            <span className="text-muted-foreground text-[9px] w-3 text-right">{i+1}.</span>
+                            <span className="font-mono font-medium text-foreground">{word}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { setShowSeedPhrase(false); setSeedConfirmReveal(false); }} className="text-xs border-border">
+                      <EyeOff className="w-3.5 h-3.5 mr-1.5" /> Hide Seed
+                    </Button>
+                  </div>
+                ) : seedConfirmReveal ? (
+                  <div className="space-y-2 p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                    <p className="text-xs text-destructive">⚠️ Make sure no one is watching your screen. Are you sure?</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => setShowSeedPhrase(true)} className="bg-destructive hover:bg-destructive/90 text-xs">Yes, show seed</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setSeedConfirmReveal(false)} className="text-xs">Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setSeedConfirmReveal(true)} className="border-border hover:border-primary/50 text-xs">
+                    <Lock className="w-3.5 h-3.5 mr-1.5" /> Show Seed Phrase
+                  </Button>
+                )}
+              </div>
+
+              {/* Remote Node */}
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Remote Node</span>
+                <span className="font-mono text-foreground">{merchant.viewOnlyNodeUrl}</span>
               </div>
 
               <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
@@ -348,10 +401,22 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowViewOnlyWizard(true)}
+                  onClick={() => {
+                    updateMerchant({
+                      viewOnlyAddress: '',
+                      viewOnlyViewKey: '',
+                      viewOnlySeedPhrase: '',
+                      viewOnlySeedBackedUp: false,
+                      viewOnlyRestoreHeight: 0,
+                      viewOnlyNodeUrl: '',
+                      viewOnlySetupComplete: false,
+                      rpcConnected: false,
+                    });
+                    setShowBrowserWalletSetup(true);
+                  }}
                   className="border-border hover:border-primary/50 text-xs"
                 >
-                  Reconfigure
+                  Create New Wallet
                 </Button>
                 <Button
                   variant="outline"
@@ -360,13 +425,15 @@ export default function SettingsPage() {
                     updateMerchant({
                       viewOnlyAddress: '',
                       viewOnlyViewKey: '',
+                      viewOnlySeedPhrase: '',
+                      viewOnlySeedBackedUp: false,
                       viewOnlyRestoreHeight: 0,
                       viewOnlyNodeUrl: '',
                       viewOnlySetupComplete: false,
                       walletMode: 'managed',
                       rpcConnected: false,
                     });
-                    toast.success('View-only wallet removed');
+                    toast.success('Browser wallet removed');
                   }}
                   className="border-destructive/30 hover:border-destructive/50 text-destructive text-xs"
                 >
