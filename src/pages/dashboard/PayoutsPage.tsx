@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { useStore } from '@/lib/store';
-import { formatUSD, formatXMR, mockInvoices, XMR_USD_RATE } from '@/lib/mock-data';
+import { formatUSD, formatXMR, XMR_USD_RATE } from '@/lib/mock-data';
 import { Landmark, FileSpreadsheet, Download, TrendingUp, ArrowRight, Calendar, Check } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';

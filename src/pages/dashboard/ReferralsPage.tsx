@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Users, TrendingUp, Coins, Gift, ChevronRight } from 'lucide-react';
+import { Copy, Check, Users, TrendingUp, Coins, Gift } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { formatXMR, formatUSD, usdToXmr } from '@/lib/mock-data';
@@ -20,7 +20,6 @@ export default function ReferralsPage() {
   const merchant = useStore(s => s.merchant);
   const referrals = useStore(s => s.referrals);
   const referralPayouts = useStore(s => s.referralPayouts);
-  const simulateReferralPayout = useStore(s => s.simulateReferralPayout);
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
 
@@ -41,16 +40,11 @@ export default function ReferralsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <FadeIn>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Gift className="w-6 h-6 text-primary" /> Referral Program
-            </h1>
-            <p className="text-muted-foreground text-sm">Earn XMR by referring merchants — multi-level commissions, forever.</p>
-          </div>
-          <Button onClick={() => simulateReferralPayout()} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
-            Simulate Referral Payout
-          </Button>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Gift className="w-6 h-6 text-primary" /> Referral Program
+          </h1>
+          <p className="text-muted-foreground text-sm">Earn XMR by referring merchants — multi-level commissions, forever.</p>
         </div>
       </FadeIn>
 
@@ -127,7 +121,7 @@ export default function ReferralsPage() {
         </div>
       </FadeIn>
 
-      {/* Downline / Referred Users */}
+      {/* Downline */}
       <FadeIn delay={0.12}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Your Downline</h2>

@@ -1,18 +1,31 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '@/lib/store';
-import { formatUSD, formatXMR, usdToXmr, generateSubaddress } from '@/lib/mock-data';
+import { formatUSD, formatXMR, usdToXmr } from '@/lib/mock-data';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Delete, Check } from 'lucide-react';
+import { Delete, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function PosPage() {
   const createInvoice = useStore(s => s.createInvoice);
-  const simulatePayment = useStore(s => s.simulatePayment);
+  const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
+  const invoices = useStore(s => s.invoices);
   const [input, setInput] = useState('0');
   const [activeInvoice, setActiveInvoice] = useState<{ id: string; fiatAmount: number; xmrAmount: number; subaddress: string } | null>(null);
-  const [paid, setPaid] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const invoice = invoices.find(i => i.id === activeInvoice?.id);
+  const paid = invoice?.status === 'paid';
+
+  // Poll for payment when invoice is active
+  useState(() => {
+    if (!activeInvoice || paid) return;
+    const interval = setInterval(() => {
+      pollInvoicePayment(activeInvoice.id);
+    }, 12000);
+    return () => clearInterval(interval);
+  });
 
   const handleKey = useCallback((key: string) => {
     if (activeInvoice) return;
@@ -26,29 +39,27 @@ export default function PosPage() {
     });
   }, [activeInvoice]);
 
-  const handleCharge = () => {
+  const handleCharge = async () => {
     const amount = parseFloat(input);
     if (!amount || amount <= 0) return;
-    const inv = createInvoice('PoS Sale', amount);
-    setActiveInvoice({ id: inv.id, fiatAmount: inv.fiatAmount, xmrAmount: inv.xmrAmount, subaddress: inv.subaddress });
-  };
-
-  const handleSimulatePayment = () => {
-    if (!activeInvoice) return;
-    simulatePayment(activeInvoice.id);
-    setPaid(true);
-    toast.success('Payment received!');
+    setCreating(true);
+    try {
+      const inv = await createInvoice('PoS Sale', amount);
+      setActiveInvoice({ id: inv.id, fiatAmount: inv.fiatAmount, xmrAmount: inv.xmrAmount, subaddress: inv.subaddress });
+    } catch (e) {
+      toast.error((e as Error).message || 'Failed to create invoice. Check RPC connection.');
+    }
+    setCreating(false);
   };
 
   const handleNewSale = () => {
     setActiveInvoice(null);
-    setPaid(false);
     setInput('0');
   };
 
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
 
-  if (paid) {
+  if (paid && activeInvoice) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
         <div className="text-center space-y-6">
@@ -56,8 +67,11 @@ export default function PosPage() {
             <Check className="w-12 h-12 text-success" />
           </div>
           <div>
-            <h2 className="text-3xl font-bold text-foreground">{formatUSD(activeInvoice!.fiatAmount)}</h2>
+            <h2 className="text-3xl font-bold text-foreground">{formatUSD(activeInvoice.fiatAmount)}</h2>
             <p className="text-muted-foreground mt-1">Payment Confirmed</p>
+            {invoice?.txid && (
+              <p className="text-xs font-mono text-muted-foreground mt-2 break-all max-w-xs mx-auto">TX: {invoice.txid.slice(0, 16)}...</p>
+            )}
           </div>
           <Button onClick={handleNewSale} className="bg-gradient-orange hover:opacity-90 px-8 py-3 text-lg">New Sale</Button>
         </div>
@@ -78,10 +92,8 @@ export default function PosPage() {
             <QRCodeSVG value={`monero:${activeInvoice.subaddress}?tx_amount=${activeInvoice.xmrAmount.toFixed(12)}`} size={220} />
           </div>
           <p className="text-muted-foreground text-xs font-mono break-all px-4">{activeInvoice.subaddress.slice(0, 20)}...{activeInvoice.subaddress.slice(-10)}</p>
-          <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={handleNewSale} className="border-border">Cancel</Button>
-            <Button onClick={handleSimulatePayment} className="bg-gradient-orange hover:opacity-90">Simulate Payment</Button>
-          </div>
+          <p className="text-[10px] text-muted-foreground">Polling for payment every 12s...</p>
+          <Button variant="outline" onClick={handleNewSale} className="border-border">Cancel</Button>
         </div>
       </div>
     );
@@ -118,10 +130,11 @@ export default function PosPage() {
           </button>
           <button
             onClick={handleCharge}
-            disabled={!parseFloat(input)}
-            className="h-14 rounded-xl bg-gradient-orange text-white font-bold hover:opacity-90 transition-all disabled:opacity-40"
+            disabled={!parseFloat(input) || creating}
+            className="h-14 rounded-xl bg-gradient-orange text-white font-bold hover:opacity-90 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
           >
-            Charge
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {creating ? 'Creating...' : 'Charge'}
           </button>
         </div>
       </div>
