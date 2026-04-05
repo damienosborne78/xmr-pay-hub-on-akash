@@ -38,6 +38,17 @@ export const useStore = create<AppState>((set, get) => ({
 
   getRpcConfig: () => {
     const m = get().merchant;
+    if (m.walletMode === 'viewonly') {
+      // View-only mode uses the daemon node directly
+      // RPC calls will be limited to read-only operations
+      const endpoint = `http://${m.viewOnlyNodeUrl}`;
+      return {
+        endpoint,
+        username: '',
+        password: '',
+        walletFilename: '',
+      };
+    }
     const endpoint = m.walletMode === 'remote'
       ? `http${m.remoteNodeSsl ? 's' : ''}://${m.remoteNodeUrl}`
       : m.rpcEndpoint;

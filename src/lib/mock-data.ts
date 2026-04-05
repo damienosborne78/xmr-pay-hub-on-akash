@@ -41,7 +41,7 @@ export interface Merchant {
   privacyBackupEmail: string;
   referralCode: string;
   referralsEnabled: boolean;
-  walletMode: 'managed' | 'remote' | 'selfcustody';
+  walletMode: 'managed' | 'remote' | 'selfcustody' | 'viewonly';
   remoteNodeUrl: string;
   remoteNodeSsl: boolean;
   nativeRpcEnabled: boolean;
@@ -50,6 +50,12 @@ export interface Merchant {
   rpcPassword: string;
   rpcWalletFilename: string;
   rpcConnected: boolean;
+  // View-only wallet fields
+  viewOnlyAddress: string;
+  viewOnlyViewKey: string;
+  viewOnlyRestoreHeight: number;
+  viewOnlyNodeUrl: string;
+  viewOnlySetupComplete: boolean;
 }
 
 export interface Referral {
@@ -121,6 +127,11 @@ export const defaultMerchant: Merchant = {
   rpcPassword: '',
   rpcWalletFilename: '',
   rpcConnected: false,
+  viewOnlyAddress: '',
+  viewOnlyViewKey: '',
+  viewOnlyRestoreHeight: 0,
+  viewOnlyNodeUrl: '',
+  viewOnlySetupComplete: false,
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
