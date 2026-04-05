@@ -116,6 +116,12 @@ export const mockMerchant: Merchant = {
   privacyBackupEmail: '',
   referralCode: 'demo01',
   referralsEnabled: true,
+  nativeRpcEnabled: true,
+  rpcEndpoint: 'http://127.0.0.1:18082',
+  rpcUsername: 'monero',
+  rpcPassword: '',
+  rpcWalletFilename: 'merchant_wallet',
+  rpcConnected: false,
 };
 
 const now = new Date();
