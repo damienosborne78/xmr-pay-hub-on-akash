@@ -1,12 +1,14 @@
 /**
- * Monero Wallet RPC Client (Mock Implementation)
+ * Real Monero Wallet RPC Client
  * 
- * In production, these calls would go through server-side API routes
- * to avoid exposing RPC credentials. This mock simulates the full
- * monero-wallet-rpc JSON-RPC interface.
+ * Makes actual JSON-RPC POST requests to monero-wallet-rpc.
+ * Browser → RPC directly (for local/self-hosted setups).
+ * 
+ * CORS: When running monero-wallet-rpc locally, add:
+ *   --rpc-access-control-origins=*
+ * 
+ * For production, proxy through your own server to avoid exposing credentials.
  */
-
-import { generateSubaddress } from './mock-data';
 
 export interface RpcConfig {
   endpoint: string;
@@ -48,102 +50,77 @@ export interface NodeHealth {
   syncPercent: number;
   networkType: 'mainnet' | 'stagenet' | 'testnet';
   version: string;
-  uptime: number; // seconds
+  uptime: number;
   status: 'synced' | 'syncing' | 'offline';
 }
 
-// Simulated latency
-const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+// ─── JSON-RPC call ───
 
-let mockSubaddrIndex = 10;
+let rpcId = 0;
 
-/**
- * Mock RPC call that simulates the JSON-RPC interface.
- * In production: fetch(`${config.endpoint}/json_rpc`, { method, params })
- */
-async function mockRpcCall<T>(method: string, _params?: Record<string, unknown>): Promise<T> {
-  await delay(200 + Math.random() * 300);
+async function jsonRpcCall<T>(
+  config: RpcConfig,
+  method: string,
+  params?: Record<string, unknown>
+): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
 
-  switch (method) {
-    case 'get_balance':
-      return {
-        balance: 5432100000000,
-        unlockedBalance: 4981200000000,
-        multisigImportNeeded: false,
-      } as T;
-
-    case 'create_address': {
-      mockSubaddrIndex++;
-      return {
-        address: generateSubaddress(),
-        addressIndex: mockSubaddrIndex,
-        label: (_params?.label as string) || '',
-        used: false,
-      } as T;
-    }
-
-    case 'get_address':
-      return {
-        address: generateSubaddress(),
-        addresses: Array.from({ length: 5 }, (_, i) => ({
-          address: generateSubaddress(),
-          addressIndex: i,
-          label: i === 0 ? 'Primary' : `Invoice #${i}`,
-          used: i < 3,
-        })),
-      } as T;
-
-    case 'get_transfers': {
-      const transfers: RpcTransfer[] = [
-        {
-          txid: 'a'.repeat(64).replace(/a/g, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]),
-          amount: 298500000000,
-          confirmations: 14,
-          height: 3120456,
-          timestamp: Date.now() / 1000 - 3600,
-          subaddrIndex: { major: 0, minor: 2 },
-          type: 'in',
-          address: generateSubaddress(),
-          fee: 0,
-          note: '',
-        },
-        {
-          txid: 'b'.repeat(64).replace(/b/g, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]),
-          amount: 149250000000,
-          confirmations: 8,
-          height: 3120460,
-          timestamp: Date.now() / 1000 - 1800,
-          subaddrIndex: { major: 0, minor: 3 },
-          type: 'in',
-          address: generateSubaddress(),
-          fee: 0,
-          note: '',
-        },
-      ];
-      return { in: transfers, out: [], pending: [] } as T;
-    }
-
-    case 'transfer':
-      return {
-        txid: 'c'.repeat(64).replace(/c/g, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]),
-        amount: (_params?.amount as number) || 0,
-        fee: 7800000,
-        multisigTxset: '',
-        txBlob: '',
-        txKey: 'd'.repeat(64).replace(/d/g, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]),
-      } as T;
-
-    case 'get_tx_key':
-      return {
-        txKey: 'e'.repeat(64).replace(/e/g, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]),
-      } as T;
-
-    case 'get_version':
-      return { version: 196621 } as T; // v0.18.3.3
-
-    default:
-      throw new Error(`Unknown RPC method: ${method}`);
+  if (config.username && config.password) {
+    headers['Authorization'] = 'Basic ' + btoa(`${config.username}:${config.password}`);
   }
+
+  const response = await fetch(`${config.endpoint}/json_rpc`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: String(++rpcId),
+      method,
+      params: params || {},
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`RPC HTTP error ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+
+  if (data.error) {
+    throw new Error(`RPC error ${data.error.code}: ${data.error.message}`);
+  }
+
+  return data.result as T;
+}
+
+// For daemon RPC calls (get_info uses a different endpoint path)
+async function daemonRpcCall<T>(
+  endpoint: string,
+  method: string,
+  params?: Record<string, unknown>
+): Promise<T> {
+  const response = await fetch(`${endpoint}/json_rpc`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: String(++rpcId),
+      method,
+      params: params || {},
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Daemon HTTP error ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(`Daemon error ${data.error.code}: ${data.error.message}`);
+  }
+  return data.result as T;
 }
 
 // ─── Public API ───
@@ -151,7 +128,16 @@ async function mockRpcCall<T>(method: string, _params?: Record<string, unknown>)
 export async function testConnection(config: RpcConfig): Promise<{ success: boolean; balance?: RpcBalance; error?: string }> {
   try {
     if (!config.endpoint) throw new Error('RPC endpoint is required');
-    const balance = await mockRpcCall<RpcBalance>('get_balance');
+    const result = await jsonRpcCall<{
+      balance: number;
+      unlocked_balance: number;
+      multisig_import_needed: boolean;
+    }>(config, 'get_balance', { account_index: 0 });
+    const balance: RpcBalance = {
+      balance: result.balance,
+      unlockedBalance: result.unlocked_balance,
+      multisigImportNeeded: result.multisig_import_needed,
+    };
     return { success: true, balance };
   } catch (e) {
     return { success: false, error: (e as Error).message };
@@ -159,46 +145,205 @@ export async function testConnection(config: RpcConfig): Promise<{ success: bool
 }
 
 export async function createSubaddress(config: RpcConfig, label: string): Promise<RpcSubaddress> {
-  return mockRpcCall<RpcSubaddress>('create_address', { account_index: 0, label });
+  const result = await jsonRpcCall<{
+    address: string;
+    address_index: number;
+  }>(config, 'create_address', { account_index: 0, label });
+  return {
+    address: result.address,
+    addressIndex: result.address_index,
+    label,
+    used: false,
+  };
 }
 
 export async function getBalance(config: RpcConfig): Promise<RpcBalance> {
-  return mockRpcCall<RpcBalance>('get_balance');
+  const result = await jsonRpcCall<{
+    balance: number;
+    unlocked_balance: number;
+    multisig_import_needed: boolean;
+  }>(config, 'get_balance', { account_index: 0 });
+  return {
+    balance: result.balance,
+    unlockedBalance: result.unlocked_balance,
+    multisigImportNeeded: result.multisig_import_needed,
+  };
 }
 
-export async function getTransfers(config: RpcConfig, subaddrIndices?: number[]): Promise<{ in: RpcTransfer[]; out: RpcTransfer[]; pending: RpcTransfer[] }> {
-  return mockRpcCall('get_transfers', {
-    in: true, out: true, pending: true,
-    filter_by_subaddr_indices: subaddrIndices,
+export async function getTransfers(
+  config: RpcConfig,
+  subaddrIndices?: number[]
+): Promise<{ in: RpcTransfer[]; out: RpcTransfer[]; pending: RpcTransfer[] }> {
+  const params: Record<string, unknown> = {
+    in: true,
+    out: true,
+    pending: true,
+    account_index: 0,
+  };
+  if (subaddrIndices?.length) {
+    params.subaddr_indices = subaddrIndices;
+  }
+
+  const result = await jsonRpcCall<{
+    in?: Array<{
+      txid: string;
+      amount: number;
+      confirmations: number;
+      height: number;
+      timestamp: number;
+      subaddr_index: { major: number; minor: number };
+      address: string;
+      fee: number;
+      note: string;
+    }>;
+    out?: Array<{
+      txid: string;
+      amount: number;
+      confirmations: number;
+      height: number;
+      timestamp: number;
+      subaddr_index: { major: number; minor: number };
+      address: string;
+      fee: number;
+      note: string;
+    }>;
+    pending?: Array<{
+      txid: string;
+      amount: number;
+      confirmations: number;
+      height: number;
+      timestamp: number;
+      subaddr_index: { major: number; minor: number };
+      address: string;
+      fee: number;
+      note: string;
+    }>;
+  }>(config, 'get_transfers', params);
+
+  const mapTransfer = (t: any, type: 'in' | 'out' | 'pending'): RpcTransfer => ({
+    txid: t.txid,
+    amount: t.amount,
+    confirmations: t.confirmations || 0,
+    height: t.height || 0,
+    timestamp: t.timestamp,
+    subaddrIndex: { major: t.subaddr_index.major, minor: t.subaddr_index.minor },
+    type,
+    address: t.address,
+    fee: t.fee || 0,
+    note: t.note || '',
   });
+
+  return {
+    in: (result.in || []).map(t => mapTransfer(t, 'in')),
+    out: (result.out || []).map(t => mapTransfer(t, 'out')),
+    pending: (result.pending || []).map(t => mapTransfer(t, 'pending')),
+  };
 }
 
-export async function sweepToAddress(config: RpcConfig, address: string, amount: number): Promise<{ txid: string; fee: number; txKey: string }> {
-  const result = await mockRpcCall<{ txid: string; fee: number; txKey: string }>('transfer', {
+export async function sweepToAddress(
+  config: RpcConfig,
+  address: string,
+  amount: number
+): Promise<{ txid: string; fee: number; txKey: string }> {
+  const result = await jsonRpcCall<{
+    tx_hash: string;
+    fee: number;
+    tx_key: string;
+  }>(config, 'transfer', {
     destinations: [{ amount, address }],
+    account_index: 0,
+    priority: 1,
   });
-  return result;
+  return {
+    txid: result.tx_hash,
+    fee: result.fee,
+    txKey: result.tx_key,
+  };
 }
 
 export async function getTxKey(config: RpcConfig, txid: string): Promise<string> {
-  const result = await mockRpcCall<{ txKey: string }>('get_tx_key', { txid });
-  return result.txKey;
+  const result = await jsonRpcCall<{ tx_key: string }>(config, 'get_tx_key', { txid });
+  return result.tx_key;
 }
 
-export async function getNodeHealth(_config: RpcConfig): Promise<NodeHealth> {
-  await delay(150);
-  const targetHeight = 3120500;
-  const syncHeight = targetHeight - Math.floor(Math.random() * 3);
-  return {
-    connected: true,
-    syncHeight,
-    targetHeight,
-    syncPercent: Math.min(100, (syncHeight / targetHeight) * 100),
-    networkType: 'mainnet',
-    version: '0.18.3.3',
-    uptime: 86400 * 3 + 7200 + 1423,
-    status: syncHeight >= targetHeight - 1 ? 'synced' : 'syncing',
-  };
+export async function getNodeHealth(config: RpcConfig): Promise<NodeHealth> {
+  try {
+    // get_info is a daemon RPC method — try the wallet's daemon via get_height first
+    const heightResult = await jsonRpcCall<{
+      height: number;
+    }>(config, 'get_height');
+
+    // Also get version
+    const versionResult = await jsonRpcCall<{
+      version: number;
+    }>(config, 'get_version');
+
+    const major = (versionResult.version >> 16) & 0xff;
+    const minor = (versionResult.version >> 8) & 0xff;
+    const patch = versionResult.version & 0xff;
+
+    return {
+      connected: true,
+      syncHeight: heightResult.height,
+      targetHeight: heightResult.height, // wallet RPC doesn't expose target easily
+      syncPercent: 100,
+      networkType: 'mainnet',
+      version: `${major}.${minor}.${patch}`,
+      uptime: 0, // not available via wallet RPC
+      status: 'synced',
+    };
+  } catch (e) {
+    return {
+      connected: false,
+      syncHeight: 0,
+      targetHeight: 0,
+      syncPercent: 0,
+      networkType: 'mainnet',
+      version: 'unknown',
+      uptime: 0,
+      status: 'offline',
+    };
+  }
+}
+
+// For remote node mode — calls monerod get_info
+export async function getDaemonInfo(daemonUrl: string): Promise<NodeHealth> {
+  try {
+    const result = await daemonRpcCall<{
+      height: number;
+      target_height: number;
+      version: string;
+      nettype: string;
+      start_time: number;
+      status: string;
+    }>(daemonUrl, 'get_info');
+
+    const syncPercent = result.target_height > 0
+      ? Math.min(100, (result.height / result.target_height) * 100)
+      : 100;
+
+    return {
+      connected: result.status === 'OK',
+      syncHeight: result.height,
+      targetHeight: result.target_height || result.height,
+      syncPercent,
+      networkType: (result.nettype as 'mainnet' | 'stagenet' | 'testnet') || 'mainnet',
+      version: result.version || 'unknown',
+      uptime: result.start_time ? Math.floor(Date.now() / 1000) - result.start_time : 0,
+      status: syncPercent >= 99.9 ? 'synced' : 'syncing',
+    };
+  } catch {
+    return {
+      connected: false,
+      syncHeight: 0,
+      targetHeight: 0,
+      syncPercent: 0,
+      networkType: 'mainnet',
+      version: 'unknown',
+      uptime: 0,
+      status: 'offline',
+    };
+  }
 }
 
 // Convert atomic units (piconero) to XMR
