@@ -28,9 +28,10 @@ export default function OnboardingPage() {
         <FadeIn className="w-full max-w-md text-center relative z-10">
           <MoneroLogo size={64} className="mx-auto mb-6" />
           <h1 className="text-3xl font-bold text-foreground mb-3">You're almost ready!</h1>
-          <p className="text-muted-foreground mb-8">We'll generate your unique XMR subaddress and set up your merchant account.</p>
+          <p className="text-muted-foreground mb-2">One click to enable native Monero payments — no third-party gateways, no custody risk.</p>
+          <p className="text-xs text-muted-foreground/60 mb-8">Powered by monero-wallet-rpc · Managed securely by XMRPay</p>
           <Button onClick={() => setStep(1)} size="lg" className="bg-gradient-orange hover:opacity-90 glow-orange-sm px-10">
-            <Zap className="mr-2 w-4 h-4" /> Generate My Subaddress
+            <Zap className="mr-2 w-4 h-4" /> Enable Monero Payments
           </Button>
         </FadeIn>
       </div>
@@ -45,7 +46,8 @@ export default function OnboardingPage() {
           <Check className="w-8 h-8 text-primary" />
         </div>
         <h1 className="text-3xl font-bold text-foreground mb-3">You're all set!</h1>
-        <p className="text-muted-foreground mb-6">Your merchant subaddress has been generated:</p>
+        <p className="text-muted-foreground mb-1">Your native Monero subaddress is ready:</p>
+        <p className="text-xs text-muted-foreground/60 mb-6">Generated via managed monero-wallet-rpc · Switch to self-custody anytime in Settings</p>
         <div className="bg-card border border-border rounded-xl p-4 mb-6">
           <p className="font-mono text-xs text-muted-foreground break-all leading-relaxed">{merchant.primarySubaddress}</p>
           <Button variant="outline" size="sm" onClick={copyAddress} className="mt-3 border-border hover:border-primary/50">

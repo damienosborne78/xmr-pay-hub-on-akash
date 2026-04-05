@@ -4,11 +4,13 @@ import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { PrivacyBanner } from '@/components/PrivacyBanner';
 import { useStore } from '@/lib/store';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield } from 'lucide-react';
 
 const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
@@ -91,6 +93,29 @@ function DashboardSidebar() {
   );
 }
 
+function ManagedBadge() {
+  const merchant = useStore(s => s.merchant);
+  const isSelfCustody = !merchant.nativeRpcEnabled ? false : merchant.rpcConnected;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div>
+          <Badge variant="outline" className={isSelfCustody ? 'bg-primary/10 text-primary border-primary/20 text-xs cursor-help' : 'bg-success/10 text-success border-success/20 text-xs cursor-help'}>
+            {isSelfCustody ? <Shield className="w-3 h-3 mr-1" /> : <Server className="w-3 h-3 mr-1" />}
+            {isSelfCustody ? 'Self-Custody' : 'Managed by XMRPay'}
+          </Badge>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs text-xs">
+        {isSelfCustody
+          ? 'Connected to your own monero-wallet-rpc. Full sovereignty — your keys, your coins.'
+          : 'Native Monero integration managed by XMRPay. No third-party gateway — direct wallet RPC, zero custodial risk.'}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function DashboardLayout() {
   return (
     <SidebarProvider>
@@ -99,7 +124,10 @@ export default function DashboardLayout() {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-            <PrivacyBanner />
+            <div className="flex items-center gap-3">
+              <ManagedBadge />
+              <PrivacyBanner />
+            </div>
           </header>
           <main className="flex-1 p-6 overflow-auto">
             <Outlet />
