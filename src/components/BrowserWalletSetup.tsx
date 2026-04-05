@@ -2,17 +2,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Download, ShieldAlert, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Copy, Download, ShieldAlert, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 import { generateBrowserWallet, type GeneratedWallet } from '@/lib/wallet-generator';
 import { encryptData } from '@/lib/crypto-store';
-
-const REMOTE_NODES = [
-  { label: 'Seth for Privacy', url: 'node.sethforprivacy.com:18089' },
-  { label: 'HashVault', url: 'nodes.hashvault.pro:18081' },
-  { label: 'Cake Wallet', url: 'xmr-node.cakewallet.com:18081' },
-];
+import { REMOTE_NODES } from '@/lib/node-manager';
 
 interface Props {
   onComplete: () => void;
@@ -21,6 +16,7 @@ interface Props {
 
 export default function BrowserWalletSetup({ onComplete, onCancel }: Props) {
   const updateMerchant = useStore(s => s.updateMerchant);
+  const autoConnectNode = useStore(s => s.autoConnectNode);
   const merchant = useStore(s => s.merchant);
 
   const [wallet, setWallet] = useState<GeneratedWallet | null>(null);
@@ -76,21 +72,28 @@ ${wallet.viewKey}
         await encryptData(wallet.viewKey, merchant.privacyPassphrase);
       }
 
-      const nodeUrl = REMOTE_NODES[0].url;
-
       updateMerchant({
         walletMode: 'viewonly',
         viewOnlyAddress: wallet.address,
         viewOnlyViewKey: wallet.viewKey,
+        viewOnlySpendKey: wallet.spendKey,
         viewOnlySeedPhrase: wallet.seedPhrase,
         viewOnlySeedBackedUp: true,
         viewOnlyRestoreHeight: 0,
-        viewOnlyNodeUrl: nodeUrl,
+        viewOnlyNodeUrl: REMOTE_NODES[0].url,
         viewOnlySetupComplete: true,
-        rpcConnected: true,
+        viewOnlySubaddressIndex: 1,
+        nodeStatus: 'connecting',
       });
 
-      toast.success('Your lightweight browser wallet is ready! You can now create invoices and receive payments.');
+      // Auto-connect to the fastest node
+      const status = await autoConnectNode();
+      if (status?.connected) {
+        toast.success('Wallet ready! Connected to ' + (status.label || 'remote node'));
+      } else {
+        toast.success('Wallet created! Connecting to network...');
+      }
+
       onComplete();
     } catch {
       toast.error('Failed to save wallet');
@@ -146,33 +149,18 @@ ${wallet.viewKey}
 
       {/* Action buttons */}
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleCopyAll}
-          className="flex-1 border-border hover:border-primary/50 text-xs"
-        >
+        <Button variant="outline" size="sm" onClick={handleCopyAll} className="flex-1 border-border hover:border-primary/50 text-xs">
           {copied ? <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-primary" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
           {copied ? 'Copied!' : 'Copy All Keys'}
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDownload}
-          className="flex-1 border-border hover:border-primary/50 text-xs"
-        >
+        <Button variant="outline" size="sm" onClick={handleDownload} className="flex-1 border-border hover:border-primary/50 text-xs">
           <Download className="w-3.5 h-3.5 mr-1.5" /> Download .txt
         </Button>
       </div>
 
       {/* Confirmation checkbox */}
       <div className="flex items-start gap-3 p-4 rounded-xl bg-card border border-border">
-        <Checkbox
-          id="confirm-backup"
-          checked={confirmed}
-          onCheckedChange={(v) => setConfirmed(!!v)}
-          className="mt-0.5"
-        />
+        <Checkbox id="confirm-backup" checked={confirmed} onCheckedChange={(v) => setConfirmed(!!v)} className="mt-0.5" />
         <label htmlFor="confirm-backup" className="text-sm text-foreground cursor-pointer leading-relaxed">
           I have safely backed up my seed phrase, address, and view key. I understand this cannot be shown again.
         </label>
@@ -180,16 +168,10 @@ ${wallet.viewKey}
 
       {/* Footer buttons */}
       <div className="flex justify-between pt-1">
-        <Button variant="ghost" onClick={onCancel} className="text-muted-foreground text-sm">
-          Cancel
-        </Button>
-        <Button
-          onClick={handleConfirm}
-          disabled={!confirmed || saving}
-          className="bg-gradient-orange hover:opacity-90"
-        >
+        <Button variant="ghost" onClick={onCancel} className="text-muted-foreground text-sm">Cancel</Button>
+        <Button onClick={handleConfirm} disabled={!confirmed || saving} className="bg-gradient-orange hover:opacity-90">
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-          {saving ? 'Setting up...' : 'I Have Saved My Backup'}
+          {saving ? 'Connecting...' : 'I Have Saved My Backup'}
         </Button>
       </div>
     </div>

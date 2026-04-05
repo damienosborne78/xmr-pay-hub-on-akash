@@ -2,28 +2,59 @@ import { useStore } from '@/lib/store';
 import { formatXMR, formatUSD, XMR_USD_RATE } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 import { MoneroLogo } from '@/components/BrandLogo';
-import { TrendingUp, FileText, Clock, DollarSign, Server, Wifi, WifiOff, Activity, Loader2 } from 'lucide-react';
+import { TrendingUp, FileText, Clock, DollarSign, Server, Wifi, WifiOff, Activity, Loader2, RefreshCw, Zap } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { FadeIn } from '@/components/FadeIn';
-import { getNodeHealth, getBalance, getDaemonInfo, piconeroToXmr, type NodeHealth } from '@/lib/monero-rpc';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
 export default function DashboardOverview() {
   const invoices = useStore(s => s.invoices);
   const merchant = useStore(s => s.merchant);
-  const getRpcConfig = useStore(s => s.getRpcConfig);
+  const autoConnectNode = useStore(s => s.autoConnectNode);
+  const refreshNodeStatus = useStore(s => s.refreshNodeStatus);
   const paid = invoices.filter(i => i.status === 'paid');
   const totalUSD = paid.reduce((s, i) => s + i.fiatAmount, 0);
   const totalXMR = paid.reduce((s, i) => s + i.xmrAmount, 0);
   const pending = invoices.filter(i => i.status === 'pending').length;
 
-  const [nodeHealth, setNodeHealth] = useState<NodeHealth | null>(null);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [autoConnecting, setAutoConnecting] = useState(false);
 
-  // Build revenue data from real invoices
+  // Auto-connect on mount if wallet is configured but not connected
+  useEffect(() => {
+    const shouldAutoConnect =
+      (merchant.walletMode === 'viewonly' && merchant.viewOnlySetupComplete) ||
+      merchant.walletMode === 'remote';
+
+    if (shouldAutoConnect && merchant.nodeStatus !== 'online') {
+      setAutoConnecting(true);
+      autoConnectNode().finally(() => setAutoConnecting(false));
+    }
+  }, []); // Only on mount
+
+  // Periodic health check every 60s
+  useEffect(() => {
+    if (merchant.nodeStatus !== 'online' && merchant.nodeStatus !== 'syncing') return;
+    const interval = setInterval(() => {
+      refreshNodeStatus();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [merchant.nodeStatus]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshNodeStatus();
+    setRefreshing(false);
+  }, [refreshNodeStatus]);
+
+  const handleReconnect = useCallback(async () => {
+    setAutoConnecting(true);
+    await autoConnectNode();
+    setAutoConnecting(false);
+  }, [autoConnectNode]);
+
   const revenueData = useMemo(() => {
     const monthMap = new Map<string, { revenue: number; txCount: number }>();
     paid.forEach(inv => {
@@ -35,46 +66,26 @@ export default function DashboardOverview() {
     return Array.from(monthMap.entries()).map(([month, data]) => ({ month, ...data }));
   }, [paid]);
 
-  const refreshNodeStatus = async () => {
-    setLoading(true);
-    try {
-      const config = getRpcConfig();
-      if (merchant.walletMode === 'remote') {
-        // Remote node: use daemon get_info
-        const health = await getDaemonInfo(`http${merchant.remoteNodeSsl ? 's' : ''}://${merchant.remoteNodeUrl}`);
-        setNodeHealth(health);
-        setWalletBalance(null);
-      } else {
-        // Managed or self-custody: use wallet RPC
-        const [health, bal] = await Promise.all([
-          getNodeHealth(config),
-          getBalance(config),
-        ]);
-        setNodeHealth(health);
-        setWalletBalance(piconeroToXmr(bal.unlockedBalance));
-      }
-    } catch {
-      setNodeHealth({ connected: false, syncHeight: 0, targetHeight: 0, syncPercent: 0, networkType: 'mainnet', version: 'unknown', uptime: 0, status: 'offline' });
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    refreshNodeStatus();
-  }, [merchant.walletMode, merchant.rpcEndpoint, merchant.remoteNodeUrl]);
-
-  const formatUptime = (secs: number) => {
-    const d = Math.floor(secs / 86400);
-    const h = Math.floor((secs % 86400) / 3600);
-    return `${d}d ${h}h`;
-  };
-
   const stats = [
     { label: 'Total Received', value: formatUSD(totalUSD), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
     { label: 'XMR Rate', value: formatUSD(XMR_USD_RATE), sub: '1 XMR', icon: TrendingUp, color: 'text-primary' },
     { label: 'Total Invoices', value: invoices.length.toString(), sub: `${paid.length} paid`, icon: FileText, color: 'text-primary' },
     { label: 'Pending', value: pending.toString(), sub: 'awaiting payment', icon: Clock, color: 'text-warning' },
   ];
+
+  const nodeStatus = merchant.nodeStatus;
+  const isConnected = nodeStatus === 'online' || nodeStatus === 'syncing';
+  const isLoading = autoConnecting || refreshing || nodeStatus === 'connecting';
+
+  const statusConfig = {
+    online: { label: 'Online & Synced', color: 'bg-success/10 text-success border-success/20', icon: Wifi, dot: 'bg-success' },
+    syncing: { label: 'Syncing...', color: 'bg-warning/10 text-warning border-warning/20', icon: Activity, dot: 'bg-warning' },
+    connecting: { label: 'Connecting...', color: 'bg-primary/10 text-primary border-primary/20', icon: Loader2, dot: 'bg-primary' },
+    offline: { label: 'Offline', color: 'bg-destructive/10 text-destructive border-destructive/20', icon: WifiOff, dot: 'bg-destructive' },
+  };
+
+  const currentStatus = statusConfig[nodeStatus] || statusConfig.offline;
+  const StatusIcon = currentStatus.icon;
 
   return (
     <div className="space-y-6">
@@ -86,62 +97,84 @@ export default function DashboardOverview() {
         <p className="text-muted-foreground text-sm">Your MoneroFlow merchant overview</p>
       </FadeIn>
 
-      {/* Node Health Widget */}
+      {/* Wallet Status Widget */}
       <FadeIn delay={0.02}>
-        <div className={`p-5 rounded-xl border ${nodeHealth?.status === 'synced' ? 'bg-card border-success/20' : nodeHealth?.status === 'offline' ? 'bg-card border-destructive/20' : 'bg-card border-border'}`}>
+        <div className={`p-5 rounded-xl border transition-colors ${
+          isConnected ? 'bg-card border-success/20' :
+          nodeStatus === 'connecting' ? 'bg-card border-primary/20' :
+          'bg-card border-destructive/20'
+        }`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Server className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-foreground">Node Health</span>
-              {nodeHealth ? (
-                <Badge variant="outline" className={
-                  nodeHealth.status === 'synced' ? 'bg-success/10 text-success border-success/20' :
-                  nodeHealth.status === 'syncing' ? 'bg-warning/10 text-warning border-warning/20' :
-                  'bg-destructive/10 text-destructive border-destructive/20'
-                }>
-                  {nodeHealth.status === 'synced' && <Wifi className="w-3 h-3 mr-1" />}
-                  {nodeHealth.status === 'syncing' && <Activity className="w-3 h-3 mr-1" />}
-                  {nodeHealth.status === 'offline' && <WifiOff className="w-3 h-3 mr-1" />}
-                  {nodeHealth.status}
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-muted-foreground">Checking...</Badge>
-              )}
-            </div>
-            <Button variant="ghost" size="sm" onClick={refreshNodeStatus} disabled={loading} className="text-muted-foreground hover:text-primary h-8 px-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-            </Button>
-          </div>
-          {nodeHealth && nodeHealth.connected && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`relative p-2 rounded-lg ${isConnected ? 'bg-success/10' : 'bg-muted'}`}>
+                <Server className={`w-4 h-4 ${isConnected ? 'text-success' : 'text-muted-foreground'}`} />
+                {isConnected && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-card animate-pulse" />
+                )}
+              </div>
               <div>
-                <p className="text-xs text-muted-foreground">Sync</p>
-                <div className="mt-1">
-                  <Progress value={nodeHealth.syncPercent} className="h-1.5" />
-                  <p className="text-xs font-mono text-foreground mt-1">{nodeHealth.syncPercent.toFixed(1)}%</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">Wallet Status</span>
+                  <Badge variant="outline" className={`${currentStatus.color} text-[10px] gap-1`}>
+                    {isLoading ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <StatusIcon className="w-3 h-3" />
+                    )}
+                    {isLoading ? 'Connecting...' : currentStatus.label}
+                  </Badge>
                 </div>
+                {isConnected && merchant.connectedNodeLabel && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Connected to <span className="text-foreground font-medium">{merchant.connectedNodeLabel}</span>
+                    {merchant.nodeLatencyMs > 0 && (
+                      <span className="text-muted-foreground"> · {merchant.nodeLatencyMs}ms</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {!isConnected && !isLoading && (
+                <Button variant="outline" size="sm" onClick={handleReconnect} className="text-xs border-border hover:border-primary/50 h-8 gap-1.5">
+                  <Zap className="w-3 h-3" /> Reconnect
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isLoading} className="text-muted-foreground hover:text-primary h-8 w-8 p-0">
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </div>
+
+          {isConnected && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2 border-t border-border/50">
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Block Height</p>
+                <p className="text-sm font-mono text-foreground mt-0.5">{merchant.nodeHeight.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Block Height</p>
-                <p className="text-sm font-mono text-foreground">{nodeHealth.syncHeight.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Mode</p>
+                <p className="text-sm text-foreground mt-0.5 capitalize">{
+                  merchant.walletMode === 'viewonly' ? 'Browser Wallet' :
+                  merchant.walletMode === 'remote' ? 'Remote Node' :
+                  merchant.walletMode === 'selfcustody' ? 'Self-Custody' : 'Managed'
+                }</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Wallet Balance</p>
-                <p className="text-sm font-mono text-primary">{walletBalance !== null ? formatXMR(walletBalance) : '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Version</p>
-                <p className="text-sm font-mono text-foreground">v{nodeHealth.version}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Node</p>
+                <p className="text-sm font-mono text-muted-foreground mt-0.5 truncate">{merchant.connectedNodeUrl}</p>
               </div>
             </div>
           )}
-          {nodeHealth && !nodeHealth.connected && (
-            <p className="text-xs text-destructive">Cannot connect to RPC. Check your Settings → Wallet & Node configuration.</p>
-          )}
-          {nodeHealth && nodeHealth.connected && (
-            <p className="text-[10px] text-muted-foreground mt-3">
-              {nodeHealth.networkType} · v{nodeHealth.version} · {merchant.walletMode === 'remote' ? merchant.remoteNodeUrl : merchant.rpcEndpoint}
-            </p>
+
+          {!isConnected && !isLoading && (
+            <div className="pt-2 border-t border-border/50">
+              <p className="text-xs text-muted-foreground">
+                {merchant.walletMode === 'viewonly' && !merchant.viewOnlySetupComplete
+                  ? 'Set up your browser wallet in Settings → Wallet & Node to get started.'
+                  : 'Could not connect to any remote node. Click Reconnect to try again, or switch nodes in Settings.'}
+              </p>
+            </div>
           )}
         </div>
       </FadeIn>
