@@ -269,7 +269,112 @@ export default function SettingsPage() {
                 </div>
               </div>
             </button>
+
+            {/* View-Only Wallet Mode */}
+            <button
+              onClick={() => setWalletMode('viewonly')}
+              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
+                walletMode === 'viewonly'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-card hover:border-muted-foreground/30'
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'viewonly' ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <Smartphone className={`w-5 h-5 ${walletMode === 'viewonly' ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground">In-Browser View-Only Wallet</span>
+                    <Badge className="bg-success/10 text-success border-success/20 text-[10px]">New</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Monitor payments with just your view key — no wallet software needed. Works on phones, tablets, and laptops. Spend key requested only for sweeps.</p>
+                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">👁️ Lightweight Browser Mode – Fast receiving, max privacy</Badge>
+                </div>
+                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  walletMode === 'viewonly' ? 'border-primary' : 'border-muted-foreground/30'
+                }`}>
+                  {walletMode === 'viewonly' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                </div>
+              </div>
+            </button>
           </div>
+
+          {/* View-Only Wizard Dialog */}
+          <Dialog open={showViewOnlyWizard} onOpenChange={setShowViewOnlyWizard}>
+            <DialogContent className="bg-card border-border max-w-lg">
+              <DialogHeader><DialogTitle className="text-foreground">Set Up View-Only Wallet</DialogTitle></DialogHeader>
+              <ViewOnlyWalletWizard
+                onComplete={() => {
+                  setShowViewOnlyWizard(false);
+                }}
+                onCancel={() => setShowViewOnlyWizard(false)}
+              />
+            </DialogContent>
+          </Dialog>
+
+          {/* View-Only Active Status */}
+          {walletMode === 'viewonly' && merchant.viewOnlySetupComplete && (
+            <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">View-Only Wallet</h3>
+                <Badge className="bg-success/10 text-success border-success/20 text-xs">
+                  <Eye className="w-3 h-3 mr-1" /> Active
+                </Badge>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Address</span>
+                  <span className="font-mono text-foreground">{merchant.viewOnlyAddress.slice(0, 8)}...{merchant.viewOnlyAddress.slice(-8)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Remote Node</span>
+                  <span className="font-mono text-foreground">{merchant.viewOnlyNodeUrl}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Restore Height</span>
+                  <span className="font-mono text-foreground">{merchant.viewOnlyRestoreHeight || 'Genesis'}</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+                <p className="text-[11px] text-warning leading-relaxed">
+                  ⚠️ <strong>Keep this tab open</strong> to detect incoming payments. For 24/7 operation, switch to Managed mode.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowViewOnlyWizard(true)}
+                  className="border-border hover:border-primary/50 text-xs"
+                >
+                  Reconfigure
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    updateMerchant({
+                      viewOnlyAddress: '',
+                      viewOnlyViewKey: '',
+                      viewOnlyRestoreHeight: 0,
+                      viewOnlyNodeUrl: '',
+                      viewOnlySetupComplete: false,
+                      walletMode: 'managed',
+                      rpcConnected: false,
+                    });
+                    toast.success('View-only wallet removed');
+                  }}
+                  className="border-destructive/30 hover:border-destructive/50 text-destructive text-xs"
+                >
+                  Remove Wallet
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Remote Node Configuration */}
           {walletMode === 'remote' && (
