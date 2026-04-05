@@ -48,6 +48,13 @@ export interface Merchant {
   privacyBackupEmail: string;
   referralCode: string;
   referralsEnabled: boolean;
+  // Native RPC settings
+  nativeRpcEnabled: boolean;
+  rpcEndpoint: string;
+  rpcUsername: string;
+  rpcPassword: string;
+  rpcWalletFilename: string;
+  rpcConnected: boolean;
 }
 
 export interface Referral {
