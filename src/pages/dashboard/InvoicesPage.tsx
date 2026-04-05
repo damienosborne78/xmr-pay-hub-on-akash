@@ -59,7 +59,7 @@ export default function InvoicesPage() {
                 </div>
                 <Button onClick={handleCreate} disabled={creating} className="w-full bg-gradient-orange hover:opacity-90">
                   {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  {creating ? 'Creating via RPC...' : 'Create Invoice'}
+                  {creating ? 'Generating secure mainnet subaddress...' : 'Create Invoice'}
                 </Button>
               </div>
             </DialogContent>
