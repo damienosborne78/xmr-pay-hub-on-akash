@@ -6,10 +6,13 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
+import { testConnection, piconeroToXmr } from '@/lib/monero-rpc';
+import { formatXMR } from '@/lib/mock-data';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function SettingsPage() {
   const merchant = useStore(s => s.merchant);
@@ -17,6 +20,8 @@ export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [showRpcHelp, setShowRpcHelp] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copyKey = () => {
@@ -54,6 +59,29 @@ export default function SettingsPage() {
     setRestoring(false);
   };
 
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      const result = await testConnection({
+        endpoint: merchant.rpcEndpoint,
+        username: merchant.rpcUsername,
+        password: merchant.rpcPassword,
+        walletFilename: merchant.rpcWalletFilename,
+      });
+      if (result.success && result.balance) {
+        updateMerchant({ rpcConnected: true });
+        toast.success(`Connected! Balance: ${formatXMR(piconeroToXmr(result.balance.unlockedBalance))}`);
+      } else {
+        updateMerchant({ rpcConnected: false });
+        toast.error(result.error || 'Connection failed');
+      }
+    } catch {
+      updateMerchant({ rpcConnected: false });
+      toast.error('RPC connection failed — check your wallet is running');
+    }
+    setTesting(false);
+  };
+
   const isPro = merchant.plan === 'pro';
 
   return (
@@ -61,6 +89,110 @@ export default function SettingsPage() {
       <FadeIn>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground text-sm">Configure your merchant account</p>
+      </FadeIn>
+
+      {/* Wallet & RPC Configuration */}
+      <FadeIn delay={0.02}>
+        <div className={`p-6 rounded-xl border space-y-4 ${merchant.rpcConnected ? 'bg-card border-success/20' : 'bg-card border-border'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Server className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold text-foreground">Wallet & RPC</h2>
+              {merchant.rpcConnected && (
+                <Badge className="bg-success/10 text-success border-success/20">
+                  <Wifi className="w-3 h-3 mr-1" /> Connected
+                </Badge>
+              )}
+              {merchant.nativeRpcEnabled && !merchant.rpcConnected && (
+                <Badge variant="outline" className="text-warning border-warning/20">
+                  <WifiOff className="w-3 h-3 mr-1" /> Disconnected
+                </Badge>
+              )}
+            </div>
+            <Dialog open={showRpcHelp} onOpenChange={setShowRpcHelp}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary h-8 px-2">
+                  <HelpCircle className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border max-w-lg">
+                <DialogHeader><DialogTitle className="text-foreground">How to run monero-wallet-rpc</DialogTitle></DialogHeader>
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <p>Run the following command to start your own wallet RPC server:</p>
+                  <pre className="bg-background border border-border rounded-lg p-3 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap">
+{`monero-wallet-rpc \\
+  --rpc-bind-port 18082 \\
+  --rpc-login monero:yourpassword \\
+  --wallet-dir /path/to/wallets \\
+  --daemon-address node.moneroworld.com:18089 \\
+  --disable-rpc-ban`}
+                  </pre>
+                  <div className="space-y-2 pt-2">
+                    <p className="text-foreground font-medium">Required flags:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li><code className="text-primary">--rpc-bind-port</code> — Port for RPC (default: 18082)</li>
+                      <li><code className="text-primary">--rpc-login</code> — Username:password for auth</li>
+                      <li><code className="text-primary">--wallet-dir</code> — Directory containing wallet files</li>
+                      <li><code className="text-primary">--daemon-address</code> — Monero node to connect to</li>
+                    </ul>
+                  </div>
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs">⚠️ CORS: If testing locally, add <code className="text-primary">--rpc-access-control-origins=*</code></p>
+                    <p className="text-xs mt-1">In production, RPC calls go through server-side API routes — never expose credentials to the browser.</p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <p className="text-xs text-muted-foreground">Connect your own monero-wallet-rpc for true self-custody. No third-party gateways.</p>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Use Native Monero RPC</p>
+              <p className="text-xs text-muted-foreground">Direct wallet integration — your keys, your coins</p>
+            </div>
+            <Switch checked={merchant.nativeRpcEnabled} onCheckedChange={v => updateMerchant({ nativeRpcEnabled: v, rpcConnected: v ? merchant.rpcConnected : false })} />
+          </div>
+
+          {merchant.nativeRpcEnabled && (
+            <div className="space-y-4 pt-3 border-t border-border">
+              <div className="space-y-2">
+                <Label className="text-foreground">RPC Endpoint URL</Label>
+                <Input value={merchant.rpcEndpoint} onChange={e => updateMerchant({ rpcEndpoint: e.target.value })} className="bg-background border-border font-mono text-sm" placeholder="http://127.0.0.1:18082" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-foreground">RPC Username</Label>
+                  <Input value={merchant.rpcUsername} onChange={e => updateMerchant({ rpcUsername: e.target.value })} className="bg-background border-border text-sm" placeholder="monero" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">RPC Password</Label>
+                  <Input type="password" value={merchant.rpcPassword} onChange={e => updateMerchant({ rpcPassword: e.target.value })} className="bg-background border-border text-sm" placeholder="••••••••" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-foreground">Wallet Filename</Label>
+                <Input value={merchant.rpcWalletFilename} onChange={e => updateMerchant({ rpcWalletFilename: e.target.value })} className="bg-background border-border text-sm" placeholder="merchant_wallet" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button onClick={handleTestConnection} disabled={testing} className="bg-gradient-orange hover:opacity-90">
+                  {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
+                  {testing ? 'Testing...' : 'Test Connection'}
+                </Button>
+                {merchant.rpcConnected && (
+                  <Badge className="bg-primary/10 text-primary border-primary/20">🔐 Self-Custody Mode</Badge>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!merchant.nativeRpcEnabled && (
+            <div className="pt-2">
+              <Badge variant="outline" className="text-muted-foreground">☁️ Managed Demo Mode — using realistic mocks</Badge>
+            </div>
+          )}
+        </div>
       </FadeIn>
 
       {/* Privacy Mode — Pro Only */}
@@ -116,7 +248,11 @@ export default function SettingsPage() {
             <Zap className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Cold Wallet Auto-Sweep</h2>
           </div>
-          <p className="text-xs text-muted-foreground">Automatically sweep funds to your cold wallet when balance exceeds threshold. Zero custodial risk.</p>
+          <p className="text-xs text-muted-foreground">
+            {merchant.nativeRpcEnabled
+              ? 'Uses native RPC transfer to sweep funds to your cold wallet automatically.'
+              : 'Automatically sweep funds to your cold wallet when balance exceeds threshold.'}
+          </p>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-foreground">Enable Auto-Sweep</p>

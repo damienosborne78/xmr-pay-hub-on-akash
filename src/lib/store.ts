@@ -55,10 +55,18 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   simulatePayment: (invoiceId: string) => {
+    // Simulate: seen_on_chain → confirming → paid
     set(state => ({
       invoices: state.invoices.map(inv =>
         inv.id === invoiceId
-          ? { ...inv, status: 'paid' as const, paidAt: new Date().toISOString() }
+          ? {
+              ...inv,
+              status: 'paid' as const,
+              confirmations: 10,
+              paidAt: new Date().toISOString(),
+              txid: Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
+              txKey: Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
+            }
           : inv
       ),
     }));
