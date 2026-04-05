@@ -15,7 +15,7 @@ import { formatXMR } from '@/lib/mock-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import ViewOnlyWalletWizard from '@/components/ViewOnlyWalletWizard';
+import BrowserWalletSetup from '@/components/BrowserWalletSetup';
 
 const REMOTE_NODES = [
   { label: 'Seth for Privacy', url: 'node.sethforprivacy.com:18089' },
