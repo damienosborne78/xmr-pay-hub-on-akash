@@ -67,7 +67,7 @@ async function mockRpcCall<T>(method: string, _params?: Record<string, unknown>)
   switch (method) {
     case 'get_balance':
       return {
-        balance: 5_432_100_000_000n ? 5432100000000 : 5432100000000,
+        balance: 5432100000000,
         unlockedBalance: 4981200000000,
         multisigImportNeeded: false,
       } as T;
