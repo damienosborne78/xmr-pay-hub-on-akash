@@ -34,7 +34,10 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState(false);
   const [showRpcHelp, setShowRpcHelp] = useState(false);
   const [autoSelecting, setAutoSelecting] = useState(false);
-  const [showViewOnlyWizard, setShowViewOnlyWizard] = useState(false);
+  const [showBrowserWalletSetup, setShowBrowserWalletSetup] = useState(false);
+  const [showViewKey, setShowViewKey] = useState(false);
+  const [showSeedPhrase, setShowSeedPhrase] = useState(false);
+  const [seedConfirmReveal, setSeedConfirmReveal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copyKey = () => {
