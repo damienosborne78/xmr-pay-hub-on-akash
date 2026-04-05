@@ -4,6 +4,12 @@ import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { PrivacyBanner } from '@/components/PrivacyBanner';
 import { useStore } from '@/lib/store';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { NavLink } from '@/components/NavLink';
+import { Button } from '@/components/ui/button';
+import { PrivacyBanner } from '@/components/PrivacyBanner';
+import { useStore } from '@/lib/store';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
