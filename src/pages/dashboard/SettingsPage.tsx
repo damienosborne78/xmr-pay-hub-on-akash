@@ -111,7 +111,19 @@ export default function SettingsPage() {
   const walletMode = merchant.walletMode || 'managed';
   const isPro = merchant.plan === 'pro';
 
-  const setWalletMode = (mode: 'managed' | 'remote' | 'selfcustody') => {
+  const setWalletMode = (mode: 'managed' | 'remote' | 'selfcustody' | 'viewonly') => {
+    if (mode === 'viewonly') {
+      if (!merchant.viewOnlySetupComplete) {
+        setShowViewOnlyWizard(true);
+        return;
+      }
+      updateMerchant({
+        walletMode: mode,
+        nativeRpcEnabled: false,
+        rpcConnected: true,
+      });
+      return;
+    }
     updateMerchant({
       walletMode: mode,
       nativeRpcEnabled: mode === 'selfcustody',
