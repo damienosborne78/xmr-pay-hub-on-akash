@@ -46,7 +46,8 @@ export default function OnboardingPage() {
           <Check className="w-8 h-8 text-primary" />
         </div>
         <h1 className="text-3xl font-bold text-foreground mb-3">You're all set!</h1>
-        <p className="text-muted-foreground mb-6">Your merchant subaddress has been generated:</p>
+        <p className="text-muted-foreground mb-1">Your native Monero subaddress is ready:</p>
+        <p className="text-xs text-muted-foreground/60 mb-6">Generated via managed monero-wallet-rpc · Switch to self-custody anytime in Settings</p>
         <div className="bg-card border border-border rounded-xl p-4 mb-6">
           <p className="font-mono text-xs text-muted-foreground break-all leading-relaxed">{merchant.primarySubaddress}</p>
           <Button variant="outline" size="sm" onClick={copyAddress} className="mt-3 border-border hover:border-primary/50">
