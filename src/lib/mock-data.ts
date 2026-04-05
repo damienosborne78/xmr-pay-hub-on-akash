@@ -58,6 +58,14 @@ export interface Merchant {
   viewOnlySetupComplete: boolean;
   viewOnlySeedPhrase: string;
   viewOnlySeedBackedUp: boolean;
+  viewOnlySubaddressIndex: number;  // Next subaddress index to use
+  viewOnlySpendKey: string;
+  // Node connection state
+  connectedNodeLabel: string;
+  connectedNodeUrl: string;
+  nodeStatus: 'online' | 'syncing' | 'offline' | 'connecting';
+  nodeHeight: number;
+  nodeLatencyMs: number;
 }
 
 export interface Referral {
@@ -136,6 +144,13 @@ export const defaultMerchant: Merchant = {
   viewOnlySetupComplete: false,
   viewOnlySeedPhrase: '',
   viewOnlySeedBackedUp: false,
+  viewOnlySubaddressIndex: 1,
+  viewOnlySpendKey: '',
+  connectedNodeLabel: '',
+  connectedNodeUrl: '',
+  nodeStatus: 'offline',
+  nodeHeight: 0,
+  nodeLatencyMs: 0,
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
