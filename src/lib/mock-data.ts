@@ -14,12 +14,18 @@ export interface Invoice {
   fiatCurrency: string;
   xmrAmount: number;
   subaddress: string;
-  status: 'pending' | 'paid' | 'expired';
+  subaddressIndex?: number;
+  status: 'pending' | 'seen_on_chain' | 'confirming' | 'paid' | 'underpaid' | 'overpaid' | 'expired';
+  confirmations?: number;
   createdAt: string;
   paidAt?: string;
   description: string;
   expiresAt: string;
   subscriptionId?: string;
+  txid?: string;
+  txKey?: string;
+  customerNote?: string;
+  cartId?: string;
 }
 
 export interface Merchant {
