@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, mockInvoices, mockMerchant, mockSubscriptions, mockPaymentLinks, mockReferrals, mockReferralPayouts, generateSubaddress, usdToXmr } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, usdToXmr } from './mock-data';
+import { createSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 
 interface AppState {
   isAuthenticated: boolean;
@@ -11,38 +12,65 @@ interface AppState {
   referralPayouts: ReferralPayout[];
   login: () => void;
   logout: () => void;
-  createInvoice: (description: string, fiatAmount: number, subscriptionId?: string) => Invoice;
-  simulatePayment: (invoiceId: string) => void;
+  createInvoice: (description: string, fiatAmount: number, subscriptionId?: string) => Promise<Invoice>;
+  updateInvoice: (id: string, updates: Partial<Invoice>) => void;
+  pollInvoicePayment: (invoiceId: string) => Promise<void>;
   updateMerchant: (updates: Partial<Merchant>) => void;
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
   toggleSubscription: (id: string) => void;
   cancelSubscription: (id: string) => void;
   createPaymentLink: (slug: string, fiatAmount: number, label: string) => PaymentLink;
   deletePaymentLink: (id: string) => void;
-  simulateReferralPayout: () => void;
+  getRpcConfig: () => RpcConfig;
 }
 
 export const useStore = create<AppState>((set, get) => ({
   isAuthenticated: false,
-  merchant: mockMerchant,
-  invoices: mockInvoices,
-  subscriptions: mockSubscriptions,
-  paymentLinks: mockPaymentLinks,
-  referrals: mockReferrals,
-  referralPayouts: mockReferralPayouts,
+  merchant: defaultMerchant,
+  invoices: [],
+  subscriptions: [],
+  paymentLinks: [],
+  referrals: [],
+  referralPayouts: [],
 
   login: () => set({ isAuthenticated: true }),
   logout: () => set({ isAuthenticated: false }),
 
-  createInvoice: (description: string, fiatAmount: number, subscriptionId?: string) => {
-    const subaddressData = { address: generateSubaddress(), index: Math.floor(Math.random() * 1000) + 10 };
+  getRpcConfig: () => {
+    const m = get().merchant;
+    const endpoint = m.walletMode === 'remote'
+      ? `http${m.remoteNodeSsl ? 's' : ''}://${m.remoteNodeUrl}`
+      : m.rpcEndpoint;
+    return {
+      endpoint,
+      username: m.rpcUsername,
+      password: m.rpcPassword,
+      walletFilename: m.rpcWalletFilename,
+    };
+  },
+
+  createInvoice: async (description: string, fiatAmount: number, subscriptionId?: string) => {
+    const config = get().getRpcConfig();
+    let subaddress = '';
+    let subaddressIndex: number | undefined;
+
+    try {
+      // Create a real subaddress via monero-wallet-rpc
+      const result = await createSubaddress(config, `Invoice: ${description}`);
+      subaddress = result.address;
+      subaddressIndex = result.addressIndex;
+    } catch (e) {
+      console.error('Failed to create subaddress via RPC:', e);
+      throw new Error('Could not create subaddress. Check your RPC connection in Settings → Wallet & Node.');
+    }
+
     const invoice: Invoice = {
       id: 'inv_' + Math.random().toString(36).slice(2, 8),
       fiatAmount,
       fiatCurrency: 'USD',
       xmrAmount: usdToXmr(fiatAmount),
-      subaddress: subaddressData.address,
-      subaddressIndex: subaddressData.index,
+      subaddress,
+      subaddressIndex,
       status: 'pending',
       confirmations: 0,
       createdAt: new Date().toISOString(),
@@ -54,22 +82,73 @@ export const useStore = create<AppState>((set, get) => ({
     return invoice;
   },
 
-  simulatePayment: (invoiceId: string) => {
-    // Simulate: seen_on_chain → confirming → paid
+  updateInvoice: (id: string, updates: Partial<Invoice>) => {
     set(state => ({
       invoices: state.invoices.map(inv =>
-        inv.id === invoiceId
-          ? {
-              ...inv,
-              status: 'paid' as const,
-              confirmations: 10,
-              paidAt: new Date().toISOString(),
-              txid: Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
-              txKey: Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
-            }
-          : inv
+        inv.id === id ? { ...inv, ...updates } : inv
       ),
     }));
+  },
+
+  pollInvoicePayment: async (invoiceId: string) => {
+    const state = get();
+    const invoice = state.invoices.find(i => i.id === invoiceId);
+    if (!invoice || invoice.status === 'paid' || invoice.status === 'expired') return;
+    if (invoice.subaddressIndex === undefined) return;
+
+    // Check expiry
+    if (new Date(invoice.expiresAt).getTime() < Date.now()) {
+      get().updateInvoice(invoiceId, { status: 'expired' });
+      return;
+    }
+
+    const config = get().getRpcConfig();
+
+    try {
+      const transfers = await getTransfers(config, [invoice.subaddressIndex]);
+      const incoming = [...transfers.in, ...transfers.pending].filter(
+        t => t.subaddrIndex.minor === invoice.subaddressIndex
+      );
+
+      if (incoming.length === 0) return;
+
+      // Sum up received amounts (in piconero)
+      const totalReceived = incoming.reduce((sum, t) => sum + t.amount, 0);
+      const totalReceivedXmr = totalReceived / 1e12;
+      const expectedXmr = invoice.xmrAmount;
+
+      // Get the first matching tx for details
+      const primaryTx = incoming[0];
+      const confirmations = primaryTx.confirmations || 0;
+
+      let newStatus: Invoice['status'];
+
+      if (totalReceivedXmr >= expectedXmr * 0.99) {
+        // Within 1% tolerance
+        if (confirmations >= 10) {
+          newStatus = 'paid';
+        } else if (confirmations >= 1) {
+          newStatus = 'confirming';
+        } else {
+          newStatus = 'seen_on_chain';
+        }
+
+        if (totalReceivedXmr > expectedXmr * 1.01) {
+          newStatus = confirmations >= 10 ? 'overpaid' : newStatus;
+        }
+      } else {
+        newStatus = 'underpaid';
+      }
+
+      get().updateInvoice(invoiceId, {
+        status: newStatus,
+        confirmations,
+        txid: primaryTx.txid,
+        paidAt: newStatus === 'paid' ? new Date().toISOString() : undefined,
+      });
+    } catch (e) {
+      console.error('Payment polling error:', e);
+    }
   },
 
   updateMerchant: (updates: Partial<Merchant>) => {
@@ -128,19 +207,5 @@ export const useStore = create<AppState>((set, get) => ({
 
   deletePaymentLink: (id: string) => {
     set(state => ({ paymentLinks: state.paymentLinks.filter(l => l.id !== id) }));
-  },
-
-  simulateReferralPayout: () => {
-    const state = get();
-    const totalCommission = state.referrals.reduce((s, r) => s + r.monthlyCommission, 0);
-    const xmrAmount = usdToXmr(totalCommission);
-    const payout: ReferralPayout = {
-      id: 'rp_' + Math.random().toString(36).slice(2, 8),
-      date: new Date().toISOString(),
-      xmrAmount,
-      referralCount: state.referrals.length,
-      status: 'paid',
-    };
-    set(state => ({ referralPayouts: [payout, ...state.referralPayouts] }));
   },
 }));
