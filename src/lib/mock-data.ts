@@ -148,6 +148,8 @@ export const defaultMerchant: Merchant = {
   viewOnlySeedBackedUp: false,
   viewOnlySubaddressIndex: 1,
   viewOnlySpendKey: '',
+  viewOnlyPublicSpendKey: '',
+  viewOnlyPublicViewKey: '',
   connectedNodeLabel: '',
   connectedNodeUrl: '',
   nodeStatus: 'offline',
