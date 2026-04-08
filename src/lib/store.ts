@@ -82,6 +82,8 @@ interface AppState {
   getRpcConfig: () => RpcConfig;
   autoConnectNode: () => Promise<NodeStatus | null>;
   refreshNodeStatus: () => Promise<void>;
+  restoreFromBackup: (data: any) => void;
+  deleteAccount: () => void;
 }
 
 export const useStore = create<AppState>()(persist((set, get) => ({
@@ -251,7 +253,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     const invoice: Invoice = {
       id: 'inv_' + Math.random().toString(36).slice(2, 8),
       fiatAmount,
-      fiatCurrency: 'USD',
+      fiatCurrency: m.fiatCurrency || 'USD',
       xmrAmount: Math.ceil(usdToXmr(fiatAmount) * 1e6) / 1e6,
       subaddress,
       subaddressIndex,
