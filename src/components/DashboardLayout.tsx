@@ -111,7 +111,7 @@ function ManagedBadge() {
       <TooltipContent side="bottom" className="max-w-xs text-xs">
         {isSelfCustody
           ? 'Connected to your own monero-wallet-rpc. Full sovereignty — your keys, your coins.'
-          : 'Native Monero integration managed by XMRPay. No third-party gateway — direct wallet RPC, zero custodial risk.'}
+          : 'In-browser wallet with local key derivation. Self-custody — your keys never leave your device.'}
       </TooltipContent>
     </Tooltip>
   );

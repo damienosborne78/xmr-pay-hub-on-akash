@@ -130,7 +130,7 @@ export const defaultMerchant: Merchant = {
   privacyBackupEmail: '',
   referralCode: '',
   referralsEnabled: false,
-  walletMode: 'managed',
+  walletMode: 'viewonly',
   remoteNodeUrl: '',
   remoteNodeSsl: false,
   nativeRpcEnabled: true,
