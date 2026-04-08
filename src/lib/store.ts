@@ -252,11 +252,26 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       }
     }
 
+    // Fetch live rates for conversion
+    let xmrAmount: number;
+    try {
+      const rates = await getRates();
+      xmrAmount = Math.ceil(fiatToXmr(fiatAmount, m.fiatCurrency || 'USD', rates) * 1e6) / 1e6;
+    } catch {
+      // Fallback to stale cache
+      const stale = getStaleCache();
+      if (stale) {
+        xmrAmount = Math.ceil(fiatToXmr(fiatAmount, m.fiatCurrency || 'USD', stale) * 1e6) / 1e6;
+      } else {
+        throw new Error('Could not fetch exchange rates. Please check your internet connection.');
+      }
+    }
+
     const invoice: Invoice = {
       id: 'inv_' + Math.random().toString(36).slice(2, 8),
       fiatAmount,
       fiatCurrency: m.fiatCurrency || 'USD',
-      xmrAmount: Math.ceil(usdToXmr(fiatAmount) * 1e6) / 1e6,
+      xmrAmount,
       subaddress,
       subaddressIndex,
       status: 'pending',
@@ -265,6 +280,40 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       description,
       expiresAt: new Date(Date.now() + 3600000).toISOString(),
       subscriptionId,
+      createdBy: m.activePosUser || 'admin',
+    };
+    set(state => ({ invoices: [invoice, ...state.invoices] }));
+    return invoice;
+  },
+
+  simulateInvoice: async (description: string, fiatAmount: number) => {
+    const m = get().merchant;
+    let xmrAmount: number;
+    try {
+      const rates = await getRates();
+      xmrAmount = Math.ceil(fiatToXmr(fiatAmount, m.fiatCurrency || 'USD', rates) * 1e6) / 1e6;
+    } catch {
+      const stale = getStaleCache();
+      xmrAmount = stale ? Math.ceil(fiatToXmr(fiatAmount, m.fiatCurrency || 'USD', stale) * 1e6) / 1e6 : 0.001;
+    }
+
+    const fakeTxHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+
+    const invoice: Invoice = {
+      id: 'inv_' + Math.random().toString(36).slice(2, 8),
+      fiatAmount,
+      fiatCurrency: m.fiatCurrency || 'USD',
+      xmrAmount,
+      subaddress: m.viewOnlyAddress || '4' + 'x'.repeat(93),
+      status: 'paid',
+      confirmations: 10,
+      createdAt: new Date().toISOString(),
+      paidAt: new Date().toISOString(),
+      description,
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      txid: fakeTxHash,
+      simulated: true,
+      createdBy: 'admin',
     };
     set(state => ({ invoices: [invoice, ...state.invoices] }));
     return invoice;
