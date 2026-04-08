@@ -99,9 +99,9 @@ export default function InvoicePage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
       <FadeIn className="w-full max-w-md relative z-10">
-        <div className="text-center mb-6">
+        <a href="/dashboard/overview" className="block text-center mb-6 cursor-pointer">
           <BrandLogo />
-        </div>
+        </a>
 
         <div className="rounded-2xl bg-card border border-border overflow-hidden">
           <div className="p-6 border-b border-border">
@@ -136,7 +136,7 @@ export default function InvoicePage() {
             <>
               <div className="p-6 flex flex-col items-center">
                 <div className="bg-foreground p-3 rounded-xl mb-4">
-                  <QRCodeSVG value={`monero:${invoice.subaddress}?tx_amount=${invoice.xmrAmount}`} size={180} bgColor="#fafafa" fgColor="#09090b" />
+                  <QRCodeSVG value={`monero:${invoice.subaddress}?tx_amount=${invoice.xmrAmount.toFixed(6)}`} size={180} bgColor="#fafafa" fgColor="#09090b" />
                 </div>
                 <p className="text-xs text-muted-foreground mb-2">Send exactly</p>
                 <p className="font-mono text-sm text-primary font-medium mb-4">{formatXMR(invoice.xmrAmount)}</p>
