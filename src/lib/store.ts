@@ -84,7 +84,7 @@ interface AppState {
   refreshNodeStatus: () => Promise<void>;
 }
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>()(persist((set, get) => ({
   isAuthenticated: false,
   merchant: defaultMerchant,
   invoices: [],
