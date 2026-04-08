@@ -196,7 +196,7 @@ export const useStore = create<AppState>((set, get) => ({
       id: 'inv_' + Math.random().toString(36).slice(2, 8),
       fiatAmount,
       fiatCurrency: 'USD',
-      xmrAmount: usdToXmr(fiatAmount),
+      xmrAmount: Math.ceil(usdToXmr(fiatAmount) * 1e6) / 1e6,
       subaddress,
       subaddressIndex,
       status: 'pending',
