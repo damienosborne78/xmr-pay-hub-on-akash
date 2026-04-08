@@ -27,6 +27,39 @@ export interface PosQuickButton {
   price: number;
   category: string;
   color: string;
+  stock?: number;
+  icon?: string;
+}
+
+export interface PosModifier {
+  id: string;
+  name: string;
+  options: { label: string; priceAdj: number }[];
+}
+
+export interface PosCombo {
+  id: string;
+  name: string;
+  itemIds: string[];
+  discount: number;
+  price: number;
+}
+
+export interface ParkedOrder {
+  id: string;
+  label: string;
+  items: { name: string; price: number; qty: number; modifiers?: string[] }[];
+  total: number;
+  parkedAt: string;
+}
+
+export interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  qty: number;
+  modifiers?: string[];
+  modifierTotal?: number;
 }
 
 export interface Merchant {
@@ -82,6 +115,13 @@ export interface Merchant {
   // PoS Pro features
   posQuickButtons: PosQuickButton[];
   posCategories: string[];
+  // Domain
+  fqdn: string;
+  // PoS Elite features
+  posModifiers: PosModifier[];
+  posCombos: PosCombo[];
+  posFavorites: string[];
+  parkedOrders: ParkedOrder[];
 }
 
 export interface Referral {
@@ -188,6 +228,11 @@ export const defaultMerchant: Merchant = {
   nodeLatencyMs: 0,
   posQuickButtons: [],
   posCategories: ['Food', 'Drinks', 'Services', 'Products'],
+  fqdn: '',
+  posModifiers: [],
+  posCombos: [],
+  posFavorites: [],
+  parkedOrders: [],
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
