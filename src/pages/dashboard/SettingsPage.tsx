@@ -613,6 +613,34 @@ export default function SettingsPage() {
         </div>
       </FadeIn>
 
+      {/* Custom Domain (FQDN) */}
+      <FadeIn delay={0.095}>
+        <div className="p-6 rounded-xl bg-card border border-border space-y-4">
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Custom Domain (FQDN)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Set your custom domain for payment links, invoices, and the checkout page. This replaces the default app URL.
+          </p>
+          <div className="space-y-2">
+            <Label className="text-foreground">Your Domain</Label>
+            <Input
+              value={merchant.fqdn || ''}
+              onChange={e => updateMerchant({ fqdn: e.target.value.replace(/^https?:\/\//, '').replace(/\/$/, '') })}
+              className="bg-background border-border font-mono text-sm"
+              placeholder="pay.yourbusiness.com"
+            />
+            <p className="text-xs text-muted-foreground">Used by: <span className="text-primary">Payment Links</span>, <span className="text-primary">Invoices</span>, <span className="text-primary">Checkout Pages</span></p>
+          </div>
+          {merchant.fqdn && (
+            <div className="p-3 rounded-lg bg-success/10 border border-success/20">
+              <p className="text-[11px] text-success">✓ Payment links will use <strong className="font-mono">https://{merchant.fqdn}</strong></p>
+            </div>
+          )}
+        </div>
+      </FadeIn>
+
       <FadeIn delay={0.1}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Webhook Configuration</h2>
