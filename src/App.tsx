@@ -21,6 +21,7 @@ import LocalizationPage from "./pages/dashboard/LocalizationPage";
 import WhiteLabelPage from "./pages/dashboard/WhiteLabelPage";
 import PayoutsPage from "./pages/dashboard/PayoutsPage";
 import ReferralsPage from "./pages/dashboard/ReferralsPage";
+import BackupsPage from "./pages/dashboard/BackupsPage";
 import InvoicePage from "./pages/InvoicePage";
 import PayPage from "./pages/PayPage";
 import NotFound from "./pages/NotFound";
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="localization" element={<LocalizationPage />} />
             <Route path="white-label" element={<WhiteLabelPage />} />
+            <Route path="backups" element={<BackupsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="/invoice/:id" element={<InvoicePage />} />
