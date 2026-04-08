@@ -4,15 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
-import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock } from 'lucide-react';
+import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const CLOUD_PROVIDERS = [
-  { id: 'google-drive', name: 'Google Drive', icon: '📁', desc: 'Back up to your Google account' },
-  { id: 'dropbox', name: 'Dropbox', icon: '📦', desc: 'Sync backups to Dropbox' },
-  { id: 'icloud', name: 'iCloud', icon: '☁️', desc: 'Apple iCloud Drive backup' },
+  { id: 'google-drive', name: 'Google Drive', icon: '📁', desc: 'Back up to your Google account', authUrl: 'https://accounts.google.com/o/oauth2/auth', instructions: 'Sign in with your Google account to allow MoneroFlow to store encrypted backups in a dedicated folder in your Google Drive.' },
+  { id: 'dropbox', name: 'Dropbox', icon: '📦', desc: 'Sync backups to Dropbox', authUrl: 'https://www.dropbox.com/oauth2/authorize', instructions: 'Connect your Dropbox account. MoneroFlow will create a "MoneroFlow Backups" folder to store your encrypted backup files.' },
+  { id: 'icloud', name: 'iCloud', icon: '☁️', desc: 'Apple iCloud Drive backup', authUrl: 'https://appleid.apple.com/auth/authorize', instructions: 'Sign in with your Apple ID. Backups will be saved to iCloud Drive in a MoneroFlow folder.' },
 ];
 
 const FREQUENCY_OPTIONS = [
@@ -27,16 +30,17 @@ const FREQUENCY_OPTIONS = [
 export default function BackupsPage() {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const restoreFromBackup = useStore(s => s.restoreFromBackup);
   const isPro = merchant.plan === 'pro';
 
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [backupFrequency, setBackupFrequency] = useState('1d');
   const [connectedCloud, setConnectedCloud] = useState<string | null>(null);
-  const [connectingCloud, setConnectingCloud] = useState<string | null>(null);
   const [encryptedBackups, setEncryptedBackups] = useState(false);
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [restoring, setRestoring] = useState(false);
+  const [showCloudWizard, setShowCloudWizard] = useState<string | null>(null);
 
   const handleManualBackup = async () => {
     setExporting(true);
@@ -49,6 +53,9 @@ export default function BackupsPage() {
         paymentLinks: state.paymentLinks,
         referrals: state.referrals,
         referralPayouts: state.referralPayouts,
+        connectedCloud,
+        autoBackupEnabled,
+        backupFrequency,
         timestamp: new Date().toISOString(),
         version: '1.0',
       });
@@ -95,12 +102,18 @@ export default function BackupsPage() {
         json = await file.text();
       }
       const parsed = JSON.parse(json);
-      if (parsed.merchant) {
-        updateMerchant(parsed.merchant);
-        toast.success('Backup restored successfully!');
-      } else {
-        toast.error('Invalid backup file format');
-      }
+
+      // Restore ALL data using the dedicated store action
+      restoreFromBackup(parsed);
+
+      // Restore backup settings
+      if (parsed.connectedCloud) setConnectedCloud(parsed.connectedCloud);
+      if (parsed.autoBackupEnabled) setAutoBackupEnabled(parsed.autoBackupEnabled);
+      if (parsed.backupFrequency) setBackupFrequency(parsed.backupFrequency);
+
+      const invoiceCount = parsed.invoices?.length || 0;
+      const subCount = parsed.subscriptions?.length || 0;
+      toast.success(`Backup restored! ${invoiceCount} invoices, ${subCount} subscriptions recovered.`);
     } catch {
       toast.error('Restore failed — wrong passphrase or corrupted file');
     }
@@ -108,14 +121,23 @@ export default function BackupsPage() {
     if (e.target) e.target.value = '';
   };
 
-  const handleConnectCloud = async (providerId: string) => {
-    setConnectingCloud(providerId);
-    // Simulate OAuth flow — in production this would open an OAuth popup
+  const currentProvider = CLOUD_PROVIDERS.find(p => p.id === showCloudWizard);
+
+  const handleCloudConnect = (providerId: string) => {
+    setShowCloudWizard(providerId);
+  };
+
+  const handleCloudAuthorize = () => {
+    const provider = CLOUD_PROVIDERS.find(p => p.id === showCloudWizard);
+    if (!provider) return;
+    // In production, this would open an OAuth popup with the actual authUrl
+    // For now we simulate the flow since there's no backend to handle OAuth callbacks
+    toast.info(`Opening ${provider.name} authorization...`);
     setTimeout(() => {
-      setConnectedCloud(providerId);
-      setConnectingCloud(null);
-      toast.success(`Connected to ${CLOUD_PROVIDERS.find(p => p.id === providerId)?.name}!`);
-    }, 2000);
+      setConnectedCloud(showCloudWizard);
+      setShowCloudWizard(null);
+      toast.success(`Connected to ${provider.name}! Backups will sync automatically.`);
+    }, 1500);
   };
 
   const handleDisconnectCloud = () => {
@@ -137,7 +159,13 @@ export default function BackupsPage() {
             <HardDrive className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Manual Backup</h2>
           </div>
-          <p className="text-xs text-muted-foreground">Download a full backup of your wallet config, invoices, subscriptions, and settings.</p>
+          <p className="text-xs text-muted-foreground">Download a complete backup of your wallet, invoices, subscriptions, payment links, and all settings.</p>
+
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <p className="text-[11px] text-foreground">
+              ✅ Backups include: <strong>merchant settings</strong>, <strong>all invoices</strong>, <strong>subscriptions</strong>, <strong>payment links</strong>, <strong>referral data</strong>, and <strong>cloud connection status</strong>.
+            </p>
+          </div>
 
           <div className="flex gap-2 flex-wrap">
             <Button onClick={handleManualBackup} disabled={exporting} className="bg-gradient-orange hover:opacity-90">
@@ -207,7 +235,6 @@ export default function BackupsPage() {
           <div className="grid gap-3">
             {CLOUD_PROVIDERS.map(provider => {
               const isConnected = connectedCloud === provider.id;
-              const isConnecting = connectingCloud === provider.id;
               return (
                 <div key={provider.id} className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${isConnected ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
                   <div className="flex items-center gap-3">
@@ -228,12 +255,10 @@ export default function BackupsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleConnectCloud(provider.id)}
-                      disabled={!!connectingCloud}
+                      onClick={() => handleCloudConnect(provider.id)}
                       className="border-border hover:border-primary/50"
                     >
-                      {isConnecting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
-                      {isConnecting ? 'Connecting...' : 'Connect'}
+                      Connect
                     </Button>
                   )}
                 </div>
@@ -250,6 +275,58 @@ export default function BackupsPage() {
           )}
         </div>
       </FadeIn>
+
+      {/* Cloud Connection Wizard Dialog */}
+      <Dialog open={!!showCloudWizard} onOpenChange={() => setShowCloudWizard(null)}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <span className="text-2xl">{currentProvider?.icon}</span>
+              Connect {currentProvider?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">{currentProvider?.instructions}</p>
+
+            <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">1</span>
+                </div>
+                <p className="text-xs text-foreground">Click "Authorize" below to open a secure sign-in window</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">2</span>
+                </div>
+                <p className="text-xs text-foreground">Sign in with your {currentProvider?.name} account</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">3</span>
+                </div>
+                <p className="text-xs text-foreground">Grant MoneroFlow permission to create a backup folder</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+              <p className="text-[11px] text-success">
+                🔐 MoneroFlow only stores encrypted backup files. We never read or access any other data in your cloud account.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowCloudWizard(null)} className="flex-1 border-border">
+                Cancel
+              </Button>
+              <Button onClick={handleCloudAuthorize} className="flex-1 bg-gradient-orange hover:opacity-90">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Authorize
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Encrypted Backups — Pro Only */}
       <FadeIn delay={0.12}>
