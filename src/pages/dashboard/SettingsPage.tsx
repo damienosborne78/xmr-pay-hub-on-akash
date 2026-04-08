@@ -411,88 +411,8 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Remote Node Configuration */}
-          {walletMode === 'remote' && (
-            <div className="p-5 rounded-xl bg-card border border-border space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Remote Node</h3>
-                {merchant.rpcConnected && (
-                  <Badge className="bg-success/10 text-success border-success/20 text-xs">
-                    <Wifi className="w-3 h-3 mr-1" /> Connected
-                  </Badge>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label className="text-foreground text-xs">Select a node</Label>
-                <Select
-                  value={merchant.remoteNodeUrl}
-                  onValueChange={v => updateMerchant({ remoteNodeUrl: v })}
-                >
-                  <SelectTrigger className="bg-background border-border font-mono text-sm">
-                    <SelectValue placeholder="Choose a remote node..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {REMOTE_NODES.map(n => (
-                      <SelectItem key={n.url} value={n.url} className="font-mono text-sm">
-                        {n.label} — {n.url}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAutoSelectNode}
-                  disabled={autoSelecting}
-                  className="border-border hover:border-primary/50 text-xs"
-                >
-                  {autoSelecting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Zap className="w-3 h-3 mr-1.5 text-primary" />}
-                  {autoSelecting ? 'Testing nodes...' : 'Auto-select fastest'}
-                </Button>
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={merchant.remoteNodeSsl}
-                          onCheckedChange={v => updateMerchant({ remoteNodeSsl: v })}
-                        />
-                        <span className="text-xs text-muted-foreground">SSL</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>Enable SSL/TLS for encrypted connection to the remote node</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-foreground text-xs">Or enter a custom node address</Label>
-                <Input
-                  value={merchant.remoteNodeUrl}
-                  onChange={e => updateMerchant({ remoteNodeUrl: e.target.value })}
-                  className="bg-background border-border font-mono text-sm"
-                  placeholder="node.example.com:18089"
-                />
-              </div>
-
-              <Button onClick={handleTestConnection} disabled={testing || !merchant.remoteNodeUrl} className="bg-gradient-orange hover:opacity-90 w-full">
-                {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
-                {testing ? 'Testing...' : 'Test Connection'}
-              </Button>
-
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border">
-                <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Remote nodes are convenient but for maximum privacy, run your own node later. Your wallet keys always stay on your device.
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Self-Custody Configuration */}
           {walletMode === 'selfcustody' && (
