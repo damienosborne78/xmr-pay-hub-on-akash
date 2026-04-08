@@ -233,13 +233,13 @@ function mnemonicToSeed(words: string[]): string {
   // Convert 24 words → 32 bytes (spend key)
   let seedHex = '';
   for (let i = 0; i < 24; i += 3) {
-    const w1 = MONERO_ENGLISH_WORDLIST.indexOf(words[i]);
-    const w2 = MONERO_ENGLISH_WORDLIST.indexOf(words[i + 1]);
-    const w3 = MONERO_ENGLISH_WORDLIST.indexOf(words[i + 2]);
+    const w1 = (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(words[i]);
+    const w2 = (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(words[i + 1]);
+    const w3 = (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(words[i + 2]);
 
     if (w1 === -1 || w2 === -1 || w3 === -1) {
       const bad = [words[i], words[i + 1], words[i + 2]].find(
-        (w) => MONERO_ENGLISH_WORDLIST.indexOf(w) === -1
+        (w) => (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(w) === -1
       );
       throw new Error(`Unknown word: "${bad}"`);
     }
