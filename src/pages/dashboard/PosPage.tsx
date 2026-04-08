@@ -416,7 +416,7 @@ export default function PosPage() {
                 <SelectValue placeholder="Admin" />
               </SelectTrigger>
               <SelectContent className="bg-card border-border">
-                <SelectItem value="">Admin</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
                 {users.map(u => (
                   <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                 ))}
