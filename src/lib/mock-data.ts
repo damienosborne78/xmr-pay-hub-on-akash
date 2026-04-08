@@ -60,6 +60,8 @@ export interface Merchant {
   viewOnlySeedBackedUp: boolean;
   viewOnlySubaddressIndex: number;  // Next subaddress index to use
   viewOnlySpendKey: string;
+  viewOnlyPublicSpendKey: string;
+  viewOnlyPublicViewKey: string;
   // Node connection state
   connectedNodeLabel: string;
   connectedNodeUrl: string;
@@ -146,6 +148,8 @@ export const defaultMerchant: Merchant = {
   viewOnlySeedBackedUp: false,
   viewOnlySubaddressIndex: 1,
   viewOnlySpendKey: '',
+  viewOnlyPublicSpendKey: '',
+  viewOnlyPublicViewKey: '',
   connectedNodeLabel: '',
   connectedNodeUrl: '',
   nodeStatus: 'offline',

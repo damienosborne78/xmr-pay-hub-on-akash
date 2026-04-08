@@ -77,6 +77,8 @@ ${wallet.viewKey}
         viewOnlyAddress: wallet.address,
         viewOnlyViewKey: wallet.viewKey,
         viewOnlySpendKey: wallet.spendKey,
+        viewOnlyPublicSpendKey: wallet.publicSpendKey,
+        viewOnlyPublicViewKey: wallet.publicViewKey,
         viewOnlySeedPhrase: wallet.seedPhrase,
         viewOnlySeedBackedUp: true,
         viewOnlyRestoreHeight: 0,
