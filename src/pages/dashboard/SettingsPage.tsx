@@ -24,6 +24,7 @@ import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 export default function SettingsPage() {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const deleteAccount = useStore(s => s.deleteAccount);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -33,6 +34,8 @@ export default function SettingsPage() {
   const [showBrowserWalletSetup, setShowBrowserWalletSetup] = useState(false);
   const [showRestoreFromSeed, setShowRestoreFromSeed] = useState(false);
   const [showWalletChoice, setShowWalletChoice] = useState(false);
+  const [dangerSeed, setDangerSeed] = useState('');
+  const [showDangerConfirm, setShowDangerConfirm] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copyKey = () => {
