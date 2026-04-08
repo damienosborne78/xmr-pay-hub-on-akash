@@ -224,11 +224,18 @@ export default function DashboardOverview() {
             <p className="text-sm text-muted-foreground py-8 text-center">No invoices yet. Create one from the Invoices page.</p>
           ) : (
             <div className="space-y-3">
-              {invoices.slice(0, 5).map(inv => (
+              {invoices.slice(0, 5).map(inv => {
+                const creatorName = inv.createdBy === 'admin' || !inv.createdBy ? 'Admin' : (merchant.posUsers || []).find(u => u.id === inv.createdBy)?.name || inv.createdBy;
+                return (
                 <div key={inv.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
                   <div>
                     <p className="text-sm font-medium text-foreground">{inv.description}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{inv.id}</p>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      {inv.id}
+                      {(merchant.posUsers || []).length > 0 && (
+                        <span className="ml-2 text-primary/70">• {creatorName}</span>
+                      )}
+                    </p>
                   </div>
                   <div className="text-right flex items-center gap-3">
                     <div>
@@ -241,7 +248,8 @@ export default function DashboardOverview() {
                     </Badge>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

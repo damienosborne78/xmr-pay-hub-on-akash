@@ -41,6 +41,15 @@ export default function PosPage() {
   const isPro = merchant.plan === 'pro';
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
+  const users = merchant.posUsers || [];
+  const activeUserId = merchant.activePosUser || '';
+  const activeUserName = activeUserId ? (users.find(u => u.id === activeUserId)?.name || 'Unknown') : 'Admin';
+
+  const handleSwitchUser = (userId: string) => {
+    updateMerchant({ activePosUser: userId });
+    const name = userId ? (users.find(u => u.id === userId)?.name || 'Unknown') : 'Admin';
+    toast.success(`Switched to ${name}`);
+  };
 
   const [input, setInput] = useState('0');
   const [activeInvoice, setActiveInvoice] = useState<{ id: string; fiatAmount: number; xmrAmount: number; subaddress: string } | null>(null);
@@ -396,7 +405,31 @@ export default function PosPage() {
 
   // ── Main PoS Layout ──
   return (
-    <div className="flex flex-col lg:flex-row items-start justify-center min-h-[70vh] gap-4 lg:gap-6">
+    <div className="space-y-3">
+      {/* ═══ User Selector Bar ═══ */}
+      {users.length > 0 && (
+        <div className="flex items-center gap-3 px-1">
+          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2">
+            <span className="text-xs text-muted-foreground">Cashier:</span>
+            <Select value={activeUserId} onValueChange={handleSwitchUser}>
+              <SelectTrigger className="h-7 w-[140px] bg-background border-border text-xs">
+                <SelectValue placeholder="Admin" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="">Admin</SelectItem>
+                {users.map(u => (
+                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs gap-1.5 py-1">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            {activeUserName}
+          </Badge>
+        </div>
+      )}
+      <div className="flex flex-col lg:flex-row items-start justify-center min-h-[70vh] gap-4 lg:gap-6">
       {/* ═══ LEFT: Product Grid (Pro) ═══ */}
       <div className="hidden lg:flex flex-col w-72 space-y-3 pt-2 max-h-[80vh] overflow-hidden">
         {/* Search bar */}
@@ -984,6 +1017,7 @@ export default function PosPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }
