@@ -1,22 +1,27 @@
 import { useStore } from '@/lib/store';
-import { formatUSD, formatXMR, XMR_USD_RATE } from '@/lib/mock-data';
+import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
-import { MoneroLogo } from '@/components/BrandLogo';
-import { TrendingUp, TrendingDown, DollarSign, Shield, ArrowDownToLine, BarChart3 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { TrendingUp, DollarSign, Shield, ArrowDownToLine, BarChart3 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { FadeIn } from '@/components/FadeIn';
 import { useMemo } from 'react';
+import { useRates } from '@/hooks/use-rates';
+import { getXmrPrice } from '@/lib/currency-service';
 
 export default function AnalyticsPage() {
   const invoices = useStore(s => s.invoices);
   const merchant = useStore(s => s.merchant);
-  const paid = invoices.filter(i => i.status === 'paid');
-  const totalUSD = paid.reduce((s, i) => s + i.fiatAmount, 0);
-  const totalXMR = paid.reduce((s, i) => s + i.xmrAmount, 0);
-  const hedgedUSD = totalUSD * (merchant.fiatHedgePercent / 100);
-  const exposedUSD = totalUSD - hedgedUSD;
+  const sym = merchant.fiatSymbol || '$';
+  const cur = merchant.fiatCurrency || 'USD';
+  const { rates } = useRates();
 
-  // Build revenue data from real invoices
+  const paid = invoices.filter(i => i.status === 'paid');
+  const totalFiat = paid.reduce((s, i) => s + i.fiatAmount, 0);
+  const totalXMR = paid.reduce((s, i) => s + i.xmrAmount, 0);
+  const hedgedFiat = totalFiat * (merchant.fiatHedgePercent / 100);
+  const exposedFiat = totalFiat - hedgedFiat;
+  const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
+
   const revenueData = useMemo(() => {
     const monthMap = new Map<string, { revenue: number; txCount: number }>();
     paid.forEach(inv => {
@@ -40,10 +45,10 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: formatUSD(totalUSD), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
-          { label: 'XMR Price', value: formatUSD(XMR_USD_RATE), sub: 'current rate', icon: TrendingUp, color: 'text-success' },
-          { label: 'Hedged', value: formatUSD(hedgedUSD), sub: `${merchant.fiatHedgePercent}% auto-converted`, icon: Shield, color: 'text-primary' },
-          { label: 'XMR Exposure', value: formatUSD(exposedUSD), sub: 'held in XMR', icon: ArrowDownToLine, color: 'text-warning' },
+          { label: 'Total Revenue', value: formatFiat(totalFiat, sym, cur), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
+          { label: 'XMR Price', value: xmrPrice ? formatFiat(xmrPrice, sym, cur) : 'Loading...', sub: `live rate in ${cur}`, icon: TrendingUp, color: 'text-success' },
+          { label: 'Hedged', value: formatFiat(hedgedFiat, sym, cur), sub: `${merchant.fiatHedgePercent}% auto-converted`, icon: Shield, color: 'text-primary' },
+          { label: `${cur} Exposure`, value: formatFiat(exposedFiat, sym, cur), sub: 'held in XMR', icon: ArrowDownToLine, color: 'text-warning' },
         ].map((s, i) => (
           <FadeIn key={s.label} delay={i * 0.05}>
             <div className="p-5 rounded-xl bg-card border border-border hover:border-primary/20 transition-colors">
@@ -72,7 +77,7 @@ export default function AnalyticsPage() {
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(240, 5%, 55%)', fontSize: 12 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(240, 5%, 55%)', fontSize: 12 }} tickFormatter={v => `$${v}`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(240, 5%, 55%)', fontSize: 12 }} tickFormatter={v => `${sym}${v}`} />
                   <Tooltip contentStyle={{ background: 'hsl(240, 10%, 7%)', border: '1px solid hsl(240, 5%, 17%)', borderRadius: '8px', color: '#fff' }} />
                   <Area type="monotone" dataKey="revenue" stroke="hsl(24, 100%, 50%)" strokeWidth={2} fill="url(#colorRev)" />
                 </AreaChart>
