@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '@/lib/store';
-import { formatXMR, formatUSD } from '@/lib/mock-data';
+import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,9 @@ import { toast } from 'sonner';
 export default function InvoicesPage() {
   const invoices = useStore(s => s.invoices);
   const createInvoice = useStore(s => s.createInvoice);
+  const merchant = useStore(s => s.merchant);
+  const sym = merchant.fiatSymbol || '$';
+  const cur = merchant.fiatCurrency || 'USD';
   const [open, setOpen] = useState(false);
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
@@ -54,7 +57,7 @@ export default function InvoicesPage() {
                   <Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="e.g. Pro Subscription" className="bg-background border-border" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-foreground">Amount (USD)</Label>
+                  <Label className="text-foreground">Amount ({cur})</Label>
                   <Input value={amount} onChange={e => setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="49.99" className="bg-background border-border" />
                 </div>
                 <Button onClick={handleCreate} disabled={creating} className="w-full bg-gradient-orange hover:opacity-90">
@@ -78,7 +81,7 @@ export default function InvoicesPage() {
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium">Invoice</th>
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium">Description</th>
-                    <th className="text-right py-3 px-4 text-muted-foreground font-medium">Amount</th>
+                    <th className="text-right py-3 px-4 text-muted-foreground font-medium">Amount ({cur})</th>
                     <th className="text-right py-3 px-4 text-muted-foreground font-medium">XMR</th>
                     <th className="text-center py-3 px-4 text-muted-foreground font-medium">Status</th>
                     <th className="text-right py-3 px-4 text-muted-foreground font-medium">Actions</th>
@@ -89,7 +92,7 @@ export default function InvoicesPage() {
                     <tr key={inv.id} className="border-b border-border/50 hover:bg-muted/10 transition-colors">
                       <td className="py-3 px-4 font-mono text-xs text-muted-foreground">{inv.id}</td>
                       <td className="py-3 px-4 text-foreground">{inv.description}</td>
-                      <td className="py-3 px-4 text-right font-medium text-foreground">{formatUSD(inv.fiatAmount)}</td>
+                      <td className="py-3 px-4 text-right font-medium text-foreground">{formatFiat(inv.fiatAmount, sym, cur)}</td>
                       <td className="py-3 px-4 text-right text-muted-foreground text-xs font-mono">{formatXMR(inv.xmrAmount)}</td>
                       <td className="py-3 px-4 text-center">
                         <Badge variant="outline"
