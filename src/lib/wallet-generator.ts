@@ -212,6 +212,55 @@ function seedToMnemonic(seedHex: string): string[] {
   return words;
 }
 
+// ─── Mnemonic to Seed (restore) ───
+
+function mnemonicToSeed(words: string[]): string {
+  const n = MONERO_ENGLISH_WORDLIST.length; // 1626
+
+  // Validate 25 words
+  if (words.length !== 25) throw new Error('Seed phrase must be exactly 25 words');
+
+  // Validate checksum (25th word)
+  const first24 = words.slice(0, 24);
+  const prefixes = first24
+    .map((w) => w.substring(0, MONERO_ENGLISH_PREFIX_LENGTH))
+    .join('');
+  const checksumIndex = crc32(prefixes) % 24;
+  if (words[24] !== first24[checksumIndex]) {
+    throw new Error('Invalid checksum word — please double-check your seed phrase');
+  }
+
+  // Convert 24 words → 32 bytes (spend key)
+  let seedHex = '';
+  for (let i = 0; i < 24; i += 3) {
+    const w1 = (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(words[i]);
+    const w2 = (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(words[i + 1]);
+    const w3 = (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(words[i + 2]);
+
+    if (w1 === -1 || w2 === -1 || w3 === -1) {
+      const bad = [words[i], words[i + 1], words[i + 2]].find(
+        (w) => (MONERO_ENGLISH_WORDLIST as readonly string[]).indexOf(w) === -1
+      );
+      throw new Error(`Unknown word: "${bad}"`);
+    }
+
+    // Reverse of the encoding
+    let val = w1;
+    let x2 = (w2 - w1 + n) % n;
+    let x3 = (w3 - w2 + n) % n;
+    val = val + n * x2 + n * n * x3;
+
+    // LE 4-byte chunk
+    const b0 = val & 0xff;
+    const b1 = (val >>> 8) & 0xff;
+    const b2 = (val >>> 16) & 0xff;
+    const b3 = (val >>> 24) & 0xff;
+    seedHex += [b0, b1, b2, b3].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  return seedHex;
+}
+
 // ─── Public API ───
 
 export interface GeneratedWallet {
@@ -226,37 +275,43 @@ export interface GeneratedWallet {
 
 /**
  * Generate a real Monero wallet in the browser.
- * Uses cryptographically secure random bytes → ed25519 key derivation →
- * proper CryptoNote base58 address encoding with valid checksums.
  */
 export function generateBrowserWallet(): GeneratedWallet {
-  // 1. Random 32 bytes → secret spend key (reduced mod l)
   const seedBytes = randomBytes(32);
   const spendKey = scReduce32(bytesToHex(seedBytes));
-
-  // 2. Secret view key = keccak256(secret_spend_key) reduced mod l
   const viewKey = scReduce32(fastHash(spendKey));
-
-  // 3. Public keys via ed25519 scalar multiplication
   const publicSpendKey = secretKeyToPublicKey(spendKey);
   const publicViewKey = secretKeyToPublicKey(viewKey);
-
-  // 4. Primary address (mainnet, prefix 0x12 → starts with '4')
-  const address = encodeAddress(
-    MAINNET_ADDRESS_PREFIX,
-    publicSpendKey,
-    publicViewKey
-  );
-
-  // 5. 25-word mnemonic from the spend key
+  const address = encodeAddress(MAINNET_ADDRESS_PREFIX, publicSpendKey, publicViewKey);
   const words = seedToMnemonic(spendKey);
-
-  console.log('[WalletGen] Generated real Monero wallet');
-  console.log('[WalletGen] Address:', address);
-  console.log('[WalletGen] Address length:', address.length, 'starts with:', address[0]);
 
   return {
     seedPhrase: words.join(' '),
+    seedHex: spendKey,
+    address,
+    viewKey,
+    spendKey,
+    publicSpendKey,
+    publicViewKey,
+  };
+}
+
+/**
+ * Restore a Monero wallet from a 25-word seed phrase.
+ */
+export function restoreWalletFromSeed(seedPhrase: string): GeneratedWallet {
+  const words = seedPhrase.trim().toLowerCase().split(/\s+/);
+  const seedHex = mnemonicToSeed(words);
+
+  const spendKey = scReduce32(seedHex);
+  const viewKey = scReduce32(fastHash(spendKey));
+  const publicSpendKey = secretKeyToPublicKey(spendKey);
+  const publicViewKey = secretKeyToPublicKey(viewKey);
+  const address = encodeAddress(MAINNET_ADDRESS_PREFIX, publicSpendKey, publicViewKey);
+  const mnemonic = seedToMnemonic(spendKey);
+
+  return {
+    seedPhrase: mnemonic.join(' '),
     seedHex: spendKey,
     address,
     viewKey,

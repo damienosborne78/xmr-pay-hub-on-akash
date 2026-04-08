@@ -1,8 +1,64 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, usdToXmr } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { generateSubaddress as localGenerateSubaddress } from './wallet-generator';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
+
+// ─── IndexedDB storage adapter for Zustand persist ───
+function createIDBStorage() {
+  const DB_NAME = 'moneroflow_store';
+  const STORE_NAME = 'app_state';
+
+  function openDB(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(STORE_NAME)) {
+          req.result.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  return {
+    getItem: async (name: string): Promise<string | null> => {
+      try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const req = tx.objectStore(STORE_NAME).get(name);
+          req.onsuccess = () => resolve(req.result ?? null);
+          req.onerror = () => resolve(null);
+        });
+      } catch { return null; }
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put(value, name);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        });
+      } catch { /* silently fail */ }
+    },
+    removeItem: async (name: string): Promise<void> => {
+      try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).delete(name);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        });
+      } catch { /* silently fail */ }
+    },
+  };
+}
 
 interface AppState {
   isAuthenticated: boolean;
@@ -28,7 +84,7 @@ interface AppState {
   refreshNodeStatus: () => Promise<void>;
 }
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>()(persist((set, get) => ({
   isAuthenticated: false,
   merchant: defaultMerchant,
   invoices: [],
@@ -330,4 +386,16 @@ export const useStore = create<AppState>((set, get) => ({
   deletePaymentLink: (id: string) => {
     set(state => ({ paymentLinks: state.paymentLinks.filter(l => l.id !== id) }));
   },
+}), {
+  name: 'moneroflow-state',
+  storage: createJSONStorage(() => createIDBStorage()),
+  partialize: (state) => ({
+    isAuthenticated: state.isAuthenticated,
+    merchant: state.merchant,
+    invoices: state.invoices,
+    subscriptions: state.subscriptions,
+    paymentLinks: state.paymentLinks,
+    referrals: state.referrals,
+    referralPayouts: state.referralPayouts,
+  }),
 }));
