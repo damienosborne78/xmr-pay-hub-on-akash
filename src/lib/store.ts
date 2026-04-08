@@ -388,6 +388,39 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   deletePaymentLink: (id: string) => {
     set(state => ({ paymentLinks: state.paymentLinks.filter(l => l.id !== id) }));
   },
+
+  restoreFromBackup: (data: any) => {
+    const updates: any = {};
+    if (data.merchant) updates.merchant = { ...defaultMerchant, ...data.merchant };
+    if (data.invoices) updates.invoices = data.invoices;
+    if (data.subscriptions) updates.subscriptions = data.subscriptions;
+    if (data.paymentLinks) updates.paymentLinks = data.paymentLinks;
+    if (data.referrals) updates.referrals = data.referrals;
+    if (data.referralPayouts) updates.referralPayouts = data.referralPayouts;
+    set(updates);
+  },
+
+  deleteAccount: () => {
+    // Clear all state
+    set({
+      isAuthenticated: false,
+      merchant: defaultMerchant,
+      invoices: [],
+      subscriptions: [],
+      paymentLinks: [],
+      referrals: [],
+      referralPayouts: [],
+    });
+    // Clear IndexedDB
+    try { indexedDB.deleteDatabase('moneroflow_store'); } catch {}
+    // Clear all storage
+    try { localStorage.clear(); } catch {}
+    try { sessionStorage.clear(); } catch {}
+    // Clear cookies
+    document.cookie.split(';').forEach(c => {
+      document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+    });
+  },
 }), {
   name: 'moneroflow-state',
   storage: createJSONStorage(() => createIDBStorage()),
