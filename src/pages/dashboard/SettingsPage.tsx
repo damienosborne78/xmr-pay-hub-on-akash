@@ -185,7 +185,7 @@ export default function SettingsPage() {
           </div>
           <p className="text-xs text-muted-foreground">Choose how XMRPay connects to the Monero network.</p>
 
-          {/* Four Mode Cards */}
+          {/* Two Mode Cards */}
           <div className="grid gap-3">
             {/* In-Browser Wallet Mode — FIRST */}
             <button
@@ -204,7 +204,6 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-foreground">In-Browser Wallet</span>
                     <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Recommended</Badge>
-                    <Badge className="bg-success/10 text-success border-success/20 text-[10px]">New</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Instant setup — wallet is created automatically in your browser. Self-custody with zero downloads. Works on any device.</p>
                   <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🔐 Lightweight • Self-Custody • Max Privacy</Badge>
@@ -213,62 +212,6 @@ export default function SettingsPage() {
                   walletMode === 'viewonly' ? 'border-primary' : 'border-muted-foreground/30'
                 }`}>
                   {walletMode === 'viewonly' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                </div>
-              </div>
-            </button>
-
-            {/* Managed Mode */}
-            <button
-              onClick={() => setWalletMode('managed')}
-              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
-                walletMode === 'managed'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border bg-card hover:border-muted-foreground/30'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'managed' ? 'bg-primary/10' : 'bg-muted'}`}>
-                  <Cloud className={`w-5 h-5 ${walletMode === 'managed' ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-foreground">Managed by XMRPay</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Zero setup. XMRPay runs secure Monero nodes in the background. Fastest onboarding — you're ready in seconds.</p>
-                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">☁️ Easiest – Managed</Badge>
-                </div>
-                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  walletMode === 'managed' ? 'border-primary' : 'border-muted-foreground/30'
-                }`}>
-                  {walletMode === 'managed' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                </div>
-              </div>
-            </button>
-
-            {/* Remote Node Mode */}
-            <button
-              onClick={() => setWalletMode('remote')}
-              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
-                walletMode === 'remote'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border bg-card hover:border-muted-foreground/30'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'remote' ? 'bg-primary/10' : 'bg-muted'}`}>
-                  <Globe className={`w-5 h-5 ${walletMode === 'remote' ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-foreground">Easy Remote Node</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Connect to trusted public Monero nodes — no need to run your own. More control than managed mode.</p>
-                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🌐 Easy – Remote Node</Badge>
-                </div>
-                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  walletMode === 'remote' ? 'border-primary' : 'border-muted-foreground/30'
-                }`}>
-                  {walletMode === 'remote' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
                 </div>
               </div>
             </button>
