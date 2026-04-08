@@ -1,122 +1,323 @@
-// Lightweight browser wallet generator
-// Generates valid-format Monero addresses using browser crypto
-// Primary addresses start with '4', subaddresses start with '8'
+/**
+ * Real Monero wallet generator using ed25519 elliptic curve cryptography.
+ * Generates cryptographically valid Monero primary addresses, subaddresses,
+ * and 25-word mnemonic seed phrases with proper checksums.
+ *
+ * References:
+ *   - knaccc/subaddress-js (subaddress derivation algorithm)
+ *   - Monero source: src/mnemonics/english.h, src/crypto/crypto.cpp
+ *   - docs.getmonero.org/mnemonics/legacy/
+ */
 
-const MONERO_WORDLIST = [
-  'abbey','ablaze','abort','absorb','abyss','academy','accent','acid','acoustic','acrobat',
-  'action','active','actor','adapt','adept','adjust','admit','adopt','adult','advance',
-  'aerial','afford','agenda','agile','agony','agree','ahead','aided','aim','aircraft',
-  'aisle','alarm','album','alert','alias','alien','align','alive','alley','almost',
-  'alpha','already','also','alter','always','ambush','amid','amuse','anchor','angel',
-  'anger','angle','ankle','annual','answer','anvil','apart','apex','apple','apply',
-  'april','aqua','arctic','arena','argue','arise','armed','armor','army','arrow',
-  'artist','ascend','asking','asset','assist','assume','atom','attach','attend','audio',
-  'august','aunt','autumn','avid','avoid','awake','aware','awful','axis','axle',
-  'azure','baby','bacon','badge','badly','baffled','bagel','bail','bakery','balance',
-  'bamboo','banana','banner','barrel','basin','basket','batch','bath','battle','beach',
-  'beacon','beam','beauty','become','begin','behind','being','below','bench','best',
-  'betray','beyond','bicycle','bird','bitter','blade','blanket','blast','blaze','blend',
-  'bless','blind','block','bloom','blue','bluff','boat','body','bold','bolt',
-  'bomb','bonus','book','border','boss','bottom','bounce','bowl','boxing','brain',
-  'brave','bread','breeze','brick','bridge','brief','bright','broken','bronze','brother',
-  'brutal','bubble','bucket','budget','buffalo','build','bulge','bulk','bullet','bundle',
-  'burden','burger','burn','burst','butter','buyer','cabin','cable','cactus','cage',
-  'cake','call','calm','camera','camp','canal','cancel','candy','canvas','canyon',
-  'capable','captain','carbon','card','cargo','carpet','carry','carve','castle','casual',
-  'catalog','catch','cattle','caution','cave','cease','ceiling','cellar','cement','census',
-  'cereal','certain','chair','chalk','chamber','chance','change','chapter','charm','chart',
-  'chase','check','cheese','chef','cherry','chest','chicken','chief','child','chimney',
-  'choice','chunk','cider','cigar','circle','citizen','civil','claim','clap','clarify',
-  'class','claw','clean','clever','click','cliff','climb','clinic','clip','clock',
-];
+import elliptic from 'elliptic';
+import BN from 'bn.js';
+import { keccak_256 } from 'js-sha3';
+import { MONERO_ENGLISH_WORDLIST, MONERO_ENGLISH_PREFIX_LENGTH } from './monero-wordlist';
 
-function getRandomWords(count: number): string[] {
-  const words: string[] = [];
-  const array = new Uint32Array(count);
-  crypto.getRandomValues(array);
-  for (let i = 0; i < count; i++) {
-    words.push(MONERO_WORDLIST[array[i] % MONERO_WORDLIST.length]);
+// ─── Ed25519 setup ───
+const ed = new (elliptic as any).eddsa('ed25519');
+
+// Ed25519 group order (l)
+const L = new BN(
+  '7237005577332262213973186563042994240857116359379907606001950938285454250989',
+  10
+);
+
+// ─── Hex / byte utilities ───
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
   }
+  return bytes;
+}
+
+function bytesToHex(bytes: Uint8Array | number[]): string {
+  return Array.from(bytes)
+    .map((b) => (b & 0xff).toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function randomBytes(n: number): Uint8Array {
+  const bytes = new Uint8Array(n);
+  crypto.getRandomValues(bytes);
+  return bytes;
+}
+
+// ─── Keccak-256 (returns hex string) ───
+
+function fastHash(hex: string): string {
+  return keccak_256(hexToBytes(hex));
+}
+
+// ─── Scalar helpers ───
+
+/** Little-endian hex → BN */
+function leHexToBN(hex: string): BN {
+  const beHex = hex.match(/../g)!.reverse().join('');
+  return new BN(beHex, 16);
+}
+
+/** BN → little-endian hex (zero-padded to byteLen) */
+function bnToLeHex(bn: BN, byteLen: number): string {
+  const beHex = bn.toString(16).padStart(byteLen * 2, '0');
+  return beHex.match(/../g)!.reverse().join('');
+}
+
+/** sc_reduce32: reduce a 32-byte LE scalar mod l */
+function scReduce32(hexLE: string): string {
+  return bnToLeHex(leHexToBN(hexLE).umod(L), 32);
+}
+
+/** Hash-to-scalar: keccak256 then reduce mod l */
+function hashToScalar(hex: string): BN {
+  const h = fastHash(hex);
+  return leHexToBN(h).umod(L);
+}
+
+// ─── Point helpers ───
+
+function pointToHex(point: any): string {
+  const encoded: number[] = ed.encodePoint(point);
+  return bytesToHex(encoded);
+}
+
+/** Derive public key from secret key: P = G * s */
+function secretKeyToPublicKey(secretKeyHex: string): string {
+  const scalar = leHexToBN(secretKeyHex);
+  const point = ed.curve.g.mul(scalar);
+  return pointToHex(point);
+}
+
+// ─── Monero Base58 (CryptoNote variant) ───
+
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const ENCODED_BLOCK_SIZES = [0, 2, 3, 5, 6, 7, 9, 10, 11];
+const FULL_BLOCK_SIZE = 8;
+const FULL_ENCODED_BLOCK_SIZE = 11;
+
+function encodeBlock(data: Uint8Array, buf: number[], index: number): void {
+  let num = new BN(0);
+  const base = new BN(256);
+  for (let i = 0; i < data.length; i++) {
+    num = num.mul(base).add(new BN(data[i]));
+  }
+  let pos = ENCODED_BLOCK_SIZES[data.length] - 1;
+  const fiftyEight = new BN(58);
+  while (num.gt(new BN(0))) {
+    const rem = num.umod(fiftyEight);
+    num = num.div(fiftyEight);
+    buf[index + pos] = BASE58_ALPHABET.charCodeAt(rem.toNumber());
+    pos--;
+  }
+}
+
+function cnBase58Encode(hex: string): string {
+  const data = hexToBytes(hex);
+  const fullBlocks = Math.floor(data.length / FULL_BLOCK_SIZE);
+  const lastBlockSize = data.length % FULL_BLOCK_SIZE;
+  const resSize =
+    fullBlocks * FULL_ENCODED_BLOCK_SIZE +
+    ENCODED_BLOCK_SIZES[lastBlockSize];
+
+  const res: number[] = new Array(resSize).fill(
+    BASE58_ALPHABET.charCodeAt(0)
+  );
+
+  for (let i = 0; i < fullBlocks; i++) {
+    encodeBlock(
+      data.slice(i * FULL_BLOCK_SIZE, (i + 1) * FULL_BLOCK_SIZE),
+      res,
+      i * FULL_ENCODED_BLOCK_SIZE
+    );
+  }
+  if (lastBlockSize > 0) {
+    encodeBlock(
+      data.slice(fullBlocks * FULL_BLOCK_SIZE),
+      res,
+      fullBlocks * FULL_ENCODED_BLOCK_SIZE
+    );
+  }
+
+  return String.fromCharCode(...res);
+}
+
+// ─── Address encoding ───
+
+const MAINNET_ADDRESS_PREFIX = '12'; // → addresses start with '4'
+const MAINNET_SUBADDRESS_PREFIX = '2a'; // → addresses start with '8'
+
+// "SubAddr\0" as hex
+const SUBADDR_PREFIX = '5375624164647200';
+
+function encodeAddress(
+  prefix: string,
+  pubSpendHex: string,
+  pubViewHex: string
+): string {
+  const data = prefix + pubSpendHex + pubViewHex;
+  const checksum = fastHash(data).substring(0, 8);
+  return cnBase58Encode(data + checksum);
+}
+
+function intToLE32Hex(value: number): string {
+  let h = value.toString(16);
+  while (h.length < 8) h = '0' + h;
+  return h.match(/../g)!.reverse().join('');
+}
+
+// ─── CRC32 (for mnemonic checksum) ───
+
+function crc32(str: string): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i);
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+// ─── Mnemonic seed encoding (Monero legacy 25-word) ───
+
+function seedToMnemonic(seedHex: string): string[] {
+  const n = MONERO_ENGLISH_WORDLIST.length; // 1626
+  const words: string[] = [];
+
+  for (let i = 0; i < 32; i += 4) {
+    const chunk = seedHex.substr(i * 2, 8);
+    const bytes = hexToBytes(chunk);
+    const val =
+      (bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24)) >>>
+      0;
+
+    const w1 = val % n;
+    const w2 = (Math.floor(val / n) + w1) % n;
+    const w3 = (Math.floor(Math.floor(val / n) / n) + w2) % n;
+
+    words.push(MONERO_ENGLISH_WORDLIST[w1]);
+    words.push(MONERO_ENGLISH_WORDLIST[w2]);
+    words.push(MONERO_ENGLISH_WORDLIST[w3]);
+  }
+
+  // 25th word = checksum
+  const prefixes = words
+    .map((w) => w.substring(0, MONERO_ENGLISH_PREFIX_LENGTH))
+    .join('');
+  const checksumIndex = crc32(prefixes) % 24;
+  words.push(words[checksumIndex]);
+
   return words;
 }
 
-function randomHex(length: number): string {
-  const bytes = new Uint8Array(length / 2);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Base58 alphabet used by Monero
-const BASE58_CHARS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-function randomBase58(length: number): string {
-  const array = new Uint32Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array).map(n => BASE58_CHARS[n % 58]).join('');
-}
+// ─── Public API ───
 
 export interface GeneratedWallet {
   seedPhrase: string;
-  address: string;    // Primary address starting with '4'
-  viewKey: string;    // 64-char hex private view key
-  spendKey: string;   // 64-char hex private spend key
+  seedHex: string;
+  address: string; // Primary address starting with '4' (95 chars)
+  viewKey: string; // 64-char hex private view key
+  spendKey: string; // 64-char hex private spend key
+  publicSpendKey: string; // 64-char hex
+  publicViewKey: string; // 64-char hex
 }
 
 /**
- * Generate a new browser wallet with valid-format Monero keys.
- * Primary address: 95 chars starting with '4'
- * View/spend keys: 64-char hex strings
+ * Generate a real Monero wallet in the browser.
+ * Uses cryptographically secure random bytes → ed25519 key derivation →
+ * proper CryptoNote base58 address encoding with valid checksums.
  */
 export function generateBrowserWallet(): GeneratedWallet {
-  const words = getRandomWords(25);
-  const seedPhrase = words.join(' ');
+  // 1. Random 32 bytes → secret spend key (reduced mod l)
+  const seedBytes = randomBytes(32);
+  const spendKey = scReduce32(bytesToHex(seedBytes));
 
-  // Generate a 95-character Monero primary address starting with '4'
-  const address = '4' + randomBase58(94);
+  // 2. Secret view key = keccak256(secret_spend_key) reduced mod l
+  const viewKey = scReduce32(fastHash(spendKey));
 
-  // Generate 64-char hex private keys
-  const viewKey = randomHex(64);
-  const spendKey = randomHex(64);
+  // 3. Public keys via ed25519 scalar multiplication
+  const publicSpendKey = secretKeyToPublicKey(spendKey);
+  const publicViewKey = secretKeyToPublicKey(viewKey);
 
-  return { seedPhrase, address, viewKey, spendKey };
+  // 4. Primary address (mainnet, prefix 0x12 → starts with '4')
+  const address = encodeAddress(
+    MAINNET_ADDRESS_PREFIX,
+    publicSpendKey,
+    publicViewKey
+  );
+
+  // 5. 25-word mnemonic from the spend key
+  const words = seedToMnemonic(spendKey);
+
+  console.log('[WalletGen] Generated real Monero wallet');
+  console.log('[WalletGen] Address:', address);
+  console.log('[WalletGen] Address length:', address.length, 'starts with:', address[0]);
+
+  return {
+    seedPhrase: words.join(' '),
+    seedHex: spendKey,
+    address,
+    viewKey,
+    spendKey,
+    publicSpendKey,
+    publicViewKey,
+  };
 }
 
 /**
- * Generate a deterministic subaddress for a given wallet + index.
- * Real subaddresses start with '8' and are 95 characters.
- * This uses a deterministic hash so the same wallet+index always produces the same subaddress.
+ * Derive a Monero subaddress from wallet keys.
+ * Uses the real CryptoNote subaddress derivation algorithm:
+ *   D = B + hash("SubAddr\0" || view_key || account || index) * G
+ *   C = D * view_key
+ * Returns a 95-char address starting with '8' (mainnet subaddress).
  */
-export async function generateSubaddress(
-  viewKey: string,
-  primaryAddress: string,
-  index: number
-): Promise<{ address: string; addressIndex: number }> {
-  // Create a deterministic seed from viewKey + index
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`${viewKey}:${primaryAddress}:subaddr:${index}`);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = new Uint8Array(hashBuffer);
-
-  // Use hash bytes to generate deterministic base58 characters
-  // Subaddresses start with '8' and are 95 chars
-  let subaddress = '8';
-  for (let i = 0; i < 94; i++) {
-    const byte = hashArray[i % hashArray.length] ^ (i * 7 + index);
-    subaddress += BASE58_CHARS[Math.abs(byte) % 58];
+export function generateSubaddress(
+  privateViewKeyHex: string,
+  publicSpendKeyHex: string,
+  accountIndex: number,
+  subaddressIndex: number
+): string {
+  if (accountIndex === 0 && subaddressIndex === 0) {
+    throw new Error('Index (0,0) is the primary address — use generateBrowserWallet().address');
   }
 
-  return { address: subaddress, addressIndex: index };
+  // "SubAddr\0" + private_view_key + account_index_LE32 + subaddr_index_LE32
+  const data =
+    SUBADDR_PREFIX +
+    privateViewKeyHex +
+    intToLE32Hex(accountIndex) +
+    intToLE32Hex(subaddressIndex);
+
+  const m = hashToScalar(data); // scalar
+  const M = ed.curve.g.mul(m); // M = m * G
+  const B = ed.decodePoint(hexToBytes(publicSpendKeyHex)); // public spend key point
+  const D = B.add(M); // subaddress public spend key
+
+  const viewScalar = leHexToBN(privateViewKeyHex);
+  const C = D.mul(viewScalar); // subaddress public view key
+
+  const addr = encodeAddress(
+    MAINNET_SUBADDRESS_PREFIX,
+    pointToHex(D),
+    pointToHex(C)
+  );
+
+  console.log(`[WalletGen] Subaddress [${accountIndex},${subaddressIndex}]:`, addr);
+  console.log(`[WalletGen] Length: ${addr.length}, starts with: ${addr[0]}`);
+
+  return addr;
 }
 
 /**
- * Validate a Monero address format.
- * Primary addresses: 95 chars starting with '4'
- * Subaddresses: 95 chars starting with '8'
- * Integrated addresses: 106 chars starting with '4'
+ * Validate a Monero address format (length + prefix check).
  */
-export function isValidMoneroAddress(address: string): { valid: boolean; type: 'primary' | 'subaddress' | 'integrated' | 'unknown' } {
+export function isValidMoneroAddress(
+  address: string
+): { valid: boolean; type: 'primary' | 'subaddress' | 'integrated' | 'unknown' } {
   if (!address) return { valid: false, type: 'unknown' };
-  
+
   const isBase58 = /^[1-9A-HJ-NP-Za-km-z]+$/.test(address);
   if (!isBase58) return { valid: false, type: 'unknown' };
 
