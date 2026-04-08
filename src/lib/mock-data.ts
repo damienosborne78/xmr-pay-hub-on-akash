@@ -122,6 +122,18 @@ export interface Merchant {
   posCombos: PosCombo[];
   posFavorites: string[];
   parkedOrders: ParkedOrder[];
+  // Admin & Users
+  adminPasswordHash: string;
+  posUsers: PosUser[];
+  activePosUser: string; // user id or '' for admin
+}
+
+export interface PosUser {
+  id: string;
+  name: string;
+  pin: string;
+  createdAt: string;
+  role: 'cashier';
 }
 
 export interface Referral {
@@ -233,6 +245,9 @@ export const defaultMerchant: Merchant = {
   posCombos: [],
   posFavorites: [],
   parkedOrders: [],
+  adminPasswordHash: '',
+  posUsers: [],
+  activePosUser: '',
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
