@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BrowserWalletSetup from '@/components/BrowserWalletSetup';
+import RestoreWalletFromSeed from '@/components/RestoreWalletFromSeed';
 import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 
 
