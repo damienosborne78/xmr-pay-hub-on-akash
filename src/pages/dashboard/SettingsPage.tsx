@@ -313,7 +313,18 @@ export default function SettingsPage() {
             </DialogContent>
           </Dialog>
 
-          {/* View-Only Active Status — full wallet management */}
+          {/* Restore from Seed Dialog */}
+          <Dialog open={showRestoreFromSeed} onOpenChange={setShowRestoreFromSeed}>
+            <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle className="text-foreground">Restore Wallet from Seed</DialogTitle></DialogHeader>
+              <RestoreWalletFromSeed
+                onComplete={() => setShowRestoreFromSeed(false)}
+                onCancel={() => setShowRestoreFromSeed(false)}
+              />
+            </DialogContent>
+          </Dialog>
+
+          {/* View-Only Active Status */}
           {walletMode === 'viewonly' && merchant.viewOnlySetupComplete && (
             <div className="p-5 rounded-xl bg-card border border-border space-y-4">
               <div className="flex items-center justify-between">
@@ -334,61 +345,17 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Private View Key — behind reveal */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Private View Key</label>
-                {showViewKey ? (
-                  <div className="flex items-center gap-2">
-                    <p className="font-mono text-[11px] text-foreground bg-background border border-border rounded-lg p-3 flex-1 break-all leading-relaxed">{merchant.viewOnlyViewKey}</p>
-                    <Button variant="outline" size="icon" className="shrink-0 border-border h-8 w-8" onClick={() => setShowViewKey(false)}>
-                      <EyeOff className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setShowViewKey(true)} className="border-border hover:border-primary/50 text-xs">
-                    <Eye className="w-3.5 h-3.5 mr-1.5" /> Reveal View Key
-                  </Button>
-                )}
-              </div>
-
-              {/* Seed Phrase — extra confirmation */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Seed Phrase</label>
-                {showSeedPhrase && merchant.viewOnlySeedPhrase ? (
-                  <div className="space-y-2">
-                    <div className="p-3 rounded-lg bg-background border border-border">
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                        {merchant.viewOnlySeedPhrase.split(' ').map((word, i) => (
-                          <div key={i} className="flex items-center gap-1 text-xs">
-                            <span className="text-muted-foreground text-[9px] w-3 text-right">{i+1}.</span>
-                            <span className="font-mono font-medium text-foreground">{word}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => { setShowSeedPhrase(false); setSeedConfirmReveal(false); }} className="text-xs border-border">
-                      <EyeOff className="w-3.5 h-3.5 mr-1.5" /> Hide Seed
-                    </Button>
-                  </div>
-                ) : seedConfirmReveal ? (
-                  <div className="space-y-2 p-3 rounded-lg bg-destructive/5 border border-destructive/20">
-                    <p className="text-xs text-destructive">⚠️ Make sure no one is watching your screen. Are you sure?</p>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => setShowSeedPhrase(true)} className="bg-destructive hover:bg-destructive/90 text-xs">Yes, show seed</Button>
-                      <Button variant="ghost" size="sm" onClick={() => setSeedConfirmReveal(false)} className="text-xs">Cancel</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setSeedConfirmReveal(true)} className="border-border hover:border-primary/50 text-xs">
-                    <Lock className="w-3.5 h-3.5 mr-1.5" /> Show Seed Phrase
-                  </Button>
-                )}
+              {/* Security note — seed was shown once during creation */}
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  🔐 Your seed phrase and private view key were shown <strong>once</strong> during wallet creation. If you need them again, restore from your backup.
+                </p>
               </div>
 
               {/* Remote Node */}
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Remote Node</span>
-                <span className="font-mono text-foreground">{merchant.viewOnlyNodeUrl}</span>
+                <span className="text-muted-foreground">Connected Node</span>
+                <span className="font-mono text-foreground">{merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl}</span>
               </div>
 
               <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
@@ -397,7 +364,7 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
@@ -416,7 +383,27 @@ export default function SettingsPage() {
                   }}
                   className="border-border hover:border-primary/50 text-xs"
                 >
-                  Create New Wallet
+                  <RefreshCw className="w-3 h-3 mr-1.5" /> Create New Wallet
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    updateMerchant({
+                      viewOnlyAddress: '',
+                      viewOnlyViewKey: '',
+                      viewOnlySeedPhrase: '',
+                      viewOnlySeedBackedUp: false,
+                      viewOnlyRestoreHeight: 0,
+                      viewOnlyNodeUrl: '',
+                      viewOnlySetupComplete: false,
+                      rpcConnected: false,
+                    });
+                    setShowRestoreFromSeed(true);
+                  }}
+                  className="border-border hover:border-primary/50 text-xs"
+                >
+                  <Download className="w-3 h-3 mr-1.5" /> Restore from Seed
                 </Button>
                 <Button
                   variant="outline"
