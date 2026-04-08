@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { formatXMR, formatUSD } from '@/lib/mock-data';
 import { BrandLogo, MoneroLogo } from '@/components/BrandLogo';
