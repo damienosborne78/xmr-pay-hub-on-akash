@@ -42,12 +42,12 @@ export default function PosPage() {
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
   const users = merchant.posUsers || [];
-  const activeUserId = merchant.activePosUser || '';
-  const activeUserName = activeUserId ? (users.find(u => u.id === activeUserId)?.name || 'Unknown') : 'Admin';
+  const activeUserId = merchant.activePosUser || 'admin';
+  const activeUserName = activeUserId === 'admin' ? 'Admin' : (users.find(u => u.id === activeUserId)?.name || 'Unknown');
 
   const handleSwitchUser = (userId: string) => {
-    updateMerchant({ activePosUser: userId });
-    const name = userId ? (users.find(u => u.id === userId)?.name || 'Unknown') : 'Admin';
+    updateMerchant({ activePosUser: userId === 'admin' ? '' : userId });
+    const name = userId === 'admin' ? 'Admin' : (users.find(u => u.id === userId)?.name || 'Unknown');
     toast.success(`Switched to ${name}`);
   };
 
@@ -416,7 +416,7 @@ export default function PosPage() {
                 <SelectValue placeholder="Admin" />
               </SelectTrigger>
               <SelectContent className="bg-card border-border">
-                <SelectItem value="">Admin</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
                 {users.map(u => (
                   <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                 ))}
