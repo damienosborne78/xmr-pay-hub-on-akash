@@ -386,4 +386,16 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   deletePaymentLink: (id: string) => {
     set(state => ({ paymentLinks: state.paymentLinks.filter(l => l.id !== id) }));
   },
+}), {
+  name: 'moneroflow-state',
+  storage: createJSONStorage(() => createIDBStorage()),
+  partialize: (state) => ({
+    isAuthenticated: state.isAuthenticated,
+    merchant: state.merchant,
+    invoices: state.invoices,
+    subscriptions: state.subscriptions,
+    paymentLinks: state.paymentLinks,
+    referrals: state.referrals,
+    referralPayouts: state.referralPayouts,
+  }),
 }));
