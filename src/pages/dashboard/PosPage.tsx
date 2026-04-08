@@ -1018,5 +1018,6 @@ export default function PosPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </div>
   );
 }
