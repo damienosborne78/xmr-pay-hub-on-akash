@@ -112,10 +112,10 @@ export default function SettingsPage() {
     setAutoSelecting(false);
   };
 
-  const walletMode = merchant.walletMode || 'managed';
+  const walletMode = merchant.walletMode || 'viewonly';
   const isPro = merchant.plan === 'pro';
 
-  const setWalletMode = (mode: 'managed' | 'remote' | 'selfcustody' | 'viewonly') => {
+  const setWalletMode = (mode: 'selfcustody' | 'viewonly') => {
     if (mode === 'viewonly') {
       if (!merchant.viewOnlySetupComplete) {
         setShowWalletChoice(true);
@@ -130,8 +130,8 @@ export default function SettingsPage() {
     }
     updateMerchant({
       walletMode: mode,
-      nativeRpcEnabled: mode === 'selfcustody',
-      rpcConnected: mode === 'managed' ? false : merchant.rpcConnected,
+      nativeRpcEnabled: true,
+      rpcConnected: merchant.rpcConnected,
     });
   };
 
