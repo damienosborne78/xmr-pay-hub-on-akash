@@ -19,6 +19,8 @@ export interface Invoice {
   txKey?: string;
   customerNote?: string;
   cartId?: string;
+  createdBy?: string; // user id or 'admin'
+  simulated?: boolean;
 }
 
 export interface PosQuickButton {

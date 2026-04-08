@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, usdToXmr } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { generateSubaddress as localGenerateSubaddress } from './wallet-generator';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
+import { getRates, fiatToXmr, getStaleCache } from './currency-service';
 
 // ─── IndexedDB storage adapter for Zustand persist ───
 function createIDBStorage() {
@@ -71,6 +72,7 @@ interface AppState {
   login: () => void;
   logout: () => void;
   createInvoice: (description: string, fiatAmount: number, subscriptionId?: string) => Promise<Invoice>;
+  simulateInvoice: (description: string, fiatAmount: number) => Promise<Invoice>;
   updateInvoice: (id: string, updates: Partial<Invoice>) => void;
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
   updateMerchant: (updates: Partial<Merchant>) => void;
