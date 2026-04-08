@@ -112,10 +112,10 @@ export default function SettingsPage() {
     setAutoSelecting(false);
   };
 
-  const walletMode = merchant.walletMode || 'managed';
+  const walletMode = merchant.walletMode || 'viewonly';
   const isPro = merchant.plan === 'pro';
 
-  const setWalletMode = (mode: 'managed' | 'remote' | 'selfcustody' | 'viewonly') => {
+  const setWalletMode = (mode: 'selfcustody' | 'viewonly') => {
     if (mode === 'viewonly') {
       if (!merchant.viewOnlySetupComplete) {
         setShowWalletChoice(true);
@@ -130,8 +130,8 @@ export default function SettingsPage() {
     }
     updateMerchant({
       walletMode: mode,
-      nativeRpcEnabled: mode === 'selfcustody',
-      rpcConnected: mode === 'managed' ? false : merchant.rpcConnected,
+      nativeRpcEnabled: true,
+      rpcConnected: merchant.rpcConnected,
     });
   };
 
@@ -185,7 +185,7 @@ export default function SettingsPage() {
           </div>
           <p className="text-xs text-muted-foreground">Choose how XMRPay connects to the Monero network.</p>
 
-          {/* Four Mode Cards */}
+          {/* Two Mode Cards */}
           <div className="grid gap-3">
             {/* In-Browser Wallet Mode — FIRST */}
             <button
@@ -204,7 +204,6 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-foreground">In-Browser Wallet</span>
                     <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Recommended</Badge>
-                    <Badge className="bg-success/10 text-success border-success/20 text-[10px]">New</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Instant setup — wallet is created automatically in your browser. Self-custody with zero downloads. Works on any device.</p>
                   <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🔐 Lightweight • Self-Custody • Max Privacy</Badge>
@@ -213,62 +212,6 @@ export default function SettingsPage() {
                   walletMode === 'viewonly' ? 'border-primary' : 'border-muted-foreground/30'
                 }`}>
                   {walletMode === 'viewonly' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                </div>
-              </div>
-            </button>
-
-            {/* Managed Mode */}
-            <button
-              onClick={() => setWalletMode('managed')}
-              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
-                walletMode === 'managed'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border bg-card hover:border-muted-foreground/30'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'managed' ? 'bg-primary/10' : 'bg-muted'}`}>
-                  <Cloud className={`w-5 h-5 ${walletMode === 'managed' ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-foreground">Managed by XMRPay</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Zero setup. XMRPay runs secure Monero nodes in the background. Fastest onboarding — you're ready in seconds.</p>
-                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">☁️ Easiest – Managed</Badge>
-                </div>
-                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  walletMode === 'managed' ? 'border-primary' : 'border-muted-foreground/30'
-                }`}>
-                  {walletMode === 'managed' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                </div>
-              </div>
-            </button>
-
-            {/* Remote Node Mode */}
-            <button
-              onClick={() => setWalletMode('remote')}
-              className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
-                walletMode === 'remote'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border bg-card hover:border-muted-foreground/30'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`mt-0.5 p-2.5 rounded-lg ${walletMode === 'remote' ? 'bg-primary/10' : 'bg-muted'}`}>
-                  <Globe className={`w-5 h-5 ${walletMode === 'remote' ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-foreground">Easy Remote Node</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Connect to trusted public Monero nodes — no need to run your own. More control than managed mode.</p>
-                  <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground border-border">🌐 Easy – Remote Node</Badge>
-                </div>
-                <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  walletMode === 'remote' ? 'border-primary' : 'border-muted-foreground/30'
-                }`}>
-                  {walletMode === 'remote' && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
                 </div>
               </div>
             </button>
@@ -468,88 +411,8 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Remote Node Configuration */}
-          {walletMode === 'remote' && (
-            <div className="p-5 rounded-xl bg-card border border-border space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Remote Node</h3>
-                {merchant.rpcConnected && (
-                  <Badge className="bg-success/10 text-success border-success/20 text-xs">
-                    <Wifi className="w-3 h-3 mr-1" /> Connected
-                  </Badge>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label className="text-foreground text-xs">Select a node</Label>
-                <Select
-                  value={merchant.remoteNodeUrl}
-                  onValueChange={v => updateMerchant({ remoteNodeUrl: v })}
-                >
-                  <SelectTrigger className="bg-background border-border font-mono text-sm">
-                    <SelectValue placeholder="Choose a remote node..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {REMOTE_NODES.map(n => (
-                      <SelectItem key={n.url} value={n.url} className="font-mono text-sm">
-                        {n.label} — {n.url}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAutoSelectNode}
-                  disabled={autoSelecting}
-                  className="border-border hover:border-primary/50 text-xs"
-                >
-                  {autoSelecting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Zap className="w-3 h-3 mr-1.5 text-primary" />}
-                  {autoSelecting ? 'Testing nodes...' : 'Auto-select fastest'}
-                </Button>
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={merchant.remoteNodeSsl}
-                          onCheckedChange={v => updateMerchant({ remoteNodeSsl: v })}
-                        />
-                        <span className="text-xs text-muted-foreground">SSL</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>Enable SSL/TLS for encrypted connection to the remote node</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-foreground text-xs">Or enter a custom node address</Label>
-                <Input
-                  value={merchant.remoteNodeUrl}
-                  onChange={e => updateMerchant({ remoteNodeUrl: e.target.value })}
-                  className="bg-background border-border font-mono text-sm"
-                  placeholder="node.example.com:18089"
-                />
-              </div>
-
-              <Button onClick={handleTestConnection} disabled={testing || !merchant.remoteNodeUrl} className="bg-gradient-orange hover:opacity-90 w-full">
-                {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
-                {testing ? 'Testing...' : 'Test Connection'}
-              </Button>
-
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border">
-                <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Remote nodes are convenient but for maximum privacy, run your own node later. Your wallet keys always stay on your device.
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Self-Custody Configuration */}
           {walletMode === 'selfcustody' && (

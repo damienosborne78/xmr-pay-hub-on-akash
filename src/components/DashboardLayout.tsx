@@ -10,7 +10,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive } from 'lucide-react';
 
 const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
@@ -31,6 +31,7 @@ const toolsNav = [
 const configNav = [
   { title: 'Localization', url: '/dashboard/localization', icon: Globe },
   { title: 'White-Label', url: '/dashboard/white-label', icon: Paintbrush },
+  { title: 'Backups', url: '/dashboard/backups', icon: HardDrive },
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
 ];
 
@@ -103,14 +104,14 @@ function ManagedBadge() {
         <div>
           <Badge variant="outline" className={isSelfCustody ? 'bg-primary/10 text-primary border-primary/20 text-xs cursor-help' : 'bg-success/10 text-success border-success/20 text-xs cursor-help'}>
             {isSelfCustody ? <Shield className="w-3 h-3 mr-1" /> : <Server className="w-3 h-3 mr-1" />}
-            {isSelfCustody ? 'Self-Custody' : 'Managed by XMRPay'}
+            {isSelfCustody ? 'Self-Custody' : 'Browser Wallet'}
           </Badge>
         </div>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-xs text-xs">
         {isSelfCustody
           ? 'Connected to your own monero-wallet-rpc. Full sovereignty — your keys, your coins.'
-          : 'Native Monero integration managed by XMRPay. No third-party gateway — direct wallet RPC, zero custodial risk.'}
+          : 'In-browser wallet with local key derivation. Self-custody — your keys never leave your device.'}
       </TooltipContent>
     </Tooltip>
   );
