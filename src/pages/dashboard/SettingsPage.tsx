@@ -325,7 +325,44 @@ export default function SettingsPage() {
             </DialogContent>
           </Dialog>
 
-          {/* View-Only Active Status */}
+          {/* Wallet Choice Dialog — Create New or Restore */}
+          <Dialog open={showWalletChoice} onOpenChange={setShowWalletChoice}>
+            <DialogContent className="bg-card border-border max-w-md">
+              <DialogHeader><DialogTitle className="text-foreground">Set Up Browser Wallet</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">Choose how to get started:</p>
+              <div className="grid gap-3 pt-2">
+                <button
+                  onClick={() => { setShowWalletChoice(false); setShowBrowserWalletSetup(true); }}
+                  className="w-full text-left p-4 rounded-xl border-2 border-border bg-card hover:border-primary/50 transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Shield className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-foreground text-sm">Create New Wallet</span>
+                      <p className="text-xs text-muted-foreground mt-1">Generate a fresh wallet with a new seed phrase. You'll back it up once during setup.</p>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setShowWalletChoice(false); setShowRestoreFromSeed(true); }}
+                  className="w-full text-left p-4 rounded-xl border-2 border-border bg-card hover:border-primary/50 transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-muted">
+                      <Download className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-foreground text-sm">Restore from Seed Phrase</span>
+                      <p className="text-xs text-muted-foreground mt-1">Already have a 25-word seed? Enter it to restore your existing wallet.</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {walletMode === 'viewonly' && merchant.viewOnlySetupComplete && (
             <div className="p-5 rounded-xl bg-card border border-border space-y-4">
               <div className="flex items-center justify-between">
