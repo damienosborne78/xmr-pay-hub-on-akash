@@ -9,13 +9,10 @@ export function useRates() {
 
   const refresh = useCallback(async () => {
     try {
-      // Force fresh fetch by clearing cache
       localStorage.removeItem('moneroflow_currency_cache');
       const r = await getRates();
       setRates(r);
-    } catch {
-      // Keep stale rates if refresh fails
-    }
+    } catch { /* keep stale */ }
   }, []);
 
   useEffect(() => {
@@ -24,7 +21,6 @@ export function useRates() {
       .then(r => { if (mounted) { setRates(r); setLoading(false); } })
       .catch(() => { if (mounted) setLoading(false); });
 
-    // Auto-refresh every 5 min
     const interval = setInterval(() => {
       getRates().then(r => { if (mounted) setRates(r); }).catch(() => {});
     }, 5 * 60 * 1000);
