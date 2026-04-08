@@ -10,7 +10,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users } from 'lucide-react';
 
 const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
@@ -29,6 +29,7 @@ const toolsNav = [
 ];
 
 const configNav = [
+  { title: 'Users', url: '/dashboard/users', icon: Users },
   { title: 'Localization', url: '/dashboard/localization', icon: Globe },
   { title: 'White-Label', url: '/dashboard/white-label', icon: Paintbrush },
   { title: 'Backups', url: '/dashboard/backups', icon: HardDrive },

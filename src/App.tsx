@@ -22,6 +22,7 @@ import WhiteLabelPage from "./pages/dashboard/WhiteLabelPage";
 import PayoutsPage from "./pages/dashboard/PayoutsPage";
 import ReferralsPage from "./pages/dashboard/ReferralsPage";
 import BackupsPage from "./pages/dashboard/BackupsPage";
+import UsersPage from "./pages/dashboard/UsersPage";
 import InvoicePage from "./pages/InvoicePage";
 import PayPage from "./pages/PayPage";
 import NotFound from "./pages/NotFound";
@@ -53,6 +54,7 @@ const App = () => (
             <Route path="localization" element={<LocalizationPage />} />
             <Route path="white-label" element={<WhiteLabelPage />} />
             <Route path="backups" element={<BackupsPage />} />
+            <Route path="users" element={<UsersPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="/invoice/:id" element={<InvoicePage />} />

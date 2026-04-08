@@ -1,5 +1,5 @@
 import { useStore } from '@/lib/store';
-import { formatXMR, formatUSD, XMR_USD_RATE } from '@/lib/mock-data';
+import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 import { MoneroLogo } from '@/components/BrandLogo';
 import { TrendingUp, FileText, Clock, DollarSign, Server, Wifi, WifiOff, Activity, Loader2, RefreshCw, Zap } from 'lucide-react';
@@ -7,47 +7,49 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { FadeIn } from '@/components/FadeIn';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { useRates } from '@/hooks/use-rates';
+import { getXmrPrice } from '@/lib/currency-service';
 
 export default function DashboardOverview() {
   const invoices = useStore(s => s.invoices);
   const merchant = useStore(s => s.merchant);
   const autoConnectNode = useStore(s => s.autoConnectNode);
   const refreshNodeStatus = useStore(s => s.refreshNodeStatus);
+  const sym = merchant.fiatSymbol || '$';
+  const cur = merchant.fiatCurrency || 'USD';
+  const { rates, refresh: refreshRates, loading: ratesLoading } = useRates();
+
   const paid = invoices.filter(i => i.status === 'paid');
-  const totalUSD = paid.reduce((s, i) => s + i.fiatAmount, 0);
+  const totalFiat = paid.reduce((s, i) => s + i.fiatAmount, 0);
   const totalXMR = paid.reduce((s, i) => s + i.xmrAmount, 0);
   const pending = invoices.filter(i => i.status === 'pending').length;
 
   const [refreshing, setRefreshing] = useState(false);
   const [autoConnecting, setAutoConnecting] = useState(false);
 
-  // Auto-connect on mount if wallet is configured but not connected
+  const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
+
   useEffect(() => {
     const shouldAutoConnect =
       (merchant.walletMode === 'viewonly' && merchant.viewOnlySetupComplete) ||
       merchant.walletMode === 'remote';
-
     if (shouldAutoConnect && merchant.nodeStatus !== 'online') {
       setAutoConnecting(true);
       autoConnectNode().finally(() => setAutoConnecting(false));
     }
-  }, []); // Only on mount
+  }, []);
 
-  // Periodic health check every 60s
   useEffect(() => {
     if (merchant.nodeStatus !== 'online' && merchant.nodeStatus !== 'syncing') return;
-    const interval = setInterval(() => {
-      refreshNodeStatus();
-    }, 60000);
+    const interval = setInterval(() => { refreshNodeStatus(); }, 60000);
     return () => clearInterval(interval);
   }, [merchant.nodeStatus]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshNodeStatus();
+    await Promise.all([refreshNodeStatus(), refreshRates()]);
     setRefreshing(false);
-  }, [refreshNodeStatus]);
+  }, [refreshNodeStatus, refreshRates]);
 
   const handleReconnect = useCallback(async () => {
     setAutoConnecting(true);
@@ -67,8 +69,8 @@ export default function DashboardOverview() {
   }, [paid]);
 
   const stats = [
-    { label: 'Total Received', value: formatUSD(totalUSD), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
-    { label: 'XMR Rate', value: formatUSD(XMR_USD_RATE), sub: '1 XMR', icon: TrendingUp, color: 'text-primary' },
+    { label: 'Total Received', value: formatFiat(totalFiat, sym, cur), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
+    { label: 'XMR Rate', value: xmrPrice ? formatFiat(xmrPrice, sym, cur) : 'Loading...', sub: `1 XMR in ${cur}`, icon: TrendingUp, color: 'text-primary' },
     { label: 'Total Invoices', value: invoices.length.toString(), sub: `${paid.length} paid`, icon: FileText, color: 'text-primary' },
     { label: 'Pending', value: pending.toString(), sub: 'awaiting payment', icon: Clock, color: 'text-warning' },
   ];
@@ -116,20 +118,14 @@ export default function DashboardOverview() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-foreground">Wallet Status</span>
                   <Badge variant="outline" className={`${currentStatus.color} text-[10px] gap-1`}>
-                    {isLoading ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <StatusIcon className="w-3 h-3" />
-                    )}
+                    {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <StatusIcon className="w-3 h-3" />}
                     {isLoading ? 'Connecting...' : currentStatus.label}
                   </Badge>
                 </div>
                 {isConnected && merchant.connectedNodeLabel && (
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     Connected to <span className="text-foreground font-medium">{merchant.connectedNodeLabel}</span>
-                    {merchant.nodeLatencyMs > 0 && (
-                      <span className="text-muted-foreground"> · {merchant.nodeLatencyMs}ms</span>
-                    )}
+                    {merchant.nodeLatencyMs > 0 && <span className="text-muted-foreground"> · {merchant.nodeLatencyMs}ms</span>}
                   </p>
                 )}
               </div>
@@ -160,7 +156,6 @@ export default function DashboardOverview() {
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Mode</p>
                 <p className="text-sm text-foreground mt-0.5 capitalize">{
                   merchant.walletMode === 'viewonly' ? 'Browser Wallet' :
-                  merchant.walletMode === 'remote' ? 'Remote Node' :
                   merchant.walletMode === 'selfcustody' ? 'Self-Custody' : 'Managed'
                 }</p>
               </div>
@@ -212,7 +207,7 @@ export default function DashboardOverview() {
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(240, 5%, 55%)', fontSize: 12 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(240, 5%, 55%)', fontSize: 12 }} tickFormatter={v => `$${v}`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(240, 5%, 55%)', fontSize: 12 }} tickFormatter={v => `${sym}${v}`} />
                   <Tooltip contentStyle={{ background: 'hsl(240, 10%, 7%)', border: '1px solid hsl(240, 5%, 17%)', borderRadius: '8px', color: '#fff' }} />
                   <Area type="monotone" dataKey="revenue" stroke="hsl(24, 100%, 50%)" strokeWidth={2} fill="url(#colorRevenue)" />
                 </AreaChart>
@@ -237,7 +232,7 @@ export default function DashboardOverview() {
                   </div>
                   <div className="text-right flex items-center gap-3">
                     <div>
-                      <p className="text-sm font-medium text-foreground">{formatUSD(inv.fiatAmount)}</p>
+                      <p className="text-sm font-medium text-foreground">{formatFiat(inv.fiatAmount, sym, cur)}</p>
                       <p className="text-xs text-muted-foreground">{formatXMR(inv.xmrAmount)}</p>
                     </div>
                     <Badge variant={inv.status === 'paid' ? 'default' : inv.status === 'pending' ? 'secondary' : 'outline'}

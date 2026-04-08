@@ -24,7 +24,7 @@ export default function ReferralsPage() {
   const [showQR, setShowQR] = useState(false);
 
   const refCode = merchant.referralCode || merchant.id.replace('merch_', '');
-  const refLink = `https://xmrpay.flow/ref/${refCode}`;
+  const refLink = `https://moneroflow.com/ref/${refCode}`;
 
   const totalReferred = referrals.length;
   const monthlyEarnings = referrals.reduce((sum, r) => sum + (r.monthlyCommission || 0), 0);
