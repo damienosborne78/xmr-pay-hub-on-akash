@@ -292,7 +292,7 @@ export function generateSubaddress(
 
   const m = hashToScalar(data); // scalar
   const M = ed.curve.g.mul(m); // M = m * G
-  const B = ed.decodePoint(hexToBytes(publicSpendKeyHex)); // public spend key point
+  const B = ed.decodePoint(Array.from(hexToBytes(publicSpendKeyHex))); // public spend key point
   const D = B.add(M); // subaddress public spend key
 
   const viewScalar = leHexToBN(privateViewKeyHex);
