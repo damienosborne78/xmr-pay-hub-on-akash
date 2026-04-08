@@ -6,73 +6,55 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStore } from '@/lib/store';
-import { formatUSD, formatXMR, XMR_USD_RATE } from '@/lib/mock-data';
-import { Landmark, FileSpreadsheet, Download, TrendingUp, Calendar, Check, Lock } from 'lucide-react';
+import { formatUSD, formatXMR, formatFiat, XMR_USD_RATE } from '@/lib/mock-data';
+import { Landmark, FileSpreadsheet, Download, Calendar, Check, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+
+function ProLock() {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Lock className="w-4 h-4 text-yellow-500 shrink-0 cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent className="bg-card border-border text-xs">Unlock Pro Sub for this feature</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export default function PayoutsPage() {
   const merchant = useStore(s => s.merchant);
   const invoices = useStore(s => s.invoices);
   const isPro = merchant.plan === 'pro';
+  const sym = merchant.fiatSymbol || '$';
+  const cur = merchant.fiatCurrency || 'USD';
 
   const [autoPayoutEnabled, setAutoPayoutEnabled] = useState(false);
   const [payoutMethod, setPayoutMethod] = useState('bank');
   const [payoutThreshold, setPayoutThreshold] = useState(1.0);
   const [bankAccount, setBankAccount] = useState('');
-  const [payoutCurrency, setPayoutCurrency] = useState('USD');
+  const [payoutCurrency, setPayoutCurrency] = useState(cur);
   const [exportRange, setExportRange] = useState('month');
 
   const paidInvoices = invoices.filter(i => i.status === 'paid');
   const totalXmr = paidInvoices.reduce((sum, i) => sum + i.xmrAmount, 0);
   const totalFiat = paidInvoices.reduce((sum, i) => sum + i.fiatAmount, 0);
 
-  // If not pro, show locked screen
-  if (!isPro) {
-    return (
-      <div className="space-y-8 max-w-3xl">
-        <FadeIn>
-          <h1 className="text-2xl font-bold text-foreground">Payouts & Accounting</h1>
-          <p className="text-muted-foreground text-sm">Fiat payouts, bank settlements, and accounting exports</p>
-        </FadeIn>
-        <FadeIn delay={0.05}>
-          <div className="p-8 rounded-xl bg-card border border-border text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-              <Lock className="w-8 h-8 text-primary" />
-            </div>
-            <h2 className="text-xl font-bold text-foreground">Pro Feature</h2>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Payouts & Accounting is available on the Pro plan. Upgrade to access fiat settlements, accounting exports (CSV, PDF, QuickBooks, Xero), and automated monthly reconciliation reports.
-            </p>
-            <Button
-              className="bg-gradient-orange hover:opacity-90"
-              onClick={() => {
-                useStore.getState().updateMerchant({ plan: 'pro' });
-                toast.success('Upgraded to Pro!');
-              }}
-            >
-              Upgrade to Pro — $29/mo
-            </Button>
-          </div>
-        </FadeIn>
-      </div>
-    );
-  }
+  const handleProAction = (action: () => void) => {
+    if (!isPro) { toast.error('Upgrade to Pro to use this feature'); return; }
+    action();
+  };
 
   const generateCSV = (invoiceList: typeof paidInvoices): string => {
-    const headers = ['Invoice ID', 'Date', 'Description', 'Fiat Amount (USD)', 'XMR Amount', 'XMR/USD Rate', 'Status', 'Subaddress', 'TX Hash', 'Paid At'];
+    const headers = ['Invoice ID', 'Date', 'Description', `Fiat Amount (${cur})`, 'XMR Amount', 'XMR/USD Rate', 'Status', 'Subaddress', 'TX Hash', 'Paid At'];
     const rows = invoiceList.map(inv => [
-      inv.id,
-      inv.createdAt,
-      `"${inv.description.replace(/"/g, '""')}"`,
-      inv.fiatAmount.toFixed(2),
-      inv.xmrAmount.toFixed(6),
-      XMR_USD_RATE.toFixed(2),
-      inv.status,
-      inv.subaddress,
-      inv.txid || '',
-      inv.paidAt || '',
+      inv.id, inv.createdAt, `"${inv.description.replace(/"/g, '""')}"`,
+      inv.fiatAmount.toFixed(2), inv.xmrAmount.toFixed(6), XMR_USD_RATE.toFixed(2),
+      inv.status, inv.subaddress, inv.txid || '', inv.paidAt || '',
     ]);
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   };
@@ -94,15 +76,10 @@ export default function PayoutsPage() {
   const generateXeroCSV = (invoiceList: typeof paidInvoices): string => {
     const headers = ['*ContactName', '*InvoiceNumber', '*InvoiceDate', '*DueDate', 'Description', '*UnitAmount', 'AccountCode', 'TaxType', 'Currency'];
     const rows = invoiceList.map(inv => [
-      `"MoneroFlow Payment"`,
-      inv.id,
-      new Date(inv.createdAt).toISOString().split('T')[0],
-      new Date(inv.createdAt).toISOString().split('T')[0],
+      `"MoneroFlow Payment"`, inv.id,
+      new Date(inv.createdAt).toISOString().split('T')[0], new Date(inv.createdAt).toISOString().split('T')[0],
       `"${inv.description.replace(/"/g, '""')} (${inv.xmrAmount.toFixed(6)} XMR)"`,
-      inv.fiatAmount.toFixed(2),
-      '200',
-      'Tax Exempt',
-      'USD',
+      inv.fiatAmount.toFixed(2), '200', 'Tax Exempt', cur,
     ]);
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   };
@@ -120,14 +97,14 @@ export default function PayoutsPage() {
     lines.push('SUMMARY');
     lines.push('-'.repeat(30));
     lines.push(`Total Transactions: ${invoiceList.length}`);
-    lines.push(`Total Revenue (USD): ${formatUSD(totalFiat)}`);
+    lines.push(`Total Revenue (${cur}): ${formatFiat(totalFiat, sym, cur)}`);
     lines.push(`Total XMR Received: ${formatXMR(totalXmr)}`);
     lines.push(`Average XMR/USD Rate: ${XMR_USD_RATE.toFixed(2)}`);
     lines.push('');
     lines.push('TRANSACTIONS');
     lines.push('-'.repeat(30));
     invoiceList.forEach(inv => {
-      lines.push(`${inv.id} | ${new Date(inv.createdAt).toLocaleDateString()} | ${inv.description} | ${formatUSD(inv.fiatAmount)} | ${formatXMR(inv.xmrAmount)} | ${inv.status}`);
+      lines.push(`${inv.id} | ${new Date(inv.createdAt).toLocaleDateString()} | ${inv.description} | ${formatFiat(inv.fiatAmount, sym, cur)} | ${formatXMR(inv.xmrAmount)} | ${inv.status}`);
     });
     lines.push('');
     lines.push('—— End of Report ——');
@@ -141,8 +118,7 @@ export default function PayoutsPage() {
       if (range === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       if (range === 'quarter') {
         const q = Math.floor(now.getMonth() / 3);
-        const invQ = Math.floor(d.getMonth() / 3);
-        return invQ === q && d.getFullYear() === now.getFullYear();
+        return Math.floor(d.getMonth() / 3) === q && d.getFullYear() === now.getFullYear();
       }
       if (range === 'year') return d.getFullYear() === now.getFullYear();
       return true;
@@ -153,21 +129,16 @@ export default function PayoutsPage() {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleExport = (format: string) => {
+    if (!isPro) { toast.error('Upgrade to Pro to export data'); return; }
     const filtered = filterByRange(exportRange);
-    if (filtered.length === 0) {
-      toast.error('No paid invoices found for the selected period.');
-      return;
-    }
+    if (filtered.length === 0) { toast.error('No paid invoices found for the selected period.'); return; }
     const rangeLabel = exportRange === 'month' ? 'monthly' : exportRange === 'quarter' ? 'quarterly' : exportRange === 'year' ? 'yearly' : 'all-time';
     const dateSuffix = new Date().toISOString().split('T')[0];
-
     switch (format) {
       case 'csv':
         downloadFile(generateCSV(filtered), `moneroflow-${rangeLabel}-${dateSuffix}.csv`, 'text/csv');
@@ -208,7 +179,7 @@ export default function PayoutsPage() {
           <div className="p-5 rounded-xl bg-card border border-border">
             <p className="text-xs text-muted-foreground">Total Received</p>
             <p className="text-2xl font-bold text-foreground mt-1">{formatXMR(totalXmr)}</p>
-            <p className="text-sm text-muted-foreground">{formatUSD(totalFiat)}</p>
+            <p className="text-sm text-muted-foreground">{formatFiat(totalFiat, sym, cur)}</p>
           </div>
           <div className="p-5 rounded-xl bg-card border border-border">
             <p className="text-xs text-muted-foreground">Paid Invoices</p>
@@ -229,18 +200,19 @@ export default function PayoutsPage() {
           <div className="flex items-center gap-2">
             <Landmark className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Automatic Fiat Payouts</h2>
+            {!isPro && <ProLock />}
           </div>
-          <p className="text-xs text-muted-foreground">Auto-convert XMR to fiat and settle to your bank account or stablecoin wallet via partner rails.</p>
+          <p className="text-xs text-muted-foreground">Auto-convert XMR to fiat and settle to your bank account or stablecoin wallet.</p>
 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-foreground">Enable Auto Payouts</p>
               <p className="text-xs text-muted-foreground">Automatically convert and settle when balance exceeds threshold</p>
             </div>
-            <Switch checked={autoPayoutEnabled} onCheckedChange={setAutoPayoutEnabled} />
+            <Switch checked={autoPayoutEnabled} onCheckedChange={v => handleProAction(() => setAutoPayoutEnabled(v))} />
           </div>
 
-          {autoPayoutEnabled && (
+          {autoPayoutEnabled && isPro && (
             <div className="space-y-4 pt-3 border-t border-border">
               <div className="space-y-2">
                 <Label className="text-foreground">Payout Method</Label>
@@ -294,8 +266,9 @@ export default function PayoutsPage() {
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Accounting Export</h2>
+            {!isPro && <ProLock />}
           </div>
-          <p className="text-xs text-muted-foreground">Export transactions with cost basis for tax reporting. Includes fiat equivalent at time of payment.</p>
+          <p className="text-xs text-muted-foreground">Export transactions with cost basis for tax reporting.</p>
 
           <div className="space-y-2">
             <Label className="text-foreground">Export Range</Label>
@@ -318,28 +291,27 @@ export default function PayoutsPage() {
                 className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/30 bg-muted/10 transition-colors text-left"
               >
                 <Download className="w-4 h-4 text-primary shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{fmt.name}</p>
                   <p className="text-xs text-muted-foreground">{fmt.desc}</p>
                 </div>
+                {!isPro && <Lock className="w-3.5 h-3.5 text-yellow-500 shrink-0" />}
               </button>
             ))}
           </div>
         </div>
       </FadeIn>
 
-      {/* Monthly Reconciliation */}
+      {/* Recent Paid Invoices */}
       <FadeIn delay={0.12}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Recent Paid Invoices</h2>
           </div>
-          <p className="text-xs text-muted-foreground">Your most recent paid transactions.</p>
-
           {paidInvoices.length === 0 ? (
             <div className="p-4 rounded-lg bg-muted/20 border border-border text-center">
-              <p className="text-sm text-muted-foreground">No paid invoices yet. Paid invoices will appear here.</p>
+              <p className="text-sm text-muted-foreground">No paid invoices yet.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -350,7 +322,7 @@ export default function PayoutsPage() {
                       <Check className="w-4 h-4 text-success" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">{formatUSD(inv.fiatAmount)}</p>
+                      <p className="text-sm font-medium text-foreground">{formatFiat(inv.fiatAmount, sym, cur)}</p>
                       <p className="text-xs text-muted-foreground">{inv.description}</p>
                     </div>
                   </div>

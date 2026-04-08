@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Globe, Languages, DollarSign, Scale, Check } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useStore } from '@/lib/store';
+import { CURRENCIES } from '@/lib/mock-data';
 
 const languages = [
   { code: 'en', name: 'English', flag: '🇺🇸', active: true },
@@ -27,20 +29,7 @@ const languages = [
   { code: 'sv', name: 'Svenska', flag: '🇸🇪', active: false },
 ];
 
-const currencies = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
-  { code: 'BRL', symbol: 'R$', name: 'Brazilian Real' },
-  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
-  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
-  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-  { code: 'MXN', symbol: 'MX$', name: 'Mexican Peso' },
-  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
-  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
-];
+const currencies = CURRENCIES;
 
 const taxRegions = [
   { region: 'European Union', vat: true, rate: '19-27%', note: 'VAT reverse charge may apply for B2B' },
@@ -51,10 +40,17 @@ const taxRegions = [
 ];
 
 export default function LocalizationPage() {
+  const merchant = useStore(s => s.merchant);
+  const updateMerchant = useStore(s => s.updateMerchant);
+
   const [activeLangs, setActiveLangs] = useState<Record<string, boolean>>(
     Object.fromEntries(languages.map(l => [l.code, l.active]))
   );
-  const [defaultCurrency, setDefaultCurrency] = useState('USD');
+  const defaultCurrency = merchant.fiatCurrency || 'USD';
+  const setDefaultCurrency = (code: string) => {
+    const cur = currencies.find(c => c.code === code);
+    updateMerchant({ fiatCurrency: code, fiatSymbol: cur?.symbol || '$' });
+  };
   const [autoDetectLang, setAutoDetectLang] = useState(true);
   const [showLocalCurrency, setShowLocalCurrency] = useState(true);
   const [autoVat, setAutoVat] = useState(false);

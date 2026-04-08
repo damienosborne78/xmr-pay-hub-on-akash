@@ -21,6 +21,14 @@ export interface Invoice {
   cartId?: string;
 }
 
+export interface PosQuickButton {
+  id: string;
+  label: string;
+  price: number;
+  category: string;
+  color: string;
+}
+
 export interface Merchant {
   id: string;
   name: string;
@@ -50,6 +58,9 @@ export interface Merchant {
   rpcPassword: string;
   rpcWalletFilename: string;
   rpcConnected: boolean;
+  // Localization
+  fiatCurrency: string;
+  fiatSymbol: string;
   // View-only wallet fields
   viewOnlyAddress: string;
   viewOnlyViewKey: string;
@@ -58,7 +69,7 @@ export interface Merchant {
   viewOnlySetupComplete: boolean;
   viewOnlySeedPhrase: string;
   viewOnlySeedBackedUp: boolean;
-  viewOnlySubaddressIndex: number;  // Next subaddress index to use
+  viewOnlySubaddressIndex: number;
   viewOnlySpendKey: string;
   viewOnlyPublicSpendKey: string;
   viewOnlyPublicViewKey: string;
@@ -68,6 +79,9 @@ export interface Merchant {
   nodeStatus: 'online' | 'syncing' | 'offline' | 'connecting';
   nodeHeight: number;
   nodeLatencyMs: number;
+  // PoS Pro features
+  posQuickButtons: PosQuickButton[];
+  posCategories: string[];
 }
 
 export interface Referral {
@@ -110,6 +124,21 @@ export interface PaymentLink {
 }
 
 // Default merchant — empty, no mock data
+export const CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+  { code: 'BRL', symbol: 'R$', name: 'Brazilian Real' },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'MXN', symbol: 'MX$', name: 'Mexican Peso' },
+  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
+];
+
 export const defaultMerchant: Merchant = {
   id: '',
   name: '',
@@ -139,6 +168,8 @@ export const defaultMerchant: Merchant = {
   rpcPassword: '',
   rpcWalletFilename: '',
   rpcConnected: false,
+  fiatCurrency: 'USD',
+  fiatSymbol: '$',
   viewOnlyAddress: '',
   viewOnlyViewKey: '',
   viewOnlyRestoreHeight: 0,
@@ -155,8 +186,14 @@ export const defaultMerchant: Merchant = {
   nodeStatus: 'offline',
   nodeHeight: 0,
   nodeLatencyMs: 0,
+  posQuickButtons: [],
+  posCategories: ['Food', 'Drinks', 'Services', 'Products'],
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
 export const formatUSD = (amount: number) => '$' + amount.toFixed(2);
+export const formatFiat = (amount: number, symbol: string = '$', code: string = 'USD') => {
+  if (code === 'JPY') return symbol + Math.round(amount).toLocaleString();
+  return symbol + amount.toFixed(2);
+};
 export const usdToXmr = (usd: number) => usd / XMR_USD_RATE;

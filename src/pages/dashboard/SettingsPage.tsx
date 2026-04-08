@@ -24,6 +24,7 @@ import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 export default function SettingsPage() {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const deleteAccount = useStore(s => s.deleteAccount);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -33,6 +34,8 @@ export default function SettingsPage() {
   const [showBrowserWalletSetup, setShowBrowserWalletSetup] = useState(false);
   const [showRestoreFromSeed, setShowRestoreFromSeed] = useState(false);
   const [showWalletChoice, setShowWalletChoice] = useState(false);
+  const [dangerSeed, setDangerSeed] = useState('');
+  const [showDangerConfirm, setShowDangerConfirm] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copyKey = () => {
@@ -672,6 +675,77 @@ export default function SettingsPage() {
               <Badge className="bg-primary/10 text-primary border-primary/20">Pro Plan Active</Badge>
             )}
           </div>
+        </div>
+      </FadeIn>
+
+      {/* DANGER ZONE */}
+      <FadeIn delay={0.25}>
+        <div className="p-6 rounded-xl border-2 border-destructive/30 bg-destructive/5 space-y-4">
+          <h2 className="text-lg font-bold text-destructive">⚠️ DANGER ZONE</h2>
+          <p className="text-xs text-muted-foreground">Permanently delete your entire account, all invoices, wallet data, cookies, and local storage. This action <strong className="text-destructive">cannot be undone</strong>.</p>
+
+          <div className="space-y-2">
+            <Label className="text-foreground text-sm">Enter your 25-word seed phrase to confirm deletion</Label>
+            <textarea
+              value={dangerSeed}
+              onChange={e => setDangerSeed(e.target.value)}
+              className="w-full h-24 rounded-lg bg-background border border-destructive/30 p-3 text-sm font-mono text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:border-destructive/60"
+              placeholder="Enter your seed phrase to unlock account deletion..."
+            />
+          </div>
+
+          {(() => {
+            const seedMatch = dangerSeed.trim().toLowerCase() === (merchant.viewOnlySeedPhrase || '').trim().toLowerCase();
+            const hasSeed = !!merchant.viewOnlySeedPhrase;
+            return (
+              <>
+                {dangerSeed.length > 0 && !seedMatch && (
+                  <p className="text-xs text-destructive">Seed phrase does not match. Please enter the exact 25-word phrase.</p>
+                )}
+                {dangerSeed.length > 0 && seedMatch && (
+                  <p className="text-xs text-success">✓ Seed phrase verified</p>
+                )}
+                <Button
+                  variant="destructive"
+                  disabled={hasSeed ? !seedMatch : false}
+                  onClick={() => setShowDangerConfirm(true)}
+                  className="w-full"
+                >
+                  DELETE ENTIRE ACCOUNT
+                </Button>
+              </>
+            );
+          })()}
+
+          <Dialog open={showDangerConfirm} onOpenChange={setShowDangerConfirm}>
+            <DialogContent className="bg-card border-destructive/30 max-w-sm">
+              <DialogHeader><DialogTitle className="text-destructive">Final Confirmation</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">This will permanently delete:</p>
+              <ul className="text-xs text-foreground space-y-1 list-disc list-inside">
+                <li>All wallet data and keys</li>
+                <li>All invoices and payment history</li>
+                <li>All subscriptions and payment links</li>
+                <li>All settings and preferences</li>
+                <li>Cookies and local storage</li>
+              </ul>
+              <p className="text-xs text-destructive font-bold">This cannot be reversed.</p>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={() => setShowDangerConfirm(false)} className="flex-1 border-border">Cancel</Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    deleteAccount();
+                    setShowDangerConfirm(false);
+                    toast.success('Account deleted. All data has been wiped.');
+                    window.location.href = '/';
+                  }}
+                >
+                  DELETE EVERYTHING
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </FadeIn>
     </div>
