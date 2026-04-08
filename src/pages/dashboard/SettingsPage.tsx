@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [autoSelecting, setAutoSelecting] = useState(false);
   const [showBrowserWalletSetup, setShowBrowserWalletSetup] = useState(false);
   const [showRestoreFromSeed, setShowRestoreFromSeed] = useState(false);
+  const [showWalletChoice, setShowWalletChoice] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copyKey = () => {
