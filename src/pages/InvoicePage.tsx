@@ -14,6 +14,7 @@ import { validateAddress, type RpcConfig } from '@/lib/monero-rpc';
 import { REMOTE_NODES } from '@/lib/node-manager';
 
 export default function InvoicePage() {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const invoices = useStore(s => s.invoices);
   const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
@@ -96,12 +97,12 @@ export default function InvoicePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) navigate('/dashboard/invoices'); }}>
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
       <FadeIn className="w-full max-w-md relative z-10">
-        <a href="/dashboard/overview" className="block text-center mb-6 cursor-pointer">
-          <BrandLogo />
-        </a>
+        <div className="text-center mb-6">
+          <BrandLogo linkTo="/dashboard/overview" />
+        </div>
 
         <div className="rounded-2xl bg-card border border-border overflow-hidden">
           <div className="p-6 border-b border-border">
