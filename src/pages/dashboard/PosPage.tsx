@@ -394,7 +394,7 @@ export default function PosPage() {
             <p className="text-primary font-mono mt-1">{formatXMR(activeInvoice.xmrAmount)}</p>
           </div>
           <div className="bg-white rounded-2xl p-6 inline-block">
-            <QRCodeSVG value={`monero:${activeInvoice.subaddress}?tx_amount=${activeInvoice.xmrAmount.toFixed(12)}`} size={220} />
+            <QRCodeSVG value={`monero:${activeInvoice.subaddress}?tx_amount=${activeInvoice.xmrAmount.toFixed(6)}`} size={220} />
           </div>
           <p className="text-muted-foreground text-xs font-mono break-all px-4">{activeInvoice.subaddress.slice(0, 20)}...{activeInvoice.subaddress.slice(-10)}</p>
           <MoneroFeeInfo compact />
