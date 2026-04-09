@@ -474,18 +474,43 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
           </div>
         )}
 
+        {/* ── Tracking Screen — polls explorer for TX ── */}
+        {step === 'tracking' && (
+          <SendTrackingProgress
+            txHash={sentTxHash}
+            amount={parsedAmount}
+            recipientAddress={recipientAddress}
+            fee={selectedFee}
+            sym={sym}
+            cur={cur}
+            xmrPrice={xmrPrice}
+            onDone={() => setStep('sent')}
+          />
+        )}
+
         {step === 'sent' && (
           <div className="space-y-4 text-center py-4">
             <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto">
               <Check className="w-8 h-8 text-success" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">Transaction Submitted!</h3>
+            <h3 className="text-lg font-bold text-foreground">Transaction Complete!</h3>
             <p className="text-sm text-muted-foreground">
               {formatXMR(parsedAmount)} sent to {recipientAddress.slice(0, 8)}...{recipientAddress.slice(-8)}
             </p>
-            <p className="text-xs text-muted-foreground">
-              Expected confirmation: {selectedFee.eta}
-            </p>
+            {sentTxHash && (
+              <div className="bg-muted/20 rounded-lg p-2.5 border border-border">
+                <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>
+                <a
+                  href={`https://xmrchain.net/tx/${sentTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[9px] text-primary hover:underline break-all flex items-center justify-center gap-1"
+                >
+                  {sentTxHash}
+                  <ExternalLink className="w-3 h-3 shrink-0" />
+                </a>
+              </div>
+            )}
             <Button onClick={() => { resetForm(); onOpenChange(false); }} className="w-full bg-gradient-orange hover:opacity-90">
               Done
             </Button>
