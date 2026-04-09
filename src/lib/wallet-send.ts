@@ -82,7 +82,7 @@ export async function sendViaDaemonProxy(
 
     // Sync the wallet with progress updates
     await wallet.sync(new class extends moneroTs.MoneroWalletListener {
-      onSyncProgress(height: number, startHeight: number, endHeight: number, percentDone: number) {
+      async onSyncProgress(height: number, startHeight: number, endHeight: number, percentDone: number, _message: string): Promise<void> {
         onProgress?.({
           percent: 35 + Math.floor(percentDone * 40),
           height,
@@ -185,7 +185,7 @@ export async function sendViaWasmWallet(
       onProgress?.({ percent: 30, height: 0, targetHeight: daemonHeight, message: 'Initial sync...' });
 
       await persistentWallet.sync(new class extends moneroTs.MoneroWalletListener {
-        onSyncProgress(height: number, _startHeight: number, endHeight: number, percentDone: number) {
+        async onSyncProgress(height: number, _startHeight: number, endHeight: number, percentDone: number, _message: string): Promise<void> {
           onProgress?.({
             percent: 30 + Math.floor(percentDone * 45),
             height,
