@@ -160,7 +160,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
       }
 
       const sendMode: SendMode = merchant.sendMode || 'proxy';
-      const nodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
+      const nodeUrl = effectiveNodeUrl;
 
       setStep('syncing');
 
