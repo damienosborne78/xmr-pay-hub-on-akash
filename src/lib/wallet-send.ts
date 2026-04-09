@@ -61,7 +61,7 @@ export async function sendViaDaemonProxy(
     onProgress?.({ percent: 15, height: 0, targetHeight: 0, message: 'Connecting to daemon...' });
 
     // Connect to the remote daemon
-    const protocol = nodeUrl.includes('443') ? 'https' : 'https';
+    const protocol = nodeUrl.includes('443') ? 'https' : 'http';
     const daemonUrl = nodeUrl.startsWith('http') ? nodeUrl : `${protocol}://${nodeUrl}`;
 
     const daemon = await moneroTs.connectToDaemonRpc(daemonUrl);
@@ -163,7 +163,7 @@ export async function sendViaWasmWallet(
 ): Promise<SendResult> {
   try {
     const moneroTs = await import('monero-ts');
-    const protocol = nodeUrl.includes('443') ? 'https' : 'https';
+    const protocol = nodeUrl.includes('443') ? 'https' : 'http';
     const daemonUrl = nodeUrl.startsWith('http') ? nodeUrl : `${protocol}://${nodeUrl}`;
 
     // Reuse or create persistent wallet
