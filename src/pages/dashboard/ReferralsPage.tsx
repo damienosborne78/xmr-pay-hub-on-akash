@@ -178,6 +178,31 @@ export default function ReferralsPage() {
         </FadeIn>
       )}
 
+      {/* Redeem Lifetime Pro Code */}
+      {!isPro && (
+        <FadeIn delay={0.015}>
+          <div className="p-5 rounded-xl bg-card border border-primary/30 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <span className="font-semibold text-foreground">Have a Lifetime Pro code?</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={proCodeInput}
+                onChange={e => setProCodeInput(e.target.value.toUpperCase())}
+                placeholder="Enter code e.g. MF-PRO-ABCD1234"
+                className="bg-background border-border font-mono text-sm uppercase tracking-wider flex-1 max-w-sm"
+                maxLength={20}
+              />
+              <Button onClick={handleRedeemProCode} disabled={!proCodeInput.trim()} className="bg-gradient-orange hover:opacity-90">
+                <Gift className="w-4 h-4 mr-1.5" /> Redeem
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">One-time-use codes that unlock Pro features permanently. Given by the MoneroFlow team.</p>
+          </div>
+        </FadeIn>
+      )}
+
       {merchant.referredBy && (
         <FadeIn delay={0.01}>
           <div className="p-3 rounded-xl bg-card border border-border flex items-center gap-2">
