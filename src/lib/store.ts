@@ -542,6 +542,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return { success: true };
   },
 
+  updateMerchant: (updates: Partial<Merchant>) => {
     set(state => ({ merchant: { ...state.merchant, ...updates } }));
   },
 
