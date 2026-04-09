@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FadeIn } from '@/components/FadeIn';
+import { isMerchantPro } from '@/lib/subscription';
 import { Plus, RefreshCw, Pause, Play, X, Crown, Zap, Shield, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,7 +27,7 @@ export default function SubscriptionsPage() {
   const [showProSignup, setShowProSignup] = useState(false);
   const [proTxid, setProTxid] = useState('');
 
-  const isPro = merchant.proStatus === 'pro' || merchant.proStatus === 'pro_referral' || merchant.proUnlockedViaReferrals;
+  const isPro = isMerchantPro(merchant);
 
   const handleCreate = () => {
     if (!email || !desc || !amount || isNaN(Number(amount))) return;

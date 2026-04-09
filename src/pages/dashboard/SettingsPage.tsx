@@ -18,12 +18,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import BrowserWalletSetup from '@/components/BrowserWalletSetup';
 import RestoreWalletFromSeed from '@/components/RestoreWalletFromSeed';
 import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
+import { isMerchantPro } from '@/lib/subscription';
 
 
 
 export default function SettingsPage() {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const restoreFromBackup = useStore(s => s.restoreFromBackup);
   const deleteAccount = useStore(s => s.deleteAccount);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -48,7 +50,18 @@ export default function SettingsPage() {
   const handleExportBackup = async () => {
     if (!merchant.privacyPassphrase) { toast.error('Set a passphrase first'); return; }
     try {
-      const data = JSON.stringify({ merchant, timestamp: new Date().toISOString() });
+      const state = useStore.getState();
+      const data = JSON.stringify({
+        merchant: state.merchant,
+        invoices: state.invoices,
+        subscriptions: state.subscriptions,
+        paymentLinks: state.paymentLinks,
+        referrals: state.referrals,
+        referralPayouts: state.referralPayouts,
+        isAuthenticated: state.isAuthenticated,
+        timestamp: new Date().toISOString(),
+        version: '2.0',
+      });
       const blob = await exportEncryptedBackup(data, merchant.privacyPassphrase);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -65,10 +78,8 @@ export default function SettingsPage() {
     try {
       const json = await importEncryptedBackup(file, merchant.privacyPassphrase);
       const parsed = JSON.parse(json);
-      if (parsed.merchant) {
-        updateMerchant(parsed.merchant);
-        toast.success('Backup restored successfully!');
-      }
+      restoreFromBackup(parsed);
+      toast.success(`Backup restored successfully! ${parsed.invoices?.length || 0} invoices recovered.`);
     } catch { toast.error('Restore failed — wrong passphrase or corrupted file'); }
     setRestoring(false);
   };
@@ -116,7 +127,7 @@ export default function SettingsPage() {
   };
 
   const walletMode = merchant.walletMode || 'viewonly';
-  const isPro = merchant.plan === 'pro';
+  const isPro = isMerchantPro(merchant);
 
   const setWalletMode = (mode: 'selfcustody' | 'viewonly') => {
     if (mode === 'viewonly') {
@@ -578,7 +589,7 @@ export default function SettingsPage() {
                     <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={restoring} className="border-border hover:border-primary/50">
                       <Upload className="w-4 h-4 mr-1" /> Restore from Backup
                     </Button>
-                    <input ref={fileRef} type="file" accept=".aes" className="hidden" onChange={handleRestoreBackup} />
+                    <input ref={fileRef} type="file" accept=".aes,.json.aes" className="hidden" onChange={handleRestoreBackup} />
                   </div>
                 </div>
               )}

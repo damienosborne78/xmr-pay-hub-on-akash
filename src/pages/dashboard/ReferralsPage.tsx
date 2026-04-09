@@ -10,6 +10,7 @@ import { formatXMR, formatUSD, usdToXmr, PRO_MONTHLY_XMR, PRO_REFERRAL_UNLOCK_CO
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TreasuryAccess } from '@/components/TreasuryAccess';
+import { isMerchantPro } from '@/lib/subscription';
 
 const COMMISSION_TIERS = [
   { level: 1, label: 'Direct Referral', percent: 25 },
@@ -48,8 +49,8 @@ export default function ReferralsPage() {
   const monthlyEarnings = referrals.reduce((sum, r) => sum + (r.monthlyCommission || 0), 0);
   const lifetimeEarnings = referralPayouts.reduce((sum, p) => sum + p.xmrAmount, 0);
   const progressToFreePro = Math.min(directReferrals / PRO_REFERRAL_UNLOCK_COUNT * 100, 100);
-  const isPro = merchant.proStatus === 'pro' || merchant.proStatus === 'pro_referral';
-  const isProViaReferral = merchant.proStatus === 'pro_referral';
+  const isPro = isMerchantPro(merchant);
+  const isProViaReferral = merchant.proStatus === 'pro_referral' || merchant.proUnlockedViaReferrals;
 
   // Anti-gaming eligibility check
   const accountAgeDays = Math.floor((Date.now() - new Date(merchant.createdAt).getTime()) / (1000 * 60 * 60 * 24));

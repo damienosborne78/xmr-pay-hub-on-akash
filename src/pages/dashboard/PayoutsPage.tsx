@@ -12,6 +12,8 @@ import { formatUSD, formatXMR, formatFiat, XMR_USD_RATE } from '@/lib/mock-data'
 import { Landmark, FileSpreadsheet, Download, Calendar, Check, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
+import { isMerchantPro } from '@/lib/subscription';
 
 function ProLock() {
   return (
@@ -29,7 +31,7 @@ function ProLock() {
 export default function PayoutsPage() {
   const merchant = useStore(s => s.merchant);
   const invoices = useStore(s => s.invoices);
-  const isPro = merchant.plan === 'pro';
+  const isPro = isMerchantPro(merchant);
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
 
@@ -40,7 +42,7 @@ export default function PayoutsPage() {
   const [payoutCurrency, setPayoutCurrency] = useState(cur);
   const [exportRange, setExportRange] = useState('month');
 
-  const paidInvoices = invoices.filter(i => i.status === 'paid');
+  const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent');
   const totalXmr = paidInvoices.reduce((sum, i) => sum + i.xmrAmount, 0);
   const totalFiat = paidInvoices.reduce((sum, i) => sum + i.fiatAmount, 0);
 
@@ -84,31 +86,108 @@ export default function PayoutsPage() {
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   };
 
-  const generatePDFContent = (invoiceList: typeof paidInvoices, range: string): string => {
+  const generatePdfReport = (invoiceList: typeof paidInvoices, range: string, filename: string) => {
     const totalXmr = invoiceList.reduce((s, i) => s + i.xmrAmount, 0);
     const totalFiat = invoiceList.reduce((s, i) => s + i.fiatAmount, 0);
-    let lines: string[] = [];
-    lines.push('MONEROFLOW — RECONCILIATION REPORT');
-    lines.push('='.repeat(50));
-    lines.push(`Period: ${range.charAt(0).toUpperCase() + range.slice(1)}`);
-    lines.push(`Generated: ${new Date().toISOString()}`);
-    lines.push(`Merchant: ${merchant.name || 'MoneroFlow Merchant'}`);
-    lines.push('');
-    lines.push('SUMMARY');
-    lines.push('-'.repeat(30));
-    lines.push(`Total Transactions: ${invoiceList.length}`);
-    lines.push(`Total Revenue (${cur}): ${formatFiat(totalFiat, sym, cur)}`);
-    lines.push(`Total XMR Received: ${formatXMR(totalXmr)}`);
-    lines.push(`Average XMR/USD Rate: ${XMR_USD_RATE.toFixed(2)}`);
-    lines.push('');
-    lines.push('TRANSACTIONS');
-    lines.push('-'.repeat(30));
-    invoiceList.forEach(inv => {
-      lines.push(`${inv.id} | ${new Date(inv.createdAt).toLocaleDateString()} | ${inv.description} | ${formatFiat(inv.fiatAmount, sym, cur)} | ${formatXMR(inv.xmrAmount)} | ${inv.status}`);
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    const orange: [number, number, number] = [255, 102, 0];
+    const ink: [number, number, number] = [24, 24, 27];
+    const muted: [number, number, number] = [113, 113, 122];
+    const line: [number, number, number] = [228, 228, 231];
+    let y = 130;
+
+    const truncate = (text: string, maxWidth: number) => {
+      if (doc.getTextWidth(text) <= maxWidth) return text;
+      let trimmed = text;
+      while (trimmed.length > 0 && doc.getTextWidth(`${trimmed}…`) > maxWidth) {
+        trimmed = trimmed.slice(0, -1);
+      }
+      return `${trimmed}…`;
+    };
+
+    const drawHeader = () => {
+      doc.setFillColor(...orange);
+      doc.rect(0, 0, pageWidth, 88, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.text('MoneroFlow Payout Statement', margin, 36);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Export range: ${range}`, margin, 58);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 73);
+      doc.text(merchant.name || 'MoneroFlow Merchant', pageWidth - margin, 58, { align: 'right' });
+    };
+
+    const drawSummaryCard = (x: number, title: string, value: string, subtitle: string) => {
+      doc.setDrawColor(...line);
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(x, 98, (pageWidth - margin * 2 - 24) / 3, 62, 12, 12, 'FD');
+      doc.setTextColor(...muted);
+      doc.setFontSize(9);
+      doc.text(title, x + 14, 118);
+      doc.setTextColor(...ink);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.text(value, x + 14, 138);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...muted);
+      doc.text(subtitle, x + 14, 152);
+    };
+
+    const drawTableHeader = () => {
+      doc.setFillColor(245, 245, 245);
+      doc.roundedRect(margin, y, pageWidth - margin * 2, 24, 8, 8, 'F');
+      doc.setTextColor(...muted);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('Date', margin + 10, y + 16);
+      doc.text('Invoice', margin + 74, y + 16);
+      doc.text('Description', margin + 146, y + 16);
+      doc.text(cur, pageWidth - margin - 130, y + 16, { align: 'right' });
+      doc.text('XMR', pageWidth - margin - 56, y + 16, { align: 'right' });
+      y += 34;
+    };
+
+    const ensureSpace = (needed: number) => {
+      if (y + needed <= pageHeight - margin) return;
+      doc.addPage();
+      drawHeader();
+      y = 110;
+      drawTableHeader();
+    };
+
+    drawHeader();
+    const cardWidth = (pageWidth - margin * 2 - 24) / 3;
+    drawSummaryCard(margin, 'Total revenue', formatFiat(totalFiat, sym, cur), `${invoiceList.length} transaction(s)`);
+    drawSummaryCard(margin + cardWidth + 12, 'Total XMR', formatXMR(totalXmr), 'Confirmed incoming only');
+    drawSummaryCard(margin + (cardWidth + 12) * 2, 'Reference rate', `$${XMR_USD_RATE.toFixed(2)}`, 'XMR / USD snapshot');
+
+    drawTableHeader();
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    invoiceList.forEach((inv) => {
+      ensureSpace(24);
+      doc.setDrawColor(...line);
+      doc.line(margin, y + 14, pageWidth - margin, y + 14);
+      doc.setTextColor(...ink);
+      doc.text(new Date(inv.paidAt || inv.createdAt).toLocaleDateString(), margin + 10, y);
+      doc.text(inv.id, margin + 74, y);
+      doc.text(truncate(inv.description, pageWidth - 360), margin + 146, y);
+      doc.text(formatFiat(inv.fiatAmount, sym, cur), pageWidth - margin - 130, y, { align: 'right' });
+      doc.text(formatXMR(inv.xmrAmount), pageWidth - margin - 56, y, { align: 'right' });
+      y += 24;
     });
-    lines.push('');
-    lines.push('—— End of Report ——');
-    return lines.join('\n');
+
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text('Generated by MoneroFlow for accounting and reconciliation purposes.', margin, pageHeight - 24);
+    doc.save(filename);
   };
 
   const filterByRange = (range: string) => {
@@ -153,8 +232,8 @@ export default function PayoutsPage() {
         toast.success(`Xero CSV exported — ${filtered.length} transactions`);
         break;
       case 'pdf':
-        downloadFile(generatePDFContent(filtered, rangeLabel), `moneroflow-report-${rangeLabel}-${dateSuffix}.txt`, 'text/plain');
-        toast.success(`Report exported — ${filtered.length} transactions`);
+        generatePdfReport(filtered, rangeLabel, `moneroflow-report-${rangeLabel}-${dateSuffix}.pdf`);
+        toast.success(`PDF exported — ${filtered.length} transactions`);
         break;
     }
   };
@@ -163,7 +242,7 @@ export default function PayoutsPage() {
     { id: 'csv', name: 'CSV', desc: 'Universal spreadsheet format' },
     { id: 'quickbooks', name: 'QuickBooks (IIF)', desc: 'Import directly into QuickBooks' },
     { id: 'xero', name: 'Xero (CSV)', desc: 'Xero-compatible transaction export' },
-    { id: 'pdf', name: 'PDF Report', desc: 'Reconciliation report (text)' },
+    { id: 'pdf', name: 'PDF Report', desc: 'Styled reconciliation statement' },
   ];
 
   return (
