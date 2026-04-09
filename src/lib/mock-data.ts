@@ -337,6 +337,7 @@ export const defaultMerchant: Merchant = {
   zeroConfThresholdUsd: 30,
   webhookPaymentUrl: '',
   preferredFeeTier: 'normal',
+  sendMode: 'proxy',
   creatorServerFqdn: '',
   lifetimeProCodes: [],
 };
