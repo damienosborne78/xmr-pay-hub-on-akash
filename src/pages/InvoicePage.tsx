@@ -102,7 +102,7 @@ export default function InvoicePage() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
       <FadeIn className="w-full max-w-md relative z-10">
         <div className="text-center mb-6">
-          <BrandLogo linkTo="/dashboard/overview" />
+          <BrandLogo linkTo="/dashboard/invoices" />
         </div>
 
         <div className="rounded-2xl bg-card border border-border overflow-hidden">
@@ -159,8 +159,10 @@ export default function InvoicePage() {
                     onClick={async () => {
                       setValidating(true);
                       try {
-                        const node = REMOTE_NODES[0];
-                        const cfg: RpcConfig = { endpoint: `https://${node.url}`, username: '', password: '', walletFilename: '' };
+                        // Use the connected node for validation (cakewallet works, sethforprivacy often fails)
+                        const merchant = useStore.getState().merchant;
+                        const connectedUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || REMOTE_NODES[0].url;
+                        const cfg: RpcConfig = { endpoint: `https://${connectedUrl}`, username: '', password: '', walletFilename: '' };
                         const result = await validateAddress(cfg, invoice.subaddress);
                         setValidationResult(result);
                         if (result.valid && result.subaddress) {
