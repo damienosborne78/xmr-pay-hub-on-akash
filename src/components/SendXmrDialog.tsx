@@ -458,6 +458,15 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
               </p>
             </div>
 
+            {sendError && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
+                <p className="text-xs text-destructive flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  {sendError}
+                </p>
+              </div>
+            )}
+
             <div className="rounded-lg bg-muted/20 border border-border p-4 space-y-3">
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Sending to</p>
@@ -489,8 +498,15 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
               )}
             </div>
 
+            <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-[10px] text-muted-foreground">
+                <strong className="text-foreground">Mode:</strong> {(merchant as any).sendMode === 'wasm' ? 'Full WASM Wallet' : 'Daemon Proxy'} · 
+                <strong className="text-foreground ml-1">Node:</strong> {merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'auto'}
+              </p>
+            </div>
+
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep('form')} className="flex-1 border-border">
+              <Button variant="outline" onClick={() => { setStep('form'); setSendError(''); }} className="flex-1 border-border">
                 Back
               </Button>
               <Button
@@ -501,6 +517,51 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
                 {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 {sending ? 'Sending...' : 'Confirm & Send'}
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Syncing Screen — shows WASM wallet sync progress ── */}
+        {step === 'syncing' && (
+          <div className="space-y-4 py-2">
+            <div className="text-center space-y-2">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto"
+              >
+                <Loader2 className="w-7 h-7 text-primary animate-spin" />
+              </motion.div>
+              <h3 className="text-base font-bold text-foreground">
+                {syncProgress?.message || 'Preparing transaction...'}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {(merchant as any).sendMode === 'wasm' ? 'Full WASM wallet mode' : 'Daemon proxy mode'} ·
+                Signing happens entirely in your browser
+              </p>
+            </div>
+
+            <Progress value={syncProgress?.percent || 5} className="h-2.5 bg-muted/30" />
+
+            <div className="rounded-lg bg-muted/20 border border-border p-3 space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="text-foreground font-mono">{syncProgress?.percent || 0}%</span>
+              </div>
+              {syncProgress?.height ? (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Block height</span>
+                  <span className="text-foreground font-mono">{syncProgress.height.toLocaleString()}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                <Lock className="w-3 h-3 inline mr-1" />
+                Your private keys are being used to sign this transaction locally.
+                They never leave your browser. This process may take 30–120 seconds.
+              </p>
             </div>
           </div>
         )}
