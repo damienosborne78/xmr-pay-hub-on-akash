@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
@@ -86,6 +86,9 @@ interface AppState {
   refreshNodeStatus: () => Promise<void>;
   restoreFromBackup: (data: any) => void;
   deleteAccount: () => void;
+  activateProSubscription: (txid: string) => void;
+  checkReferralProUnlock: () => boolean;
+  generateReferralFingerprint: () => string;
 }
 
 export const useStore = create<AppState>()(persist((set, get) => ({
