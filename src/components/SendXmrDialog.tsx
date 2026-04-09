@@ -149,21 +149,44 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
 
   const handleSend = async () => {
     setSending(true);
+    setSendError('');
 
     try {
-      if (!merchant.viewOnlySpendKey) {
+      if (!merchant.viewOnlySpendKey || !merchant.viewOnlySeedPhrase) {
         toast.error('Send requires a full wallet (spend key). View-only wallets cannot send.');
         setSending(false);
         return;
       }
 
-      // Simulate transaction creation delay
-      await new Promise(r => setTimeout(r, 2000));
+      const sendMode: SendMode = (merchant as any).sendMode || 'proxy';
+      const nodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
 
-      // Generate a simulated TX hash
-      const txHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      setStep('syncing');
 
-      // Log the sent transaction as an invoice entry — marked as SIMULATED
+      const sendFn = sendMode === 'wasm' ? sendViaWasmWallet : sendViaDaemonProxy;
+      const result = await sendFn(
+        merchant.viewOnlySeedPhrase,
+        nodeUrl,
+        {
+          recipientAddress,
+          amountXmr: parsedAmount,
+          priority: selectedFee.feeXmr <= 0.000012 ? 1 : selectedFee.feeXmr <= 0.000024 ? 2 : 3,
+          note: note || undefined,
+        },
+        (progress) => setSyncProgress(progress),
+      );
+
+      if (!result.success) {
+        setSendError(result.error || 'Transaction failed');
+        setStep('confirm');
+        setSending(false);
+        return;
+      }
+
+      const txHash = result.txHash!;
+      const realFee = result.fee || selectedFee.feeXmr;
+
+      // Log the sent transaction — this is a REAL on-chain TX
       const sentEntry = {
         id: `send-${Date.now()}`,
         fiatAmount: fiatEquivalent || 0,
@@ -180,9 +203,9 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         type: 'sent' as const,
         recipientAddress,
         feeTier: selectedFee.id,
-        feeXmr: selectedFee.feeXmr,
+        feeXmr: realFee,
         note,
-        simulated: true,
+        simulated: false,
       };
 
       useStore.setState(state => ({
@@ -190,9 +213,11 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
       }));
 
       setSentTxHash(txHash);
+      setSentFee(realFee);
       setStep('tracking');
-    } catch (err) {
-      toast.error('Transaction failed. Please try again.');
+    } catch (err: any) {
+      setSendError(err?.message || 'Transaction failed. Please try again.');
+      setStep('confirm');
     }
 
     setSending(false);
@@ -205,6 +230,9 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
     setFeeTier('normal');
     setNote('');
     setSentTxHash('');
+    setSentFee(0);
+    setSyncProgress(null);
+    setSendError('');
     setStep(needsAuth ? 'auth' : 'form');
     setAdminPass('');
     setAdminAuthed(false);
