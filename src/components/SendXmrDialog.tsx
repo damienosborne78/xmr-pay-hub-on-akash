@@ -12,8 +12,9 @@ import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, Lock, X, Wallet, ExternalLink, Radio, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
-import { verifyTxOutputs, getMempoolTxHashes } from '@/lib/block-explorer';
+import { verifyTxOutputs, getMempoolTxHashes, getTxInfo } from '@/lib/block-explorer';
 import { motion } from 'framer-motion';
+import { sendViaDaemonProxy, sendViaWasmWallet, type SyncProgress, type SendMode } from '@/lib/wallet-send';
 
 // Fee tiers for sending
 const SEND_FEE_TIERS = [
@@ -43,11 +44,13 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'tracking' | 'sent'>('form');
+  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'syncing' | 'tracking' | 'sent'>('form');
   const [adminPass, setAdminPass] = useState('');
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [sentTxHash, setSentTxHash] = useState('');
-
+  const [sentFee, setSentFee] = useState(0);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [sendError, setSendError] = useState('');
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
@@ -146,21 +149,44 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
 
   const handleSend = async () => {
     setSending(true);
+    setSendError('');
 
     try {
-      if (!merchant.viewOnlySpendKey) {
+      if (!merchant.viewOnlySpendKey || !merchant.viewOnlySeedPhrase) {
         toast.error('Send requires a full wallet (spend key). View-only wallets cannot send.');
         setSending(false);
         return;
       }
 
-      // Simulate transaction creation delay
-      await new Promise(r => setTimeout(r, 2000));
+      const sendMode: SendMode = merchant.sendMode || 'proxy';
+      const nodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
 
-      // Generate a simulated TX hash
-      const txHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      setStep('syncing');
 
-      // Log the sent transaction as an invoice entry — marked as SIMULATED
+      const sendFn = sendMode === 'wasm' ? sendViaWasmWallet : sendViaDaemonProxy;
+      const result = await sendFn(
+        merchant.viewOnlySeedPhrase,
+        nodeUrl,
+        {
+          recipientAddress,
+          amountXmr: parsedAmount,
+          priority: selectedFee.feeXmr <= 0.000012 ? 1 : selectedFee.feeXmr <= 0.000024 ? 2 : 3,
+          note: note || undefined,
+        },
+        (progress) => setSyncProgress(progress),
+      );
+
+      if (!result.success) {
+        setSendError(result.error || 'Transaction failed');
+        setStep('confirm');
+        setSending(false);
+        return;
+      }
+
+      const txHash = result.txHash!;
+      const realFee = result.fee || selectedFee.feeXmr;
+
+      // Log the sent transaction — this is a REAL on-chain TX
       const sentEntry = {
         id: `send-${Date.now()}`,
         fiatAmount: fiatEquivalent || 0,
@@ -177,9 +203,9 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         type: 'sent' as const,
         recipientAddress,
         feeTier: selectedFee.id,
-        feeXmr: selectedFee.feeXmr,
+        feeXmr: realFee,
         note,
-        simulated: true,
+        simulated: false,
       };
 
       useStore.setState(state => ({
@@ -187,9 +213,11 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
       }));
 
       setSentTxHash(txHash);
+      setSentFee(realFee);
       setStep('tracking');
-    } catch (err) {
-      toast.error('Transaction failed. Please try again.');
+    } catch (err: any) {
+      setSendError(err?.message || 'Transaction failed. Please try again.');
+      setStep('confirm');
     }
 
     setSending(false);
@@ -202,6 +230,9 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
     setFeeTier('normal');
     setNote('');
     setSentTxHash('');
+    setSentFee(0);
+    setSyncProgress(null);
+    setSendError('');
     setStep(needsAuth ? 'auth' : 'form');
     setAdminPass('');
     setAdminAuthed(false);
@@ -427,6 +458,15 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
               </p>
             </div>
 
+            {sendError && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
+                <p className="text-xs text-destructive flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  {sendError}
+                </p>
+              </div>
+            )}
+
             <div className="rounded-lg bg-muted/20 border border-border p-4 space-y-3">
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Sending to</p>
@@ -458,8 +498,15 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
               )}
             </div>
 
+            <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-[10px] text-muted-foreground">
+                <strong className="text-foreground">Mode:</strong> {merchant.sendMode === 'wasm' ? 'Full WASM Wallet' : 'Daemon Proxy'} · 
+                <strong className="text-foreground ml-1">Node:</strong> {merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'auto'}
+              </p>
+            </div>
+
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep('form')} className="flex-1 border-border">
+              <Button variant="outline" onClick={() => { setStep('form'); setSendError(''); }} className="flex-1 border-border">
                 Back
               </Button>
               <Button
@@ -470,6 +517,51 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
                 {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 {sending ? 'Sending...' : 'Confirm & Send'}
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Syncing Screen — shows WASM wallet sync progress ── */}
+        {step === 'syncing' && (
+          <div className="space-y-4 py-2">
+            <div className="text-center space-y-2">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto"
+              >
+                <Loader2 className="w-7 h-7 text-primary animate-spin" />
+              </motion.div>
+              <h3 className="text-base font-bold text-foreground">
+                {syncProgress?.message || 'Preparing transaction...'}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {merchant.sendMode === 'wasm' ? 'Full WASM wallet mode' : 'Daemon proxy mode'} ·
+                Signing happens entirely in your browser
+              </p>
+            </div>
+
+            <Progress value={syncProgress?.percent || 5} className="h-2.5 bg-muted/30" />
+
+            <div className="rounded-lg bg-muted/20 border border-border p-3 space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="text-foreground font-mono">{syncProgress?.percent || 0}%</span>
+              </div>
+              {syncProgress?.height ? (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Block height</span>
+                  <span className="text-foreground font-mono">{syncProgress.height.toLocaleString()}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                <Lock className="w-3 h-3 inline mr-1" />
+                Your private keys are being used to sign this transaction locally.
+                They never leave your browser. This process may take 30–120 seconds.
+              </p>
             </div>
           </div>
         )}
@@ -522,7 +614,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
 }
 
 // ─── Send Tracking Progress Component ───
-// Shows a progress screen after sending, polling the block explorer for the TX
+// Polls the block explorer for real TX confirmation status
 function SendTrackingProgress({
   txHash,
   amount,
@@ -542,27 +634,54 @@ function SendTrackingProgress({
   xmrPrice: number | null;
   onDone: () => void;
 }) {
-  const [stage, setStage] = useState<'broadcasting' | 'mempool' | 'confirming' | 'confirmed'>('broadcasting');
+  const [stage, setStage] = useState<'broadcasting' | 'mempool' | 'confirming' | 'confirmed'>('mempool');
   const [confirmations, setConfirmations] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [pollCount, setPollCount] = useState(0);
   const merchant = useStore(s => s.merchant);
   const requiredConfs = merchant.requiredConfirmations ?? 1;
 
+  // Elapsed timer
   useEffect(() => {
     if (stage === 'confirmed') return;
     const t = setInterval(() => setElapsed(s => s + 1), 1000);
     return () => clearInterval(t);
   }, [stage]);
 
-  // Simulate progression (no real wallet RPC available)
+  // Poll block explorer for real TX status
   useEffect(() => {
-    const t1 = setTimeout(() => { if (stage === 'broadcasting') setStage('mempool'); }, 3000);
-    const t2 = setTimeout(() => { setStage('confirming'); setConfirmations(1); }, 8000);
-    const t3 = setTimeout(() => { setConfirmations(requiredConfs); setStage('confirmed'); }, 12000);
-    const pollInterval = setInterval(() => setPollCount(c => c + 1), 3000);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearInterval(pollInterval); };
-  }, [requiredConfs]);
+    if (!txHash || stage === 'confirmed') return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        setPollCount(c => c + 1);
+        const info = await getTxInfo(txHash);
+        if (cancelled) return;
+
+        if (info) {
+          if (info.confirmations >= requiredConfs) {
+            setConfirmations(info.confirmations);
+            setStage('confirmed');
+          } else if (info.confirmations >= 1) {
+            setConfirmations(info.confirmations);
+            setStage('confirming');
+          } else if (info.confirmed) {
+            setStage('confirming');
+            setConfirmations(1);
+          } else {
+            setStage('mempool');
+          }
+        }
+      } catch {
+        // Explorer may not have the TX yet — keep polling
+      }
+    };
+
+    poll(); // Initial check
+    const interval = setInterval(poll, 15000); // Poll every 15s
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [txHash, requiredConfs, stage]);
 
   const progressPercent =
     stage === 'broadcasting' ? 10 :
@@ -571,14 +690,14 @@ function SendTrackingProgress({
 
   const stageMessages = {
     broadcasting: { title: 'Broadcasting transaction...', subtitle: 'Submitting to the Monero network' },
-    mempool: { title: 'Transaction in mempool! 📡', subtitle: 'Waiting for block inclusion...' },
+    mempool: { title: 'Transaction broadcast! 📡', subtitle: 'Waiting for block inclusion (~2 min)...' },
     confirming: { title: `Confirming... (${confirmations}/${requiredConfs})`, subtitle: 'Waiting for block confirmations' },
     confirmed: { title: 'Transaction confirmed! ✅', subtitle: 'Your XMR has been sent successfully' },
   };
 
   const msg = stageMessages[stage];
   const steps = [
-    { id: 'broadcast', label: 'Broadcasting to network', done: stage !== 'broadcasting', current: stage === 'broadcasting' },
+    { id: 'broadcast', label: 'Broadcast to network', done: true, current: false },
     { id: 'mempool', label: 'Seen in mempool (0-conf)', done: stage === 'confirming' || stage === 'confirmed', current: stage === 'mempool' },
     { id: 'confirming', label: `${confirmations}/${requiredConfs} confirmations`, done: stage === 'confirmed', current: stage === 'confirming' },
     { id: 'confirmed', label: 'Transaction confirmed', done: stage === 'confirmed', current: false },
@@ -653,7 +772,7 @@ function SendTrackingProgress({
       </div>
 
       <div className="bg-muted/20 rounded-lg p-2.5 border border-border">
-        <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>
+        <p className="text-[10px] text-muted-foreground mb-1">Transaction ID (real, on-chain)</p>
         <a
           href={`https://xmrchain.net/tx/${txHash}`}
           target="_blank"
@@ -665,17 +784,18 @@ function SendTrackingProgress({
         </a>
       </div>
 
-      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-warning/10 border border-warning/20">
-        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
-        <p className="text-[10px] text-warning leading-relaxed">
-          Simulated TX — In production with a full wallet RPC, this would be a real Monero transaction verified on-chain.
+      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-success/10 border border-success/20">
+        <Shield className="w-3.5 h-3.5 text-success shrink-0 mt-0.5" />
+        <p className="text-[10px] text-success leading-relaxed">
+          Real mainnet transaction — signed in your browser, broadcast to the Monero network.
+          Verify on <a href={`https://xmrchain.net/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline">xmrchain.net</a>.
         </p>
       </div>
 
       {stage !== 'confirmed' && (
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          Tracking · Poll #{pollCount} · {formatTime(elapsed)} elapsed
+          Polling explorer · #{pollCount} · {formatTime(elapsed)} elapsed
         </div>
       )}
 

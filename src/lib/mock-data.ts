@@ -152,6 +152,8 @@ export interface Merchant {
   zeroConfThresholdUsd: number; // max USD amount for 0-conf (default $30)
   webhookPaymentUrl: string; // webhook fired on payment confirmation
   preferredFeeTier: 'normal' | 'fast' | 'urgent'; // default fee tier to display
+  // Send mode
+  sendMode: 'proxy' | 'wasm'; // Daemon Proxy (default) or Full WASM
   // Treasury / Creator server
   creatorServerFqdn: string; // FQDN of the self-hosted API for pro code validation
   lifetimeProCodes: { code: string; createdAt: string; usedBy?: string }[];
@@ -335,6 +337,7 @@ export const defaultMerchant: Merchant = {
   zeroConfThresholdUsd: 30,
   webhookPaymentUrl: '',
   preferredFeeTier: 'normal',
+  sendMode: 'proxy',
   creatorServerFqdn: '',
   lifetimeProCodes: [],
 };
