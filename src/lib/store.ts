@@ -602,18 +602,19 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 
   activateProWithCode: (code: string) => {
     const m = get().merchant;
-    // Check against stored lifetime pro codes
-    const storedCodes: string[] = JSON.parse(localStorage.getItem('mf_lifetime_pro_codes') || '[]');
-    const codeEntry = storedCodes.find((c: any) => (typeof c === 'object' ? c.code : c) === code.toUpperCase());
+    const upperCode = code.toUpperCase();
+    
+    // Check against codes stored in the Zustand state (persisted in IndexedDB, shared via backups/server)
+    const storedCodes = m.lifetimeProCodes || [];
+    const codeEntry = storedCodes.find(c => c.code === upperCode);
     
     if (!codeEntry) return false;
+    if (codeEntry.usedBy) return false; // already redeemed
     
     // Mark code as used
-    const usedCodes: string[] = JSON.parse(localStorage.getItem('mf_used_pro_codes') || '[]');
-    if (usedCodes.includes(code.toUpperCase())) return false;
-    
-    usedCodes.push(code.toUpperCase());
-    localStorage.setItem('mf_used_pro_codes', JSON.stringify(usedCodes));
+    const updatedCodes = storedCodes.map(c => 
+      c.code === upperCode ? { ...c, usedBy: m.referralWalletFingerprint || 'unknown' } : c
+    );
     
     // Activate lifetime pro
     get().updateMerchant({
@@ -621,8 +622,19 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       proStatus: 'pro',
       proActivatedAt: new Date().toISOString(),
       proExpiresAt: '', // never expires — lifetime
-      proTxid: `LIFETIME-CODE-${code.toUpperCase()}`,
+      proTxid: `LIFETIME-CODE-${upperCode}`,
+      lifetimeProCodes: updatedCodes,
     });
+
+    // If creator server is configured, sync the used code
+    if (m.creatorServerFqdn) {
+      fetch(`https://${m.creatorServerFqdn}/api/mf/codes/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint }),
+      }).catch(() => {}); // best-effort sync
+    }
+
     return true;
   },
 

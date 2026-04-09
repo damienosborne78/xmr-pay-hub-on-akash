@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 export default function UsersPage() {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const isPro = merchant.plan === 'pro';
   const [showSetAdmin, setShowSetAdmin] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [adminPassConfirm, setAdminPassConfirm] = useState('');
@@ -159,10 +160,13 @@ export default function UsersPage() {
               <Users className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold text-foreground">PoS Cashier Users</h2>
             </div>
-            {adminUnlocked && (
+            {adminUnlocked && isPro && (
               <Button variant="outline" size="sm" onClick={() => setShowAddUser(true)} className="border-border hover:border-primary/50">
                 <Plus className="w-4 h-4 mr-1" /> Add User
               </Button>
+            )}
+            {adminUnlocked && !isPro && (
+              <Badge variant="outline" className="text-primary border-primary/30 text-xs">Pro Only</Badge>
             )}
           </div>
           <p className="text-xs text-muted-foreground">

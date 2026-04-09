@@ -101,13 +101,38 @@ export default function ReferralsPage() {
     toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
-  const handleRedeemProCode = () => {
+  const handleRedeemProCode = async () => {
     const code = proCodeInput.trim().toUpperCase();
     if (!code || code.length < 6) {
       toast.error('Please enter a valid Pro code');
       return;
     }
-    const success = activateProWithCode(code);
+
+    // Try local store first
+    let success = activateProWithCode(code);
+    
+    // If not found locally and creator server is configured, try fetching from server
+    if (!success && merchant.creatorServerFqdn) {
+      try {
+        const resp = await fetch(`https://${merchant.creatorServerFqdn}/api/mf/codes/validate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.valid && !data.usedBy) {
+            // Add code to local store then activate
+            const codes = merchant.lifetimeProCodes || [];
+            updateMerchant({ lifetimeProCodes: [...codes, { code, createdAt: data.createdAt || new Date().toISOString() }] });
+            success = activateProWithCode(code);
+          }
+        }
+      } catch {
+        // Server unreachable — fall through
+      }
+    }
+
     if (success) {
       setProCodeInput('');
       toast.success('🎉 Lifetime Pro activated! You have permanent access to all Pro features.');
