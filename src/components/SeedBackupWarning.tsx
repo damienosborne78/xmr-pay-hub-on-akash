@@ -7,11 +7,10 @@ import { useState } from 'react';
 export function SeedBackupWarning() {
   const merchant = useStore(s => s.merchant);
   const [dismissed, setDismissed] = useState(false);
+  const navigate = useNavigate();
 
   // Only show if wallet exists but seed not backed up
   if (!merchant.viewOnlySetupComplete || merchant.viewOnlySeedBackedUp || dismissed) return null;
-
-  const navigate = useNavigate();
 
   return (
     <div className="bg-gradient-to-r from-destructive/20 via-warning/20 to-destructive/20 border border-destructive/30 rounded-lg px-3 py-2 flex items-center gap-2 animate-pulse-slow">
