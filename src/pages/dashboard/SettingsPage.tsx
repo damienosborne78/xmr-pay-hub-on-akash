@@ -329,12 +329,64 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Security note — seed was shown once during creation */}
-              <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  🔐 Your seed phrase and private view key were shown <strong>once</strong> during wallet creation. If you need them again, restore from your backup.
-                </p>
-              </div>
+              {/* Seed Phrase Backup Section */}
+              {!merchant.viewOnlySeedBackedUp && merchant.viewOnlySeedPhrase ? (
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-destructive" />
+                    <p className="text-sm font-semibold text-destructive">⚠️ Back up your seed phrase NOW</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Write down these 25 words in order and store them somewhere safe offline. This is the <strong>only way</strong> to recover your wallet. Once you confirm, this phrase will be hidden permanently.
+                  </p>
+                  {showKey ? (
+                    <>
+                      <div className="bg-background border border-border rounded-lg p-3">
+                        <p className="font-mono text-xs text-foreground leading-relaxed break-all select-all">{merchant.viewOnlySeedPhrase}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-border text-xs"
+                          onClick={() => {
+                            navigator.clipboard.writeText(merchant.viewOnlySeedPhrase || '');
+                            toast.success('Seed phrase copied — store it safely!');
+                          }}
+                        >
+                          <Copy className="w-3 h-3 mr-1.5" /> Copy
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-gradient-orange text-xs"
+                          onClick={() => {
+                            updateMerchant({ viewOnlySeedBackedUp: true });
+                            setShowKey(false);
+                            toast.success('Seed phrase marked as backed up');
+                          }}
+                        >
+                          <Check className="w-3 h-3 mr-1.5" /> I've saved it — lock it down
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-destructive/30 text-destructive hover:bg-destructive/10 text-xs"
+                      onClick={() => setShowKey(true)}
+                    >
+                      <Eye className="w-3 h-3 mr-1.5" /> Reveal Seed Phrase
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    🔐 Seed phrase backed up and secured. If you need to access it again, restore from your backup file.
+                  </p>
+                </div>
+              )}
 
               {/* Remote Node */}
               <div className="flex justify-between text-xs">

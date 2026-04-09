@@ -431,7 +431,7 @@ export default function PosPage() {
           </Badge>
         </div>
       )}
-      <div className="flex flex-col lg:flex-row items-start justify-center min-h-[70vh] gap-4 lg:gap-6">
+      <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center min-h-[70vh] gap-4 lg:gap-6">
       {/* ═══ LEFT: Product Grid (Pro) ═══ */}
       <div className="hidden lg:flex flex-col w-72 space-y-3 pt-2 max-h-[80vh] overflow-hidden">
         {/* Search bar */}
@@ -588,10 +588,10 @@ export default function PosPage() {
       </div>
 
       {/* ═══ CENTER: Keypad ═══ */}
-      <div className="w-full max-w-xs space-y-4">
+      <div className="w-full max-w-xs mx-auto space-y-4">
         <div className="text-center">
           <Badge variant="outline" className="mb-3 text-primary border-primary/20">PoS Terminal</Badge>
-          <div className="text-5xl font-bold text-foreground tracking-tight tabular-nums">
+          <div className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight tabular-nums">
             {isPro && cart.length > 0 ? `${sym}${cartTotal.toFixed(2)}` : `${sym}${input}`}
           </div>
           <p className="text-muted-foreground text-sm mt-1.5 font-mono">
@@ -609,12 +609,12 @@ export default function PosPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
           {keys.map(key => (
             <button
               key={key}
               onClick={() => handleKey(key)}
-              className="h-14 rounded-xl bg-card border border-border text-foreground text-xl font-medium hover:bg-muted/30 hover:border-primary/30 active:scale-95 transition-all"
+              className="h-14 sm:h-14 rounded-xl bg-card border border-border text-foreground text-xl sm:text-xl font-medium hover:bg-muted/30 hover:border-primary/30 active:scale-95 transition-all touch-manipulation"
             >
               {key === '⌫' ? <Delete className="w-5 h-5 mx-auto" /> : key}
             </button>
