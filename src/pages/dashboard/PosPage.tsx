@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MoneroFeeInfo } from '@/components/MoneroFeeInfo';
+import { PaymentProgress } from '@/components/PaymentProgress';
 
 function ProLock({ label = 'Unlock Pro Sub' }: { label?: string }) {
   return (
@@ -363,10 +364,10 @@ export default function PosPage() {
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
 
   // ── Payment confirmed ──
-  if (paid && activeInvoice) {
+  if ((paid || invoice?.status === 'paid') && activeInvoice) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <div className="text-center space-y-6">
+        <div className="text-center space-y-6 max-w-sm w-full">
           <div className="w-24 h-24 rounded-full bg-success/20 flex items-center justify-center mx-auto">
             <Check className="w-12 h-12 text-success" />
           </div>
@@ -383,11 +384,11 @@ export default function PosPage() {
     );
   }
 
-  // ── QR code screen ──
+  // ── QR code screen with smart confirmation ──
   if (activeInvoice) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <div className="text-center space-y-6 max-w-sm w-full">
+        <div className="text-center space-y-5 max-w-sm w-full">
           <div>
             <p className="text-muted-foreground text-sm mb-1">Customer owes</p>
             <h2 className="text-4xl font-bold text-foreground">{formatFiat(activeInvoice.fiatAmount, sym, cur)}</h2>
@@ -397,8 +398,18 @@ export default function PosPage() {
             <QRCodeSVG value={`monero:${activeInvoice.subaddress}?tx_amount=${activeInvoice.xmrAmount.toFixed(6)}`} size={220} />
           </div>
           <p className="text-muted-foreground text-xs font-mono break-all px-4">{activeInvoice.subaddress.slice(0, 20)}...{activeInvoice.subaddress.slice(-10)}</p>
+          
+          {/* Fee estimation */}
           <MoneroFeeInfo compact />
-          <p className="text-[10px] text-muted-foreground">Polling for payment every 12s...</p>
+          
+          {/* Smart confirmation progress */}
+          <PaymentProgress
+            invoiceId={activeInvoice.id}
+            fiatAmount={activeInvoice.fiatAmount}
+            xmrAmount={activeInvoice.xmrAmount}
+            subaddress={activeInvoice.subaddress}
+          />
+          
           <Button variant="outline" onClick={handleNewSale} className="border-border">Cancel</Button>
         </div>
       </div>

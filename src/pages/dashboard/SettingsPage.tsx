@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -588,6 +588,118 @@ export default function SettingsPage() {
           )}
         </div>
       </FadeIn>
+
+      {/* Payment Confirmation Settings */}
+      <FadeIn delay={0.04}>
+        <div className="p-6 rounded-xl bg-card border border-border space-y-4">
+          <div className="flex items-center gap-2">
+            <Radio className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Payment Confirmation</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Configure how many block confirmations are required before a payment is marked as complete. 
+            Lower = faster checkout, higher = more secure.
+          </p>
+
+          {/* Required Confirmations Slider */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-foreground">Required Confirmations</Label>
+              <span className="text-sm font-mono text-primary font-bold">{merchant.requiredConfirmations ?? 1}</span>
+            </div>
+            <Slider
+              value={[merchant.requiredConfirmations ?? 1]}
+              onValueChange={v => updateMerchant({ requiredConfirmations: v[0] })}
+              min={1}
+              max={10}
+              step={1}
+              className="py-2"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>1 (fast ~2 min)</span>
+              <span>5 (~10 min)</span>
+              <span>10 (max security ~20 min)</span>
+            </div>
+          </div>
+
+          {/* 0-conf for small amounts */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Zero-Confirmation Auto-Approve</p>
+                <p className="text-xs text-muted-foreground">Instantly approve small payments (0-conf) — great for coffee shops & kiosks</p>
+              </div>
+              <Switch
+                checked={merchant.zeroConfEnabled ?? true}
+                onCheckedChange={v => updateMerchant({ zeroConfEnabled: v })}
+              />
+            </div>
+            {(merchant.zeroConfEnabled ?? true) && (
+              <div className="space-y-2 pl-4 border-l-2 border-primary/20">
+                <div className="flex items-center justify-between">
+                  <Label className="text-foreground text-xs">Max amount for 0-conf</Label>
+                  <span className="text-sm font-mono text-primary">{merchant.fiatSymbol || '$'}{merchant.zeroConfThresholdUsd ?? 30}</span>
+                </div>
+                <Slider
+                  value={[merchant.zeroConfThresholdUsd ?? 30]}
+                  onValueChange={v => updateMerchant({ zeroConfThresholdUsd: v[0] })}
+                  min={5}
+                  max={200}
+                  step={5}
+                  className="py-2"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Orders under {merchant.fiatSymbol || '$'}{merchant.zeroConfThresholdUsd ?? 30} will be instantly approved when seen in the mempool.
+                  Full confirmation follows in ~2 minutes.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Preferred fee tier */}
+          <div className="space-y-2 pt-2 border-t border-border">
+            <Label className="text-foreground text-xs">Default Fee Tier Display</Label>
+            <p className="text-[10px] text-muted-foreground mb-2">Which fee estimate to show customers on the payment screen</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(['normal', 'fast', 'urgent'] as const).map(tier => (
+                <button
+                  key={tier}
+                  onClick={() => updateMerchant({ preferredFeeTier: tier })}
+                  className={`text-center p-2.5 rounded-lg border-2 transition-all text-xs ${
+                    (merchant.preferredFeeTier || 'normal') === tier
+                      ? 'border-primary bg-primary/5 text-primary font-medium'
+                      : 'border-border bg-card text-muted-foreground hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <div className={`w-2 h-2 rounded-full mx-auto mb-1 ${
+                    tier === 'normal' ? 'bg-success' : tier === 'fast' ? 'bg-warning' : 'bg-destructive'
+                  }`} />
+                  <span className="capitalize">{tier}</span>
+                  <p className="text-[9px] text-muted-foreground mt-0.5">
+                    {tier === 'normal' ? '~20 min' : tier === 'fast' ? '~10 min' : '~2 min'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Webhook URL */}
+          <div className="space-y-2 pt-2 border-t border-border">
+            <Label className="text-foreground text-xs">Payment Webhook URL</Label>
+            <Input
+              value={merchant.webhookPaymentUrl || ''}
+              onChange={e => updateMerchant({ webhookPaymentUrl: e.target.value })}
+              className="bg-background border-border font-mono text-sm"
+              placeholder="https://yoursite.com/api/payment-confirmed"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              We'll POST a JSON payload when a payment reaches the required confirmations. 
+              Includes: invoiceId, txid, amount, confirmations, timestamp.
+            </p>
+          </div>
+        </div>
+      </FadeIn>
+
 
       <FadeIn delay={0.05}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
