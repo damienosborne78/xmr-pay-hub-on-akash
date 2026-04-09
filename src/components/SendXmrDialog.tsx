@@ -502,7 +502,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
             <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-[10px] text-muted-foreground">
                 <strong className="text-foreground">Mode:</strong> {merchant.sendMode === 'wasm' ? 'Full WASM Wallet' : 'Daemon Proxy'} · 
-                <strong className="text-foreground ml-1">Node:</strong> {merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'auto'}
+                <strong className="text-foreground ml-1">Node:</strong> {effectiveNodeUrl}
               </p>
             </div>
 
