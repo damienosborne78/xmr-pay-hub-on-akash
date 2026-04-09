@@ -157,10 +157,10 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
       // Simulate transaction creation delay
       await new Promise(r => setTimeout(r, 2000));
 
-      // Generate a TX hash for the send
+      // Generate a simulated TX hash
       const txHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
-      // Log the sent transaction as an invoice entry
+      // Log the sent transaction as an invoice entry — marked as SIMULATED
       const sentEntry = {
         id: `send-${Date.now()}`,
         fiatAmount: fiatEquivalent || 0,
@@ -179,18 +179,15 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         feeTier: selectedFee.id,
         feeXmr: selectedFee.feeXmr,
         note,
+        simulated: true,
       };
 
-      // Add to invoices store
       useStore.setState(state => ({
         invoices: [...state.invoices, sentEntry],
       }));
 
-      toast.success('Transaction submitted!', {
-        description: `TX: ${txHash.slice(0, 16)}... · Fee: ${formatXMR(selectedFee.feeXmr)}`,
-      });
-
-      setStep('sent');
+      setSentTxHash(txHash);
+      setStep('tracking');
     } catch (err) {
       toast.error('Transaction failed. Please try again.');
     }
