@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Clock, Loader2, Radio, Shield, Zap, AlertTriangle } from 'lucide-react';
+import { Check, Clock, Loader2, Radio, Shield, Zap, AlertTriangle, Hash, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useStore } from '@/lib/store';
+import { toast } from 'sonner';
 
 interface PaymentProgressProps {
   invoiceId: string;
@@ -20,6 +23,8 @@ const BLOCK_TIME_SECONDS = 120; // Monero avg ~2 min per block
 export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, onPaid }: PaymentProgressProps) {
   const invoice = useStore(s => s.invoices.find(i => i.id === invoiceId));
   const merchant = useStore(s => s.merchant);
+  const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
+  const verifyInvoiceTxHash = useStore(s => s.verifyInvoiceTxHash);
   const requiredConfs = merchant.requiredConfirmations ?? 1;
   const zeroConfEnabled = merchant.zeroConfEnabled;
   const zeroConfThreshold = merchant.zeroConfThresholdUsd || 30;
@@ -27,6 +32,10 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [pulseKey, setPulseKey] = useState(0);
+  const [showTxInput, setShowTxInput] = useState(false);
+  const [txHashInput, setTxHashInput] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
 
   const confirmations = invoice?.confirmations || 0;
   const status = invoice?.status || 'pending';
@@ -57,10 +66,25 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
     return () => clearInterval(t);
   }, [stage]);
 
+  // Active polling via block explorer — every 15 seconds
+  useEffect(() => {
+    if (stage === 'confirmed') return;
+    // Initial poll immediately
+    pollInvoicePayment(invoiceId).then(() => setPollCount(c => c + 1));
+    
+    const interval = setInterval(() => {
+      pollInvoicePayment(invoiceId).then(() => setPollCount(c => c + 1));
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [invoiceId, stage, pollInvoicePayment]);
+
+  // Show TX input hint after 60s of waiting
+  const showManualHint = stage === 'waiting' && elapsedSeconds > 60;
+
   // ETA calculation
   const etaSeconds = useMemo(() => {
     if (stage === 'confirmed') return 0;
-    if (stage === 'waiting') return null; // unknown
+    if (stage === 'waiting') return null;
     const remainingConfs = Math.max(0, requiredConfs - confirmations);
     return remainingConfs * BLOCK_TIME_SECONDS;
   }, [stage, requiredConfs, confirmations]);
@@ -77,10 +101,28 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
     if (stage === 'confirmed') return 100;
     if (stage === 'waiting') return 5;
     if (stage === 'mempool') return 25;
-    // confirming: scale from 30 to 95 based on confirmations
     const confProgress = Math.min(confirmations / requiredConfs, 1);
     return 25 + confProgress * 70;
   }, [stage, confirmations, requiredConfs]);
+
+  // Manual TX hash verification
+  const handleVerifyTx = async () => {
+    if (!txHashInput.trim()) return;
+    setVerifying(true);
+    try {
+      const result = await verifyInvoiceTxHash(invoiceId, txHashInput.trim());
+      if (result.success) {
+        toast.success('Transaction found! Verifying payment...');
+        setShowTxInput(false);
+        setTxHashInput('');
+      } else {
+        toast.error(result.error || 'Could not verify transaction');
+      }
+    } catch (e) {
+      toast.error('Verification failed. Please try again.');
+    }
+    setVerifying(false);
+  };
 
   const steps = [
     { id: 'broadcast', label: 'Waiting for payment', icon: Radio, done: stage !== 'waiting' },
@@ -89,7 +131,6 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
     { id: 'confirmed', label: 'Payment confirmed!', icon: Check, done: stage === 'confirmed' },
   ];
 
-  // Skip mempool step for 0-conf eligible
   if (isZeroConfEligible) {
     steps[1].label = 'Seen in mempool → auto-approved';
   }
@@ -104,7 +145,7 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
   const stageMessages: Record<PaymentStage, { title: string; subtitle: string }> = {
     waiting: {
       title: 'Awaiting payment...',
-      subtitle: 'Scan the QR code with your Monero wallet',
+      subtitle: 'Scan the QR code and send XMR. We\'re checking the blockchain every 15 seconds.',
     },
     mempool: {
       title: 'Payment detected! 🎉',
@@ -143,7 +184,7 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
 
       {/* Step indicators */}
       <div className="space-y-1.5">
-        {steps.map((step, i) => {
+        {steps.map((step) => {
           const isCurrent =
             (step.id === 'broadcast' && stage === 'waiting') ||
             (step.id === 'mempool' && stage === 'mempool') ||
@@ -184,6 +225,22 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
         })}
       </div>
 
+      {/* TX ID display when found */}
+      {invoice?.txid && stage !== 'waiting' && (
+        <div className="bg-muted/20 rounded-lg p-2.5 border border-border">
+          <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>
+          <a 
+            href={`https://xmrchain.net/tx/${invoice.txid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-[9px] text-primary hover:underline break-all flex items-start gap-1"
+          >
+            {invoice.txid}
+            <ExternalLink className="w-3 h-3 shrink-0 mt-0.5" />
+          </a>
+        </div>
+      )}
+
       {/* 0-conf disclaimer */}
       {isZeroConfEligible && stage === 'confirmed' && confirmations === 0 && (
         <motion.div
@@ -199,11 +256,65 @@ export function PaymentProgress({ invoiceId, fiatAmount, xmrAmount, subaddress, 
         </motion.div>
       )}
 
+      {/* Manual TX hash entry — shown after 60s or on demand */}
+      {stage === 'waiting' && (
+        <div className="space-y-2">
+          {showManualHint && !showTxInput && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <p className="text-[10px] text-muted-foreground text-center">
+                Already sent? Paste your TX hash below for instant verification.
+              </p>
+            </motion.div>
+          )}
+          
+          {!showTxInput ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTxInput(true)}
+              className="w-full text-xs text-muted-foreground hover:text-primary gap-1.5"
+            >
+              <Hash className="w-3.5 h-3.5" />
+              I already sent — enter TX hash
+            </Button>
+          ) : (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
+              <Input
+                placeholder="Paste your Monero TX hash here..."
+                value={txHashInput}
+                onChange={e => setTxHashInput(e.target.value)}
+                className="font-mono text-xs h-9 bg-muted/20"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleVerifyTx}
+                  disabled={verifying || !txHashInput.trim()}
+                  className="flex-1 h-8 text-xs gap-1"
+                >
+                  {verifying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  Verify
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setShowTxInput(false); setTxHashInput(''); }}
+                  className="h-8 text-xs"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      )}
+
       {/* Polling indicator */}
       {stage !== 'confirmed' && (
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          Checking every 12 seconds · {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')} elapsed
+          Scanning blockchain · Poll #{pollCount} · {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')} elapsed
         </div>
       )}
     </div>
