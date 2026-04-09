@@ -341,6 +341,41 @@ export default function BackupsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Restore Passphrase Prompt for encrypted backups without active passphrase */}
+      <Dialog open={showRestorePassphrasePrompt} onOpenChange={(v) => { if (!v) { setShowRestorePassphrasePrompt(false); setPendingRestoreFile(null); setRestorePassphrase(''); } }}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" /> Enter Backup Passphrase
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This backup is encrypted. Enter the passphrase you used when creating it to restore your data.
+            </p>
+            <div className="space-y-2">
+              <Label className="text-foreground">Passphrase</Label>
+              <Input
+                type="password"
+                value={restorePassphrase}
+                onChange={e => setRestorePassphrase(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && pendingRestoreFile && restorePassphrase) doRestore(pendingRestoreFile, restorePassphrase); }}
+                placeholder="Enter your backup passphrase"
+                className="bg-background border-border font-mono"
+              />
+            </div>
+            <Button
+              onClick={() => pendingRestoreFile && doRestore(pendingRestoreFile, restorePassphrase)}
+              disabled={!restorePassphrase || restoring}
+              className="w-full bg-gradient-orange hover:opacity-90"
+            >
+              {restoring ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              {restoring ? 'Restoring...' : 'Restore Backup'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Encrypted Backups — Pro Only */}
       <FadeIn delay={0.12}>
         <div className={`p-6 rounded-xl border space-y-4 ${isPro ? 'bg-card border-success/20' : 'bg-card border-border opacity-60'}`}>
