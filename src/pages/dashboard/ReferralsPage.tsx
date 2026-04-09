@@ -101,6 +101,21 @@ export default function ReferralsPage() {
     toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
+  const handleRedeemProCode = () => {
+    const code = proCodeInput.trim().toUpperCase();
+    if (!code || code.length < 6) {
+      toast.error('Please enter a valid Pro code');
+      return;
+    }
+    const success = activateProWithCode(code);
+    if (success) {
+      setProCodeInput('');
+      toast.success('🎉 Lifetime Pro activated! You have permanent access to all Pro features.');
+    } else {
+      toast.error('Invalid or already-used code. Please check and try again.');
+    }
+  };
+
   const handleProActivation = () => {
     if (!proTxid || proTxid.length < 10) {
       toast.error('Please enter a valid transaction hash');
