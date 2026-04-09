@@ -141,6 +141,12 @@ export interface Merchant {
   proUnlockedViaReferrals: boolean;
   referralEarningsXmr: number;
   referralEarningsPendingXmr: number;
+  // Payment confirmation settings
+  requiredConfirmations: number; // default 1 for retail
+  zeroConfEnabled: boolean; // auto-approve 0-conf for small amounts
+  zeroConfThresholdUsd: number; // max USD amount for 0-conf (default $30)
+  webhookPaymentUrl: string; // webhook fired on payment confirmation
+  preferredFeeTier: 'normal' | 'fast' | 'urgent'; // default fee tier to display
 }
 
 // Pro subscription constants
@@ -280,6 +286,11 @@ export const defaultMerchant: Merchant = {
   proUnlockedViaReferrals: false,
   referralEarningsXmr: 0,
   referralEarningsPendingXmr: 0,
+  requiredConfirmations: 1,
+  zeroConfEnabled: true,
+  zeroConfThresholdUsd: 30,
+  webhookPaymentUrl: '',
+  preferredFeeTier: 'normal',
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
