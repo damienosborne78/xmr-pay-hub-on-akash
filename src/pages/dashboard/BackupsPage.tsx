@@ -46,6 +46,7 @@ export default function BackupsPage() {
     setExporting(true);
     try {
       const state = useStore.getState();
+      // Include ALL app data — same for both regular and encrypted backups
       const backupData = JSON.stringify({
         merchant: state.merchant,
         invoices: state.invoices,
@@ -53,11 +54,13 @@ export default function BackupsPage() {
         paymentLinks: state.paymentLinks,
         referrals: state.referrals,
         referralPayouts: state.referralPayouts,
+        isAuthenticated: state.isAuthenticated,
         connectedCloud,
         autoBackupEnabled,
         backupFrequency,
+        encryptedBackups,
         timestamp: new Date().toISOString(),
-        version: '1.0',
+        version: '2.0',
       });
 
       if (encryptedBackups && isPro && merchant.privacyPassphrase) {
@@ -100,12 +103,20 @@ export default function BackupsPage() {
       }
       const parsed = JSON.parse(json);
       restoreFromBackup(parsed);
+      // Restore UI-local settings
       if (parsed.connectedCloud) setConnectedCloud(parsed.connectedCloud);
       if (parsed.autoBackupEnabled) setAutoBackupEnabled(parsed.autoBackupEnabled);
       if (parsed.backupFrequency) setBackupFrequency(parsed.backupFrequency);
+      if (parsed.encryptedBackups) setEncryptedBackups(parsed.encryptedBackups);
+      // Restore authentication state
+      if (parsed.isAuthenticated) {
+        useStore.getState().login();
+      }
       const invoiceCount = parsed.invoices?.length || 0;
       const subCount = parsed.subscriptions?.length || 0;
-      toast.success(`Backup restored! ${invoiceCount} invoices, ${subCount} subscriptions recovered.`);
+      const userCount = parsed.merchant?.posUsers?.length || 0;
+      const proStatus = parsed.merchant?.proStatus || 'free';
+      toast.success(`Backup restored! ${invoiceCount} invoices, ${subCount} subscriptions, ${userCount} users. Pro: ${proStatus}`);
       setShowRestorePassphrasePrompt(false);
       setPendingRestoreFile(null);
       setRestorePassphrase('');
@@ -176,7 +187,7 @@ export default function BackupsPage() {
 
           <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
             <p className="text-[11px] text-foreground">
-              ✅ Backups include: <strong>merchant settings</strong>, <strong>all invoices</strong>, <strong>subscriptions</strong>, <strong>payment links</strong>, <strong>referral data</strong>, and <strong>cloud connection status</strong>.
+              ✅ Backups include: <strong>merchant settings</strong>, <strong>all invoices</strong>, <strong>subscriptions</strong>, <strong>payment links</strong>, <strong>referral data</strong>, <strong>POS items & users</strong>, <strong>wallet/seed phrase</strong>, <strong>pro-sub status</strong>, <strong>passwords</strong>, <strong>analytics</strong>, and <strong>local currency settings</strong>.
             </p>
           </div>
 

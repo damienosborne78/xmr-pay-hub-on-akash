@@ -1,9 +1,12 @@
 import { useStore } from '@/lib/store';
 import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { FadeIn } from '@/components/FadeIn';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState } from 'react';
+import { Send } from 'lucide-react';
+import { SendXmrDialog } from '@/components/SendXmrDialog';
 
 export default function PaymentsPage() {
   const invoices = useStore(s => s.invoices);
@@ -13,6 +16,7 @@ export default function PaymentsPage() {
   const users = merchant.posUsers || [];
   const paid = invoices.filter(i => i.status === 'paid');
   const [filterUser, setFilterUser] = useState('all');
+  const [showSendDialog, setShowSendDialog] = useState(false);
 
   const filteredPaid = filterUser === 'all'
     ? paid
@@ -26,20 +30,29 @@ export default function PaymentsPage() {
             <h1 className="text-2xl font-bold text-foreground">Payment History</h1>
             <p className="text-muted-foreground text-sm">All confirmed XMR payments</p>
           </div>
-          {users.length > 0 && (
-            <Select value={filterUser} onValueChange={setFilterUser}>
-              <SelectTrigger className="w-[140px] h-9 bg-background border-border text-sm">
-                <SelectValue placeholder="All users" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-border">
-                <SelectItem value="all">All Users</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                {users.map(u => (
-                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowSendDialog(true)}
+              className="bg-gradient-orange hover:opacity-90 gap-2"
+            >
+              <Send className="w-4 h-4" />
+              Send XMR
+            </Button>
+            {users.length > 0 && (
+              <Select value={filterUser} onValueChange={setFilterUser}>
+                <SelectTrigger className="w-[140px] h-9 bg-background border-border text-sm">
+                  <SelectValue placeholder="All users" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  {users.map(u => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
       </FadeIn>
 
@@ -87,6 +100,8 @@ export default function PaymentsPage() {
           )}
         </div>
       </FadeIn>
+
+      <SendXmrDialog open={showSendDialog} onOpenChange={setShowSendDialog} />
     </div>
   );
 }
