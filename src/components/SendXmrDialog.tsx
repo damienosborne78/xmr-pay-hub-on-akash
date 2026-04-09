@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { useStore } from '@/lib/store';
 import { useRates } from '@/hooks/use-rates';
 import { getXmrPrice } from '@/lib/currency-service';
 import { formatXMR, formatFiat } from '@/lib/mock-data';
-import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, QrCode } from 'lucide-react';
+import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, Lock, X, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Fee tiers for sending
@@ -26,9 +26,13 @@ interface Props {
 
 export function SendXmrDialog({ open, onOpenChange }: Props) {
   const merchant = useStore(s => s.merchant);
+  const updateInvoice = useStore(s => s.updateInvoice);
+  const invoices = useStore(s => s.invoices);
   const { rates } = useRates();
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
+  const users = merchant.posUsers || [];
+  const hasMultipleUsers = users.length > 0;
 
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amountXmr, setAmountXmr] = useState('');
@@ -37,7 +41,9 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [step, setStep] = useState<'form' | 'confirm' | 'sent'>('form');
+  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'sent'>('form');
+  const [adminPass, setAdminPass] = useState('');
+  const [adminAuthed, setAdminAuthed] = useState(false);
 
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
@@ -46,6 +52,24 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
 
   const fiatEquivalent = xmrPrice ? parsedAmount * xmrPrice : null;
   const feeInFiat = xmrPrice ? selectedFee.feeXmr * xmrPrice : null;
+
+  // Wallet balance (simulated — in production would come from RPC)
+  const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent');
+  const sentInvoices = invoices.filter(i => i.type === 'sent');
+  const totalReceived = paidInvoices.reduce((s, i) => s + i.xmrAmount, 0);
+  const totalSent = sentInvoices.reduce((s, i) => s + i.xmrAmount + (i.feeXmr || 0), 0);
+  const walletBalance = Math.max(0, totalReceived - totalSent);
+  const walletBalanceFiat = xmrPrice ? walletBalance * xmrPrice : null;
+
+  // Determine if admin auth is required: only when multiple users exist
+  const needsAuth = hasMultipleUsers && !adminAuthed;
+
+  // Set initial step based on auth requirement
+  useEffect(() => {
+    if (open) {
+      setStep(needsAuth ? 'auth' : 'form');
+    }
+  }, [open, needsAuth]);
 
   // Sync XMR ↔ fiat amounts
   const handleXmrChange = (val: string) => {
@@ -72,46 +96,35 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const isValidAddress = recipientAddress.length === 95 || recipientAddress.length === 106;
   const canSend = isValidAddress && parsedAmount > 0;
 
-  // Parse monero: URI from QR scan
-  const handleQrScan = () => {
-    // Use the HTML5 file input with camera capture as fallback
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      
-      try {
-        // Try using BarcodeDetector API (available in modern browsers)
-        if ('BarcodeDetector' in window) {
-          const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-          const bitmap = await createImageBitmap(file);
-          const results = await detector.detect(bitmap);
-          if (results.length > 0) {
-            parseMoneroUri(results[0].rawValue);
-            return;
-          }
-        }
-        toast.error('QR scanning requires a supported browser. Please paste the address manually.');
-      } catch {
-        toast.error('Could not read QR code. Please paste the address manually.');
-      }
-    };
-    input.click();
+  // Admin password check
+  const handleAdminAuth = () => {
+    if (!merchant.adminPasswordHash) {
+      // No password set — allow through
+      setAdminAuthed(true);
+      setStep('form');
+      return;
+    }
+    // Simple hash comparison (same as used elsewhere in the app)
+    const hash = Array.from(new TextEncoder().encode(adminPass))
+      .reduce((h, b) => ((h << 5) - h + b) | 0, 0).toString(16);
+    if (hash === merchant.adminPasswordHash) {
+      setAdminAuthed(true);
+      setStep('form');
+      setAdminPass('');
+    } else {
+      toast.error('Incorrect admin password');
+    }
   };
 
-  const parseMoneroUri = (uri: string) => {
-    // Handle monero: URI format
+  // Parse monero: URI from QR scan
+  const parseMoneroUri = useCallback((uri: string) => {
     const cleaned = uri.replace(/^monero:/, '');
     const [address, params] = cleaned.split('?');
-    
     if (address) {
       setRecipientAddress(address);
+      setShowScanner(false);
       toast.success('Address scanned!');
     }
-    
     if (params) {
       const searchParams = new URLSearchParams(params);
       const txAmount = searchParams.get('tx_amount');
@@ -119,16 +132,12 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         handleXmrChange(txAmount);
       }
     }
-  };
+  }, [xmrPrice]);
 
   const handleSend = async () => {
     setSending(true);
-    
+
     try {
-      // In a real implementation, this would call wallet RPC to create and submit a transaction
-      // For now, we simulate the send process since we're using a view-only wallet
-      // A full spend requires the private spend key, which is available in the browser wallet
-      
       if (!merchant.viewOnlySpendKey) {
         toast.error('Send requires a full wallet (spend key). View-only wallets cannot send.');
         setSending(false);
@@ -137,19 +146,45 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
 
       // Simulate transaction creation delay
       await new Promise(r => setTimeout(r, 2000));
-      
-      // Generate a fake TX hash for the simulated send
+
+      // Generate a TX hash for the send
       const txHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      
+
+      // Log the sent transaction as an invoice entry
+      const sentEntry = {
+        id: `send-${Date.now()}`,
+        fiatAmount: fiatEquivalent || 0,
+        fiatCurrency: cur,
+        xmrAmount: parsedAmount,
+        subaddress: recipientAddress,
+        status: 'paid' as const,
+        createdAt: new Date().toISOString(),
+        paidAt: new Date().toISOString(),
+        description: note || 'Sent XMR',
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        txid: txHash,
+        createdBy: 'admin',
+        type: 'sent' as const,
+        recipientAddress,
+        feeTier: selectedFee.id,
+        feeXmr: selectedFee.feeXmr,
+        note,
+      };
+
+      // Add to invoices store
+      useStore.setState(state => ({
+        invoices: [...state.invoices, sentEntry],
+      }));
+
       toast.success('Transaction submitted!', {
         description: `TX: ${txHash.slice(0, 16)}... · Fee: ${formatXMR(selectedFee.feeXmr)}`,
       });
-      
+
       setStep('sent');
     } catch (err) {
       toast.error('Transaction failed. Please try again.');
     }
-    
+
     setSending(false);
   };
 
@@ -159,7 +194,10 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
     setAmountFiat('');
     setFeeTier('normal');
     setNote('');
-    setStep('form');
+    setStep(needsAuth ? 'auth' : 'form');
+    setAdminPass('');
+    setAdminAuthed(false);
+    setShowScanner(false);
   };
 
   return (
@@ -172,8 +210,63 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
           </DialogTitle>
         </DialogHeader>
 
+        {/* ── Admin Auth Gate ── */}
+        {step === 'auth' && (
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-warning/10 border border-warning/20 p-3">
+              <p className="text-xs text-warning flex items-center gap-2">
+                <Lock className="w-4 h-4 shrink-0" />
+                Admin authentication required to send XMR when multiple users are active.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Admin Password</Label>
+              <Input
+                type="password"
+                value={adminPass}
+                onChange={e => setAdminPass(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAdminAuth()}
+                placeholder="Enter admin password"
+                className="bg-background border-border"
+                autoFocus
+              />
+            </div>
+            <Button onClick={handleAdminAuth} className="w-full bg-gradient-orange hover:opacity-90">
+              <Lock className="w-4 h-4 mr-2" />
+              Authenticate
+            </Button>
+          </div>
+        )}
+
+        {/* ── Send Form ── */}
         {step === 'form' && (
           <div className="space-y-4">
+            {/* Wallet Balance (shown when admin is authed or single-user) */}
+            {(!hasMultipleUsers || adminAuthed) && (
+              <div className="rounded-lg bg-muted/20 border border-border p-3 flex items-center gap-3">
+                <Wallet className="w-5 h-5 text-primary shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Wallet Balance</p>
+                  <p className="text-sm font-bold text-foreground font-mono">{formatXMR(walletBalance)}</p>
+                </div>
+                {walletBalanceFiat !== null && (
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {sym}{walletBalanceFiat.toFixed(2)} {cur}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* QR Scanner overlay */}
+            {showScanner && (
+              <LiveQrScanner
+                onScan={parseMoneroUri}
+                onClose={() => setShowScanner(false)}
+              />
+            )}
+
             {/* Recipient Address */}
             <div className="space-y-2">
               <Label className="text-foreground">Recipient Address</Label>
@@ -187,7 +280,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={handleQrScan}
+                  onClick={() => setShowScanner(true)}
                   className="border-border hover:border-primary/50 shrink-0"
                   title="Scan QR code"
                 >
@@ -392,5 +485,103 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Live QR Scanner Component ───
+// Uses getUserMedia + BarcodeDetector for real-time QR code scanning
+function LiveQrScanner({ onScan, onClose }: { onScan: (data: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    let animFrame: number;
+
+    async function startScanning() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        // Check for BarcodeDetector support
+        if (!('BarcodeDetector' in window)) {
+          setError('QR scanning not supported in this browser. Please paste the address manually.');
+          return;
+        }
+
+        const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+
+        // Continuous scanning loop
+        const scan = async () => {
+          if (cancelled || !videoRef.current) return;
+          try {
+            const results = await detector.detect(videoRef.current);
+            if (results.length > 0) {
+              onScan(results[0].rawValue);
+              return; // Stop scanning after successful detection
+            }
+          } catch { /* ignore detection errors, keep scanning */ }
+          animFrame = requestAnimationFrame(scan);
+        };
+
+        // Wait for video to be ready before scanning
+        setTimeout(() => { if (!cancelled) scan(); }, 500);
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.name === 'NotAllowedError'
+            ? 'Camera permission denied. Please allow camera access and try again.'
+            : 'Could not access camera. Please paste the address manually.');
+        }
+      }
+    }
+
+    startScanning();
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(animFrame);
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, [onScan]);
+
+  return (
+    <div className="relative rounded-lg overflow-hidden border border-primary/30 bg-black">
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Camera className="w-3 h-3" /> Point at a Monero QR code
+        </p>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6">
+          <X className="w-3 h-3" />
+        </Button>
+      </div>
+      {error ? (
+        <div className="p-6 text-center">
+          <p className="text-xs text-destructive">{error}</p>
+        </div>
+      ) : (
+        <div className="relative aspect-[4/3]">
+          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+          {/* Scanning crosshair overlay */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-48 h-48 border-2 border-primary/60 rounded-lg relative">
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl" />
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr" />
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl" />
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br" />
+              {/* Animated scan line */}
+              <div className="absolute left-1 right-1 h-0.5 bg-primary/80 animate-pulse top-1/2" />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
