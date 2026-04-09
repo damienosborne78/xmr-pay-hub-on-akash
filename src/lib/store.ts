@@ -435,7 +435,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     if (m.viewOnlyViewKey && invoice.subaddress) {
       try {
         console.log(`[Poll] Explorer scan for invoice ${invoiceId} → ${invoice.subaddress.slice(0, 12)}...`);
-        const outputs = await scanRecentOutputs(invoice.subaddress, m.viewOnlyViewKey, 10, true);
+        const outputs = await scanRecentOutputs(invoice.subaddress, m.viewOnlyViewKey, 10);
         
         if (outputs.length > 0) {
           const totalPico = outputs.reduce((sum, o) => sum + o.amount, 0);
