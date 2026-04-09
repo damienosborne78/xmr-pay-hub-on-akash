@@ -859,9 +859,7 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">Current: <span className="capitalize font-medium text-foreground">{merchant.plan}</span></p>
             </div>
             {merchant.plan === 'free' && (
-              <Button className="bg-gradient-orange hover:opacity-90" onClick={() => { updateMerchant({ plan: 'pro' }); toast.success('Upgraded to Pro!'); }}>
-                Upgrade to Pro — $29/mo
-              </Button>
+              <p className="text-xs text-muted-foreground">Visit the <span className="text-primary">Referrals</span> tab to upgrade to Pro</p>
             )}
             {merchant.plan === 'pro' && (
               <Badge className="bg-primary/10 text-primary border-primary/20">Pro Plan Active</Badge>
