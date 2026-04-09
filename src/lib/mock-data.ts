@@ -128,7 +128,26 @@ export interface Merchant {
   adminPasswordHash: string;
   posUsers: PosUser[];
   activePosUser: string; // user id or '' for admin
+  // Pro Subscription (on-chain)
+  proStatus: 'free' | 'pro' | 'pro_referral';
+  proExpiresAt: string;
+  proTxid: string;
+  proPaymentId: string;
+  proActivatedAt: string;
+  // Referral tracking
+  referralWalletFingerprint: string; // first 8 chars of wallet address hash
+  referredBy: string; // referrer's fingerprint
+  referralActiveCount: number; // active referred merchants count
+  proUnlockedViaReferrals: boolean;
+  referralEarningsXmr: number;
+  referralEarningsPendingXmr: number;
 }
+
+// Pro subscription constants
+export const PRO_MONTHLY_XMR = 0.05;
+export const PRO_REFERRAL_UNLOCK_COUNT = 10;
+export const CREATOR_TREASURY_ADDRESS = '47sghzufGhJJDQEbScMCwVBimTn42jXtXqfNWYGbbbB2cPmHjV9VFRxDAaBZRcsFnMoyTyXbFr4ALGSKFQN2MJN76sixoYce';
+export const REFERRAL_ECOSYSTEM_PERCENT = 50; // 50% of pro-sub goes back to referrers
 
 export interface PosUser {
   id: string;
@@ -250,6 +269,17 @@ export const defaultMerchant: Merchant = {
   adminPasswordHash: '',
   posUsers: [],
   activePosUser: '',
+  proStatus: 'free',
+  proExpiresAt: '',
+  proTxid: '',
+  proPaymentId: '',
+  proActivatedAt: '',
+  referralWalletFingerprint: '',
+  referredBy: '',
+  referralActiveCount: 0,
+  proUnlockedViaReferrals: false,
+  referralEarningsXmr: 0,
+  referralEarningsPendingXmr: 0,
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
