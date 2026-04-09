@@ -17,7 +17,7 @@ interface Props {
 export default function AdvancedWalletSetup({ open, onOpenChange }: Props) {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
-  const currentMode: SendMode = (merchant as any).sendMode || 'proxy';
+  const currentMode: SendMode = merchant.sendMode || 'proxy';
   const [selectedMode, setSelectedMode] = useState<SendMode>(currentMode);
 
   const handleConfirm = () => {

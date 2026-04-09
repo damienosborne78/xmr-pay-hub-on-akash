@@ -158,7 +158,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         return;
       }
 
-      const sendMode: SendMode = (merchant as any).sendMode || 'proxy';
+      const sendMode: SendMode = merchant.sendMode || 'proxy';
       const nodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
 
       setStep('syncing');
@@ -500,7 +500,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
 
             <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-[10px] text-muted-foreground">
-                <strong className="text-foreground">Mode:</strong> {(merchant as any).sendMode === 'wasm' ? 'Full WASM Wallet' : 'Daemon Proxy'} · 
+                <strong className="text-foreground">Mode:</strong> {merchant.sendMode === 'wasm' ? 'Full WASM Wallet' : 'Daemon Proxy'} · 
                 <strong className="text-foreground ml-1">Node:</strong> {merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'auto'}
               </p>
             </div>
@@ -536,7 +536,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
                 {syncProgress?.message || 'Preparing transaction...'}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {(merchant as any).sendMode === 'wasm' ? 'Full WASM wallet mode' : 'Daemon proxy mode'} ·
+                {merchant.sendMode === 'wasm' ? 'Full WASM wallet mode' : 'Daemon proxy mode'} ·
                 Signing happens entirely in your browser
               </p>
             </div>
