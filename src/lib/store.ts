@@ -544,7 +544,88 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return { success: true };
   },
 
-  updateMerchant: (updates: Partial<Merchant>) => {
+  verifyAllPendingInvoices: async () => {
+    const state = get();
+    const m = state.merchant;
+    if (!m.viewOnlyViewKey) return { verified: 0, failed: 0 };
+    
+    const pendingInvoices = state.invoices.filter(
+      i => i.status === 'pending' || i.status === 'seen_on_chain' || i.status === 'confirming'
+    );
+    
+    let verified = 0;
+    let failed = 0;
+    
+    for (const inv of pendingInvoices) {
+      // If invoice has a txid, verify it directly
+      if (inv.txid) {
+        try {
+          const result = await verifyTxOutputs(inv.txid, inv.subaddress, m.viewOnlyViewKey);
+          if (result && result.matched) {
+            const totalXmr = result.totalAmount / 1e12;
+            const requiredConfs = m.requiredConfirmations ?? 1;
+            const isZeroConf = m.zeroConfEnabled && inv.fiatAmount <= (m.zeroConfThresholdUsd || 30);
+            
+            let status: Invoice['status'] = 'seen_on_chain';
+            if (totalXmr >= inv.xmrAmount * 0.95) {
+              if (isZeroConf || result.confirmations >= requiredConfs) {
+                status = 'paid';
+              } else if (result.confirmations >= 1) {
+                status = 'confirming';
+              }
+            } else if (totalXmr > 0) {
+              status = 'underpaid';
+            }
+            
+            get().updateInvoice(inv.id, {
+              status,
+              confirmations: result.confirmations,
+              paidAt: status === 'paid' && !inv.paidAt ? new Date().toISOString() : inv.paidAt,
+            });
+            verified++;
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+      }
+      
+      // Check if expired
+      if (!inv.txid && new Date(inv.expiresAt).getTime() < Date.now()) {
+        get().updateInvoice(inv.id, { status: 'expired' });
+      }
+    }
+    
+    return { verified, failed };
+  },
+
+  activateProWithCode: (code: string) => {
+    const m = get().merchant;
+    // Check against stored lifetime pro codes
+    const storedCodes: string[] = JSON.parse(localStorage.getItem('mf_lifetime_pro_codes') || '[]');
+    const codeEntry = storedCodes.find((c: any) => (typeof c === 'object' ? c.code : c) === code.toUpperCase());
+    
+    if (!codeEntry) return false;
+    
+    // Mark code as used
+    const usedCodes: string[] = JSON.parse(localStorage.getItem('mf_used_pro_codes') || '[]');
+    if (usedCodes.includes(code.toUpperCase())) return false;
+    
+    usedCodes.push(code.toUpperCase());
+    localStorage.setItem('mf_used_pro_codes', JSON.stringify(usedCodes));
+    
+    // Activate lifetime pro
+    get().updateMerchant({
+      plan: 'pro',
+      proStatus: 'pro',
+      proActivatedAt: new Date().toISOString(),
+      proExpiresAt: '', // never expires — lifetime
+      proTxid: `LIFETIME-CODE-${code.toUpperCase()}`,
+    });
+    return true;
+  },
+
     set(state => ({ merchant: { ...state.merchant, ...updates } }));
   },
 
