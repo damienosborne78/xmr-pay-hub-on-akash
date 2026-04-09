@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoneroLogo } from '@/components/BrandLogo';
 import { Check, Clock, Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PaymentProgress } from '@/components/PaymentProgress';
 
 export default function PayPage() {
   const { amount, label } = useParams();
@@ -160,9 +161,15 @@ export default function PayPage() {
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted-foreground text-center">
-                Checking for payment every 12 seconds via monero-wallet-rpc...
-              </p>
+              {/* Smart confirmation progress */}
+              {invoiceId && (
+                <PaymentProgress
+                  invoiceId={invoiceId}
+                  fiatAmount={fiatAmount}
+                  xmrAmount={xmrAmount}
+                  subaddress={subaddress}
+                />
+              )}
             </>
           )}
 
