@@ -9,8 +9,11 @@ import { useStore } from '@/lib/store';
 import { useRates } from '@/hooks/use-rates';
 import { getXmrPrice } from '@/lib/currency-service';
 import { formatXMR, formatFiat } from '@/lib/mock-data';
-import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, Lock, X, Wallet } from 'lucide-react';
+import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, Lock, X, Wallet, ExternalLink, Radio, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
+import { verifyTxOutputs, getMempoolTxHashes } from '@/lib/block-explorer';
+import { motion } from 'framer-motion';
 
 // Fee tiers for sending
 const SEND_FEE_TIERS = [

@@ -144,7 +144,7 @@ export default function PaymentsPage() {
                         <td className="py-3 px-4">
                           {inv.txid ? (
                             <a
-                              href={`https://monero.com/tx/${inv.txid}`}
+                              href={`https://xmrchain.net/tx/${inv.txid}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="font-mono text-[10px] text-primary hover:underline"
