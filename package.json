@@ -54,6 +54,7 @@
     "js-sha3": "^0.9.3",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.462.0",
+    "monero-ts": "0.9.6",
     "next-themes": "^0.3.0",
     "qrcode.react": "^4.0.1",
     "react": "^18.3.1",
