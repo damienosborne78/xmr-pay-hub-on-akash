@@ -419,7 +419,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         newStatus = 'underpaid';
       }
 
-      const wasPaid = invoice.status === 'paid';
+      const wasPaid = (invoice.status as string) === 'paid';
       get().updateInvoice(invoiceId, {
         status: newStatus,
         confirmations,
