@@ -43,9 +43,10 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'sent'>('form');
+  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'tracking' | 'sent'>('form');
   const [adminPass, setAdminPass] = useState('');
   const [adminAuthed, setAdminAuthed] = useState(false);
+  const [sentTxHash, setSentTxHash] = useState('');
 
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
