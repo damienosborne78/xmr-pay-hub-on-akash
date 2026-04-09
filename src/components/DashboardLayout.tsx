@@ -3,6 +3,7 @@ import { BrandLogo } from '@/components/BrandLogo';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { PrivacyBanner } from '@/components/PrivacyBanner';
+import { SeedBackupWarning } from '@/components/SeedBackupWarning';
 import { useStore } from '@/lib/store';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -127,6 +128,7 @@ export default function DashboardLayout() {
           <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
             <div className="flex items-center gap-3">
+              <SeedBackupWarning />
               <ManagedBadge />
               <PrivacyBanner />
             </div>

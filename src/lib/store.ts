@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
-import { generateSubaddress as localGenerateSubaddress } from './wallet-generator';
+import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
 
@@ -103,7 +103,6 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     const m = get().merchant;
     if (!m.viewOnlySetupComplete || !m.viewOnlyViewKey) {
       try {
-        const { generateBrowserWallet } = require('./wallet-generator');
         const w = generateBrowserWallet();
         get().updateMerchant({
           walletMode: 'viewonly',

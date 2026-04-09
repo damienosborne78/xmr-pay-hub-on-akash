@@ -12,6 +12,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { Progress } from '@/components/ui/progress';
 import { validateAddress, type RpcConfig } from '@/lib/monero-rpc';
 import { REMOTE_NODES } from '@/lib/node-manager';
+import { MoneroFeeInfo } from '@/components/MoneroFeeInfo';
 
 export default function InvoicePage() {
   const navigate = useNavigate();
@@ -211,6 +212,11 @@ export default function InvoicePage() {
                 {timeLeft && invoice.status === 'pending' && (
                   <p className="text-xs text-muted-foreground mt-4">Expires in <span className="text-warning font-mono">{timeLeft}</span></p>
                 )}
+
+                {/* Network fee & speed info */}
+                <div className="w-full mt-3">
+                  <MoneroFeeInfo />
+                </div>
               </div>
               <div className="px-6 pb-4">
                 <p className="text-[10px] text-muted-foreground text-center">
