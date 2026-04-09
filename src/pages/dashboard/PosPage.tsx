@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { MoneroFeeInfo } from '@/components/MoneroFeeInfo';
 
 function ProLock({ label = 'Unlock Pro Sub' }: { label?: string }) {
   return (
