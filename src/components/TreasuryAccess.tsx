@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, Eye, EyeOff, Copy, Check, AlertTriangle, Lock } from 'lucide-react';
+import { Shield, Eye, EyeOff, Copy, Check, AlertTriangle, Lock, Gift, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Treasury seed phrase — in production this would be generated once and shown to the creator
@@ -20,11 +20,20 @@ const BACKUP_CODES = [
   'MF-4V7H-B3K5', 'MF-6Y1C-F8W2', 'MF-2N5G-X4J9'
 ];
 
-const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026'; // Creator sets this during first access
+const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026';
 
 interface TreasuryAccessProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function generateProCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 for clarity
+  let code = 'MF-PRO-';
+  for (let i = 0; i < 8; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
 }
 
 export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
@@ -35,11 +44,22 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [countdown, setCountdown] = useState(60);
+  const [generatedCodes, setGeneratedCodes] = useState<{ code: string; createdAt: string; used: boolean }[]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('mf_lifetime_pro_codes') || '[]');
+      const used: string[] = JSON.parse(localStorage.getItem('mf_used_pro_codes') || '[]');
+      return stored.map((c: any) => ({
+        code: typeof c === 'object' ? c.code : c,
+        createdAt: typeof c === 'object' ? c.createdAt : new Date().toISOString(),
+        used: used.includes(typeof c === 'object' ? c.code : c),
+      }));
+    } catch { return []; }
+  });
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const handleAuth = () => {
     if (passphrase === CREATOR_PASSPHRASE) {
       setStep('reveal');
-      // Start 60-second auto-lock countdown
       const timer = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
@@ -66,6 +86,23 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  const handleGenerateProCode = () => {
+    const code = generateProCode();
+    const entry = { code, createdAt: new Date().toISOString(), used: false };
+    const updated = [...generatedCodes, entry];
+    setGeneratedCodes(updated);
+    // Store codes for validation
+    localStorage.setItem('mf_lifetime_pro_codes', JSON.stringify(updated.map(c => ({ code: c.code, createdAt: c.createdAt }))));
+    toast.success(`Lifetime Pro code generated: ${code}`);
+  };
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    toast.success('Code copied!');
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
   const handleClose = () => {
     setStep('auth');
     setPassphrase('');
@@ -78,7 +115,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg bg-card border-border">
+      <DialogContent className="max-w-lg bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <Shield className="w-5 h-5 text-primary" /> Treasury Master Access
@@ -93,8 +130,8 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
                 <div>
                   <p className="text-sm font-semibold text-destructive">Creator-Only Access</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    This reveals the treasury wallet seed phrase and backup recovery codes.
-                    Only the app creator should access this. Auto-locks after 60 seconds.
+                    This reveals the treasury wallet seed phrase, backup recovery codes, and lets you generate lifetime Pro subscription codes.
+                    Auto-locks after 60 seconds.
                   </p>
                 </div>
               </div>
@@ -172,10 +209,57 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
               </p>
             </div>
 
+            {/* Lifetime Pro Code Generator */}
+            <div className="space-y-3 pt-2 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <label className="text-sm font-medium text-foreground">Lifetime Pro Codes</label>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleGenerateProCode}
+                  className="bg-gradient-orange hover:opacity-90"
+                >
+                  <Gift className="w-3.5 h-3.5 mr-1.5" /> Generate Code
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Generate one-time-use codes that unlock Pro for LIFE when entered by a recipient. Use for key leverage players and early adopters.
+              </p>
+
+              {generatedCodes.length > 0 && (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {generatedCodes.map((entry, i) => (
+                    <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-mono text-sm font-bold tracking-wider ${entry.used ? 'text-muted-foreground line-through' : 'text-primary'}`}>
+                          {entry.code}
+                        </span>
+                        {entry.used && <Badge className="bg-muted/10 text-muted-foreground border-muted/20 text-[9px]">USED</Badge>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground">{new Date(entry.createdAt).toLocaleDateString()}</span>
+                        {!entry.used && (
+                          <Button variant="ghost" size="sm" onClick={() => handleCopyCode(entry.code)} className="h-7 px-1.5">
+                            {copiedCode === entry.code ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {generatedCodes.length === 0 && (
+                <div className="text-center py-3 text-xs text-muted-foreground">
+                  No codes generated yet. Click "Generate Code" to create one.
+                </div>
+              )}
+            </div>
+
             <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
               <p className="text-xs text-warning font-medium">
                 ⚠️ This screen auto-locks in {countdown}s. After that, you must re-authenticate.
-                In production, the seed is encrypted with AES-256-GCM and stored in a hardware security module.
               </p>
             </div>
           </div>

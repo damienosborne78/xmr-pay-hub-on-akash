@@ -77,6 +77,8 @@ interface AppState {
   updateInvoice: (id: string, updates: Partial<Invoice>) => void;
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
   verifyInvoiceTxHash: (invoiceId: string, txHash: string) => Promise<{ success: boolean; error?: string }>;
+  verifyAllPendingInvoices: () => Promise<{ verified: number; failed: number }>;
+  activateProWithCode: (code: string) => boolean;
   updateMerchant: (updates: Partial<Merchant>) => void;
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
   toggleSubscription: (id: string) => void;
@@ -435,7 +437,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     if (m.viewOnlyViewKey && invoice.subaddress) {
       try {
         console.log(`[Poll] Explorer scan for invoice ${invoiceId} → ${invoice.subaddress.slice(0, 12)}...`);
-        const outputs = await scanRecentOutputs(invoice.subaddress, m.viewOnlyViewKey, 10, true);
+        const outputs = await scanRecentOutputs(invoice.subaddress, m.viewOnlyViewKey, 10);
         
         if (outputs.length > 0) {
           const totalPico = outputs.reduce((sum, o) => sum + o.amount, 0);
@@ -540,6 +542,88 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     // Fallback: just mark as seen if we can't verify (will continue polling)
     get().updateInvoice(invoiceId, { txid: cleanHash, status: 'seen_on_chain' });
     return { success: true };
+  },
+
+  verifyAllPendingInvoices: async () => {
+    const state = get();
+    const m = state.merchant;
+    if (!m.viewOnlyViewKey) return { verified: 0, failed: 0 };
+    
+    const pendingInvoices = state.invoices.filter(
+      i => i.status === 'pending' || i.status === 'seen_on_chain' || i.status === 'confirming'
+    );
+    
+    let verified = 0;
+    let failed = 0;
+    
+    for (const inv of pendingInvoices) {
+      // If invoice has a txid, verify it directly
+      if (inv.txid) {
+        try {
+          const result = await verifyTxOutputs(inv.txid, inv.subaddress, m.viewOnlyViewKey);
+          if (result && result.matched) {
+            const totalXmr = result.totalAmount / 1e12;
+            const requiredConfs = m.requiredConfirmations ?? 1;
+            const isZeroConf = m.zeroConfEnabled && inv.fiatAmount <= (m.zeroConfThresholdUsd || 30);
+            
+            let status: Invoice['status'] = 'seen_on_chain';
+            if (totalXmr >= inv.xmrAmount * 0.95) {
+              if (isZeroConf || result.confirmations >= requiredConfs) {
+                status = 'paid';
+              } else if (result.confirmations >= 1) {
+                status = 'confirming';
+              }
+            } else if (totalXmr > 0) {
+              status = 'underpaid';
+            }
+            
+            get().updateInvoice(inv.id, {
+              status,
+              confirmations: result.confirmations,
+              paidAt: status === 'paid' && !inv.paidAt ? new Date().toISOString() : inv.paidAt,
+            });
+            verified++;
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+      }
+      
+      // Check if expired
+      if (!inv.txid && new Date(inv.expiresAt).getTime() < Date.now()) {
+        get().updateInvoice(inv.id, { status: 'expired' });
+      }
+    }
+    
+    return { verified, failed };
+  },
+
+  activateProWithCode: (code: string) => {
+    const m = get().merchant;
+    // Check against stored lifetime pro codes
+    const storedCodes: string[] = JSON.parse(localStorage.getItem('mf_lifetime_pro_codes') || '[]');
+    const codeEntry = storedCodes.find((c: any) => (typeof c === 'object' ? c.code : c) === code.toUpperCase());
+    
+    if (!codeEntry) return false;
+    
+    // Mark code as used
+    const usedCodes: string[] = JSON.parse(localStorage.getItem('mf_used_pro_codes') || '[]');
+    if (usedCodes.includes(code.toUpperCase())) return false;
+    
+    usedCodes.push(code.toUpperCase());
+    localStorage.setItem('mf_used_pro_codes', JSON.stringify(usedCodes));
+    
+    // Activate lifetime pro
+    get().updateMerchant({
+      plan: 'pro',
+      proStatus: 'pro',
+      proActivatedAt: new Date().toISOString(),
+      proExpiresAt: '', // never expires — lifetime
+      proTxid: `LIFETIME-CODE-${code.toUpperCase()}`,
+    });
+    return true;
   },
 
   updateMerchant: (updates: Partial<Merchant>) => {

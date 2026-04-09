@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Users, TrendingUp, Coins, Gift, Zap, Crown, Shield, QrCode, Wallet, AlertTriangle, KeyRound } from 'lucide-react';
+import { Copy, Check, Users, TrendingUp, Coins, Gift, Zap, Crown, Shield, QrCode, Wallet, AlertTriangle, KeyRound, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { formatXMR, formatUSD, usdToXmr, PRO_MONTHLY_XMR, PRO_REFERRAL_UNLOCK_COUNT, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT } from '@/lib/mock-data';
@@ -31,6 +31,7 @@ export default function ReferralsPage() {
   const referrals = useStore(s => s.referrals);
   const referralPayouts = useStore(s => s.referralPayouts);
   const activateProSubscription = useStore(s => s.activateProSubscription);
+  const activateProWithCode = useStore(s => s.activateProWithCode);
   const updateMerchant = useStore(s => s.updateMerchant);
   const [copied, setCopied] = useState(false);
   const [copiedTreasury, setCopiedTreasury] = useState(false);
@@ -39,6 +40,7 @@ export default function ReferralsPage() {
   const [showTreasury, setShowTreasury] = useState(false);
   const [proTxid, setProTxid] = useState('');
   const [referralInput, setReferralInput] = useState('');
+  const [proCodeInput, setProCodeInput] = useState('');
 
   const fingerprint = merchant.referralWalletFingerprint || merchant.referralCode || 'LOADING';
   const directReferrals = referrals.filter(r => r.level === 1).length;
@@ -99,6 +101,21 @@ export default function ReferralsPage() {
     toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
+  const handleRedeemProCode = () => {
+    const code = proCodeInput.trim().toUpperCase();
+    if (!code || code.length < 6) {
+      toast.error('Please enter a valid Pro code');
+      return;
+    }
+    const success = activateProWithCode(code);
+    if (success) {
+      setProCodeInput('');
+      toast.success('🎉 Lifetime Pro activated! You have permanent access to all Pro features.');
+    } else {
+      toast.error('Invalid or already-used code. Please check and try again.');
+    }
+  };
+
   const handleProActivation = () => {
     if (!proTxid || proTxid.length < 10) {
       toast.error('Please enter a valid transaction hash');
@@ -157,6 +174,31 @@ export default function ReferralsPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">Enter a code to link your account. Your referrer earns commissions when you go Pro.</p>
+          </div>
+        </FadeIn>
+      )}
+
+      {/* Redeem Lifetime Pro Code */}
+      {!isPro && (
+        <FadeIn delay={0.015}>
+          <div className="p-5 rounded-xl bg-card border border-primary/30 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <span className="font-semibold text-foreground">Have a Lifetime Pro code?</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={proCodeInput}
+                onChange={e => setProCodeInput(e.target.value.toUpperCase())}
+                placeholder="Enter code e.g. MF-PRO-ABCD1234"
+                className="bg-background border-border font-mono text-sm uppercase tracking-wider flex-1 max-w-sm"
+                maxLength={20}
+              />
+              <Button onClick={handleRedeemProCode} disabled={!proCodeInput.trim()} className="bg-gradient-orange hover:opacity-90">
+                <Gift className="w-4 h-4 mr-1.5" /> Redeem
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">One-time-use codes that unlock Pro features permanently. Given by the MoneroFlow team.</p>
           </div>
         </FadeIn>
       )}

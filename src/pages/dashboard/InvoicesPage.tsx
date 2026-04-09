@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ExternalLink, FileDown, Loader2, FlaskConical } from 'lucide-react';
+import { Plus, ExternalLink, FileDown, Loader2, FlaskConical, RefreshCw, CheckCircle2, AlertCircle, Search } from 'lucide-react';
 import { FadeIn } from '@/components/FadeIn';
 import { toast } from 'sonner';
 import { useRates } from '@/hooks/use-rates';
@@ -18,6 +18,8 @@ export default function InvoicesPage() {
   const invoices = useStore(s => s.invoices);
   const createInvoice = useStore(s => s.createInvoice);
   const simulateInvoice = useStore(s => s.simulateInvoice);
+  const verifyInvoiceTxHash = useStore(s => s.verifyInvoiceTxHash);
+  const verifyAllPendingInvoices = useStore(s => s.verifyAllPendingInvoices);
   const merchant = useStore(s => s.merchant);
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
@@ -36,6 +38,10 @@ export default function InvoicesPage() {
   const [simulating, setSimulating] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [adminVerified, setAdminVerified] = useState(false);
+  const [verifyingAll, setVerifyingAll] = useState(false);
+  const [txHashInput, setTxHashInput] = useState('');
+  const [verifyingInvoiceId, setVerifyingInvoiceId] = useState<string | null>(null);
+  const [verifyingSingle, setVerifyingSingle] = useState(false);
 
   const hashPassword = (pw: string) => {
     let hash = 0;
@@ -84,11 +90,50 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleVerifyAll = async () => {
+    setVerifyingAll(true);
+    try {
+      const result = await verifyAllPendingInvoices();
+      if (result.verified > 0) {
+        toast.success(`✅ Verified ${result.verified} invoice(s) on-chain!`);
+      } else if (result.failed > 0) {
+        toast.info(`Checked pending invoices: ${result.failed} could not be verified. Add TX hashes to verify.`);
+      } else {
+        toast.info('No pending invoices with TX hashes to verify.');
+      }
+    } catch (e) {
+      toast.error('Verification failed');
+    }
+    setVerifyingAll(false);
+  };
+
+  const handleVerifySingle = async (invoiceId: string) => {
+    if (!txHashInput || txHashInput.length < 10) {
+      toast.error('Please enter a valid TX hash');
+      return;
+    }
+    setVerifyingSingle(true);
+    try {
+      const result = await verifyInvoiceTxHash(invoiceId, txHashInput.trim());
+      if (result.success) {
+        toast.success('✅ Transaction verified on blockchain!');
+        setVerifyingInvoiceId(null);
+        setTxHashInput('');
+      } else {
+        toast.error(result.error || 'Verification failed');
+      }
+    } catch {
+      toast.error('Verification failed');
+    }
+    setVerifyingSingle(false);
+  };
+
   const filteredInvoices = filterUser === 'all'
     ? invoices
     : invoices.filter(i => (i.createdBy || 'admin') === filterUser);
 
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
+  const pendingCount = invoices.filter(i => i.status === 'pending' || i.status === 'seen_on_chain' || i.status === 'confirming').length;
 
   return (
     <div className="space-y-6">
@@ -101,7 +146,21 @@ export default function InvoicesPage() {
               {xmrPrice && <span className="ml-2 text-primary font-mono text-xs">XMR: {formatFiat(xmrPrice, sym, cur)}</span>}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Verify All Pending */}
+            {pendingCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleVerifyAll}
+                disabled={verifyingAll}
+                className="border-primary/30 hover:border-primary/50 text-primary"
+              >
+                {verifyingAll ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                Verify Pending ({pendingCount})
+              </Button>
+            )}
+
             {/* User filter */}
             {users.length > 0 && (
               <Select value={filterUser} onValueChange={setFilterUser}>
@@ -179,6 +238,39 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* TX Hash Verify Dialog */}
+      <Dialog open={!!verifyingInvoiceId} onOpenChange={(o) => { if (!o) { setVerifyingInvoiceId(null); setTxHashInput(''); } }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <Search className="w-5 h-5 text-primary" /> Verify Invoice Payment
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Paste the Monero transaction hash to verify this payment against the blockchain explorer.
+          </p>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label className="text-foreground">Transaction Hash</Label>
+              <Input
+                value={txHashInput}
+                onChange={e => setTxHashInput(e.target.value)}
+                placeholder="64-character hex TX hash"
+                className="bg-background border-border font-mono text-xs"
+              />
+            </div>
+            <Button
+              onClick={() => verifyingInvoiceId && handleVerifySingle(verifyingInvoiceId)}
+              disabled={verifyingSingle || txHashInput.length < 10}
+              className="w-full bg-gradient-orange hover:opacity-90"
+            >
+              {verifyingSingle ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              {verifyingSingle ? 'Checking blockchain...' : 'Verify on Blockchain'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <FadeIn delay={0.1}>
         <div className="rounded-xl bg-card border border-border overflow-hidden">
           {filteredInvoices.length === 0 ? (
@@ -200,6 +292,7 @@ export default function InvoicesPage() {
                 <tbody>
                   {filteredInvoices.map(inv => {
                     const creatorName = inv.createdBy === 'admin' || !inv.createdBy ? 'Admin' : users.find(u => u.id === inv.createdBy)?.name || inv.createdBy;
+                    const isPending = inv.status === 'pending' || inv.status === 'seen_on_chain' || inv.status === 'confirming';
                     return (
                       <tr key={inv.id} className="border-b border-border/50 hover:bg-muted/10 transition-colors">
                         <td className="py-3 px-4 font-mono text-xs text-muted-foreground">{inv.id}</td>
@@ -212,12 +305,32 @@ export default function InvoicesPage() {
                         {users.length > 0 && <td className="py-3 px-4 text-center text-xs text-muted-foreground">{creatorName}</td>}
                         <td className="py-3 px-4 text-center">
                           <Badge variant="outline"
-                            className={inv.status === 'paid' ? 'bg-success/10 text-success border-success/20' : inv.status === 'pending' ? 'bg-warning/10 text-warning border-warning/20' : 'text-muted-foreground'}>
-                            {inv.status}
+                            className={
+                              inv.status === 'paid' ? 'bg-success/10 text-success border-success/20' :
+                              inv.status === 'confirming' ? 'bg-primary/10 text-primary border-primary/20' :
+                              inv.status === 'seen_on_chain' ? 'bg-primary/10 text-primary border-primary/20' :
+                              inv.status === 'pending' ? 'bg-warning/10 text-warning border-warning/20' :
+                              inv.status === 'expired' ? 'bg-muted/10 text-muted-foreground border-muted/20' :
+                              'text-muted-foreground'
+                            }>
+                            {inv.status === 'seen_on_chain' ? 'seen' : inv.status}
+                            {inv.confirmations !== undefined && inv.confirmations > 0 && ` (${inv.confirmations})`}
                           </Badge>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {/* Verify button for pending invoices */}
+                            {isPending && !inv.simulated && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-primary hover:text-primary h-8 px-2"
+                                onClick={() => { setVerifyingInvoiceId(inv.id); setTxHashInput(inv.txid || ''); }}
+                                title="Verify payment with TX hash"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
                             <Link to={`/invoice/${inv.id}`}>
                               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary h-8 px-2">
                                 <ExternalLink className="w-3.5 h-3.5" />
