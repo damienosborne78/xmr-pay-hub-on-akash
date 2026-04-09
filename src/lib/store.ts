@@ -77,6 +77,8 @@ interface AppState {
   updateInvoice: (id: string, updates: Partial<Invoice>) => void;
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
   verifyInvoiceTxHash: (invoiceId: string, txHash: string) => Promise<{ success: boolean; error?: string }>;
+  verifyAllPendingInvoices: () => Promise<{ verified: number; failed: number }>;
+  activateProWithCode: (code: string) => boolean;
   updateMerchant: (updates: Partial<Merchant>) => void;
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
   toggleSubscription: (id: string) => void;
