@@ -31,6 +31,7 @@ export default function ReferralsPage() {
   const referrals = useStore(s => s.referrals);
   const referralPayouts = useStore(s => s.referralPayouts);
   const activateProSubscription = useStore(s => s.activateProSubscription);
+  const activateProWithCode = useStore(s => s.activateProWithCode);
   const updateMerchant = useStore(s => s.updateMerchant);
   const [copied, setCopied] = useState(false);
   const [copiedTreasury, setCopiedTreasury] = useState(false);
@@ -39,6 +40,7 @@ export default function ReferralsPage() {
   const [showTreasury, setShowTreasury] = useState(false);
   const [proTxid, setProTxid] = useState('');
   const [referralInput, setReferralInput] = useState('');
+  const [proCodeInput, setProCodeInput] = useState('');
 
   const fingerprint = merchant.referralWalletFingerprint || merchant.referralCode || 'LOADING';
   const directReferrals = referrals.filter(r => r.level === 1).length;
