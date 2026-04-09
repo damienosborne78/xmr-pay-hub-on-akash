@@ -12,8 +12,9 @@ import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, Lock, X, Wallet, ExternalLink, Radio, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
-import { verifyTxOutputs, getMempoolTxHashes } from '@/lib/block-explorer';
+import { verifyTxOutputs, getMempoolTxHashes, getTxInfo } from '@/lib/block-explorer';
 import { motion } from 'framer-motion';
+import { sendViaDaemonProxy, sendViaWasmWallet, type SyncProgress, type SendMode } from '@/lib/wallet-send';
 
 // Fee tiers for sending
 const SEND_FEE_TIERS = [
@@ -43,11 +44,13 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'tracking' | 'sent'>('form');
+  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'syncing' | 'tracking' | 'sent'>('form');
   const [adminPass, setAdminPass] = useState('');
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [sentTxHash, setSentTxHash] = useState('');
-
+  const [sentFee, setSentFee] = useState(0);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [sendError, setSendError] = useState('');
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
