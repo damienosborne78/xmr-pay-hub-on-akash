@@ -614,7 +614,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
 }
 
 // ─── Send Tracking Progress Component ───
-// Shows a progress screen after sending, polling the block explorer for the TX
+// Polls the block explorer for real TX confirmation status
 function SendTrackingProgress({
   txHash,
   amount,
@@ -634,27 +634,54 @@ function SendTrackingProgress({
   xmrPrice: number | null;
   onDone: () => void;
 }) {
-  const [stage, setStage] = useState<'broadcasting' | 'mempool' | 'confirming' | 'confirmed'>('broadcasting');
+  const [stage, setStage] = useState<'broadcasting' | 'mempool' | 'confirming' | 'confirmed'>('mempool');
   const [confirmations, setConfirmations] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [pollCount, setPollCount] = useState(0);
   const merchant = useStore(s => s.merchant);
   const requiredConfs = merchant.requiredConfirmations ?? 1;
 
+  // Elapsed timer
   useEffect(() => {
     if (stage === 'confirmed') return;
     const t = setInterval(() => setElapsed(s => s + 1), 1000);
     return () => clearInterval(t);
   }, [stage]);
 
-  // Simulate progression (no real wallet RPC available)
+  // Poll block explorer for real TX status
   useEffect(() => {
-    const t1 = setTimeout(() => { if (stage === 'broadcasting') setStage('mempool'); }, 3000);
-    const t2 = setTimeout(() => { setStage('confirming'); setConfirmations(1); }, 8000);
-    const t3 = setTimeout(() => { setConfirmations(requiredConfs); setStage('confirmed'); }, 12000);
-    const pollInterval = setInterval(() => setPollCount(c => c + 1), 3000);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearInterval(pollInterval); };
-  }, [requiredConfs]);
+    if (!txHash || stage === 'confirmed') return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        setPollCount(c => c + 1);
+        const info = await getTxInfo(txHash);
+        if (cancelled) return;
+
+        if (info) {
+          if (info.confirmations >= requiredConfs) {
+            setConfirmations(info.confirmations);
+            setStage('confirmed');
+          } else if (info.confirmations >= 1) {
+            setConfirmations(info.confirmations);
+            setStage('confirming');
+          } else if (info.confirmed) {
+            setStage('confirming');
+            setConfirmations(1);
+          } else {
+            setStage('mempool');
+          }
+        }
+      } catch {
+        // Explorer may not have the TX yet — keep polling
+      }
+    };
+
+    poll(); // Initial check
+    const interval = setInterval(poll, 15000); // Poll every 15s
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [txHash, requiredConfs, stage]);
 
   const progressPercent =
     stage === 'broadcasting' ? 10 :
@@ -663,14 +690,14 @@ function SendTrackingProgress({
 
   const stageMessages = {
     broadcasting: { title: 'Broadcasting transaction...', subtitle: 'Submitting to the Monero network' },
-    mempool: { title: 'Transaction in mempool! 📡', subtitle: 'Waiting for block inclusion...' },
+    mempool: { title: 'Transaction broadcast! 📡', subtitle: 'Waiting for block inclusion (~2 min)...' },
     confirming: { title: `Confirming... (${confirmations}/${requiredConfs})`, subtitle: 'Waiting for block confirmations' },
     confirmed: { title: 'Transaction confirmed! ✅', subtitle: 'Your XMR has been sent successfully' },
   };
 
   const msg = stageMessages[stage];
   const steps = [
-    { id: 'broadcast', label: 'Broadcasting to network', done: stage !== 'broadcasting', current: stage === 'broadcasting' },
+    { id: 'broadcast', label: 'Broadcast to network', done: true, current: false },
     { id: 'mempool', label: 'Seen in mempool (0-conf)', done: stage === 'confirming' || stage === 'confirmed', current: stage === 'mempool' },
     { id: 'confirming', label: `${confirmations}/${requiredConfs} confirmations`, done: stage === 'confirmed', current: stage === 'confirming' },
     { id: 'confirmed', label: 'Transaction confirmed', done: stage === 'confirmed', current: false },
@@ -745,7 +772,7 @@ function SendTrackingProgress({
       </div>
 
       <div className="bg-muted/20 rounded-lg p-2.5 border border-border">
-        <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>
+        <p className="text-[10px] text-muted-foreground mb-1">Transaction ID (real, on-chain)</p>
         <a
           href={`https://xmrchain.net/tx/${txHash}`}
           target="_blank"
@@ -757,17 +784,18 @@ function SendTrackingProgress({
         </a>
       </div>
 
-      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-warning/10 border border-warning/20">
-        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
-        <p className="text-[10px] text-warning leading-relaxed">
-          Simulated TX — In production with a full wallet RPC, this would be a real Monero transaction verified on-chain.
+      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-success/10 border border-success/20">
+        <Shield className="w-3.5 h-3.5 text-success shrink-0 mt-0.5" />
+        <p className="text-[10px] text-success leading-relaxed">
+          Real mainnet transaction — signed in your browser, broadcast to the Monero network.
+          Verify on <a href={`https://xmrchain.net/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline">xmrchain.net</a>.
         </p>
       </div>
 
       {stage !== 'confirmed' && (
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          Tracking · Poll #{pollCount} · {formatTime(elapsed)} elapsed
+          Polling explorer · #{pollCount} · {formatTime(elapsed)} elapsed
         </div>
       )}
 
