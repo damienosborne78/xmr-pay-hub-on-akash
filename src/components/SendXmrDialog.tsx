@@ -54,6 +54,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
+  const effectiveNodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
   const totalWithFee = parsedAmount + selectedFee.feeXmr;
 
   const fiatEquivalent = xmrPrice ? parsedAmount * xmrPrice : null;
