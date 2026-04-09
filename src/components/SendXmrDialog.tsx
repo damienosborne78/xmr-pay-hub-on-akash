@@ -201,6 +201,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
     setAmountFiat('');
     setFeeTier('normal');
     setNote('');
+    setSentTxHash('');
     setStep(needsAuth ? 'auth' : 'form');
     setAdminPass('');
     setAdminAuthed(false);
