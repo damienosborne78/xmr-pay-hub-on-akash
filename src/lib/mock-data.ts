@@ -21,6 +21,11 @@ export interface Invoice {
   cartId?: string;
   createdBy?: string; // user id or 'admin'
   simulated?: boolean;
+  type?: 'received' | 'sent'; // Track direction of payment
+  recipientAddress?: string; // For sent payments
+  feeTier?: string; // Fee tier used for sent payments
+  feeXmr?: number; // Fee amount for sent payments
+  note?: string; // Optional note for sent payments
 }
 
 export interface PosQuickButton {
