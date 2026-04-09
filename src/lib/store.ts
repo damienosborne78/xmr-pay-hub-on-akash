@@ -6,6 +6,7 @@ import { scanRecentOutputs, verifyTxOutputs } from './block-explorer';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
+import { normalizeMerchantSubscription } from './subscription';
 
 // ─── IndexedDB storage adapter for Zustand persist ───
 function createIDBStorage() {
@@ -698,12 +699,15 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 
   restoreFromBackup: (data: any) => {
     const updates: any = {};
-    if (data.merchant) updates.merchant = { ...defaultMerchant, ...data.merchant };
+    if (data.merchant) {
+      updates.merchant = normalizeMerchantSubscription({ ...defaultMerchant, ...data.merchant });
+    }
     if (data.invoices) updates.invoices = data.invoices;
     if (data.subscriptions) updates.subscriptions = data.subscriptions;
     if (data.paymentLinks) updates.paymentLinks = data.paymentLinks;
     if (data.referrals) updates.referrals = data.referrals;
     if (data.referralPayouts) updates.referralPayouts = data.referralPayouts;
+    if (typeof data.isAuthenticated === 'boolean') updates.isAuthenticated = data.isAuthenticated;
     set(updates);
   },
 

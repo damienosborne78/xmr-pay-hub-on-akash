@@ -26,7 +26,6 @@ interface Props {
 
 export function SendXmrDialog({ open, onOpenChange }: Props) {
   const merchant = useStore(s => s.merchant);
-  const updateInvoice = useStore(s => s.updateInvoice);
   const invoices = useStore(s => s.invoices);
   const { rates } = useRates();
   const sym = merchant.fiatSymbol || '$';
@@ -54,7 +53,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const feeInFiat = xmrPrice ? selectedFee.feeXmr * xmrPrice : null;
 
   // Wallet balance (simulated — in production would come from RPC)
-  const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent');
+  const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent' && !i.simulated);
   const sentInvoices = invoices.filter(i => i.type === 'sent');
   const totalReceived = paidInvoices.reduce((s, i) => s + i.xmrAmount, 0);
   const totalSent = sentInvoices.reduce((s, i) => s + i.xmrAmount + (i.feeXmr || 0), 0);

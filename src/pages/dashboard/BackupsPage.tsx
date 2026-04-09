@@ -11,6 +11,7 @@ import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { isMerchantPro } from '@/lib/subscription';
 
 const CLOUD_PROVIDERS = [
   { id: 'google-drive', name: 'Google Drive', icon: '📁', desc: 'Back up to your Google account', authUrl: 'https://accounts.google.com/o/oauth2/auth', instructions: 'Sign in with your Google account to allow MoneroFlow to store encrypted backups in a dedicated folder in your Google Drive.' },
@@ -31,7 +32,7 @@ export default function BackupsPage() {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
   const restoreFromBackup = useStore(s => s.restoreFromBackup);
-  const isPro = merchant.plan === 'pro';
+  const isPro = isMerchantPro(merchant);
 
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [backupFrequency, setBackupFrequency] = useState('1d');
@@ -104,14 +105,10 @@ export default function BackupsPage() {
       const parsed = JSON.parse(json);
       restoreFromBackup(parsed);
       // Restore UI-local settings
-      if (parsed.connectedCloud) setConnectedCloud(parsed.connectedCloud);
-      if (parsed.autoBackupEnabled) setAutoBackupEnabled(parsed.autoBackupEnabled);
+       if ('connectedCloud' in parsed) setConnectedCloud(parsed.connectedCloud || null);
+       if (typeof parsed.autoBackupEnabled === 'boolean') setAutoBackupEnabled(parsed.autoBackupEnabled);
       if (parsed.backupFrequency) setBackupFrequency(parsed.backupFrequency);
-      if (parsed.encryptedBackups) setEncryptedBackups(parsed.encryptedBackups);
-      // Restore authentication state
-      if (parsed.isAuthenticated) {
-        useStore.getState().login();
-      }
+       if (typeof parsed.encryptedBackups === 'boolean') setEncryptedBackups(parsed.encryptedBackups);
       const invoiceCount = parsed.invoices?.length || 0;
       const subCount = parsed.subscriptions?.length || 0;
       const userCount = parsed.merchant?.posUsers?.length || 0;
@@ -198,9 +195,9 @@ export default function BackupsPage() {
             </Button>
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={restoring} className="border-border hover:border-primary/50">
               {restoring ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-              {restoring ? 'Restoring...' : 'Restore from File'}
+              {restoring ? 'Restoring...' : 'Restore from File (.json / .aes)'}
             </Button>
-            <input ref={fileRef} type="file" accept=".json,.aes" className="hidden" onChange={handleRestoreBackup} />
+            <input ref={fileRef} type="file" accept=".json,.aes,.json.aes" className="hidden" onChange={handleRestoreBackup} />
           </div>
         </div>
       </FadeIn>
