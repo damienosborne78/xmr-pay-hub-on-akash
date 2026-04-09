@@ -57,16 +57,29 @@ export default function DashboardOverview() {
     setAutoConnecting(false);
   }, [autoConnectNode]);
 
+  const [chartTimeframe, setChartTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+
   const revenueData = useMemo(() => {
-    const monthMap = new Map<string, { revenue: number; txCount: number }>();
+    const bucketMap = new Map<string, { revenue: number; txCount: number }>();
     paid.forEach(inv => {
       const d = new Date(inv.paidAt || inv.createdAt);
-      const key = d.toLocaleString('default', { month: 'short' });
-      const existing = monthMap.get(key) || { revenue: 0, txCount: 0 };
-      monthMap.set(key, { revenue: existing.revenue + inv.fiatAmount, txCount: existing.txCount + 1 });
+      let key: string;
+      if (chartTimeframe === 'daily') {
+        key = d.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+      } else if (chartTimeframe === 'weekly') {
+        // Group by ISO week start (Monday)
+        const dayOfWeek = d.getDay() || 7;
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - dayOfWeek + 1);
+        key = 'W ' + monday.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+      } else {
+        key = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      }
+      const existing = bucketMap.get(key) || { revenue: 0, txCount: 0 };
+      bucketMap.set(key, { revenue: existing.revenue + inv.fiatAmount, txCount: existing.txCount + 1 });
     });
-    return Array.from(monthMap.entries()).map(([month, data]) => ({ month, ...data }));
-  }, [paid]);
+    return Array.from(bucketMap.entries()).map(([month, data]) => ({ month, ...data }));
+  }, [paid, chartTimeframe]);
 
   const stats = [
     { label: 'Total Received', value: formatFiat(totalFiat, sym, cur), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
@@ -196,7 +209,24 @@ export default function DashboardOverview() {
       {revenueData.length > 0 && (
         <FadeIn delay={0.25}>
           <div className="p-6 rounded-xl bg-card border border-border">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Revenue</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-foreground">Revenue</h2>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {(['daily', 'weekly', 'monthly'] as const).map(tf => (
+                  <button
+                    key={tf}
+                    onClick={() => setChartTimeframe(tf)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      chartTimeframe === tf
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {tf.charAt(0).toUpperCase() + tf.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueData}>

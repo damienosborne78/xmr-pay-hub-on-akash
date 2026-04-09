@@ -96,18 +96,25 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const isValidAddress = recipientAddress.length === 95 || recipientAddress.length === 106;
   const canSend = isValidAddress && parsedAmount > 0;
 
+  // Hash function — must match UsersPage/InvoicesPage exactly
+  const hashPassword = (pw: string) => {
+    let hash = 0;
+    for (let i = 0; i < pw.length; i++) {
+      const chr = pw.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0;
+    }
+    return 'h_' + Math.abs(hash).toString(36);
+  };
+
   // Admin password check
   const handleAdminAuth = () => {
     if (!merchant.adminPasswordHash) {
-      // No password set — allow through
       setAdminAuthed(true);
       setStep('form');
       return;
     }
-    // Simple hash comparison (same as used elsewhere in the app)
-    const hash = Array.from(new TextEncoder().encode(adminPass))
-      .reduce((h, b) => ((h << 5) - h + b) | 0, 0).toString(16);
-    if (hash === merchant.adminPasswordHash) {
+    if (hashPassword(adminPass) === merchant.adminPasswordHash) {
       setAdminAuthed(true);
       setStep('form');
       setAdminPass('');
