@@ -21,7 +21,7 @@ export default function AdvancedWalletSetup({ open, onOpenChange }: Props) {
   const [selectedMode, setSelectedMode] = useState<SendMode>(currentMode);
 
   const handleConfirm = () => {
-    updateMerchant({ sendMode: selectedMode } as any);
+    updateMerchant({ sendMode: selectedMode });
     onOpenChange(false);
   };
 
