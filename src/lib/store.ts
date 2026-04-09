@@ -97,7 +97,39 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   referrals: [],
   referralPayouts: [],
 
-  login: () => set({ isAuthenticated: true }),
+  login: () => {
+    set({ isAuthenticated: true });
+    // Auto-provision browser wallet if none exists
+    const m = get().merchant;
+    if (!m.viewOnlySetupComplete || !m.viewOnlyViewKey) {
+      try {
+        const { generateBrowserWallet } = require('./wallet-generator');
+        const w = generateBrowserWallet();
+        get().updateMerchant({
+          walletMode: 'viewonly',
+          viewOnlyAddress: w.address,
+          viewOnlyViewKey: w.viewKey,
+          viewOnlySpendKey: w.spendKey,
+          viewOnlyPublicSpendKey: w.publicSpendKey,
+          viewOnlyPublicViewKey: w.publicViewKey,
+          viewOnlySeedPhrase: w.seedPhrase,
+          viewOnlySeedBackedUp: false,
+          viewOnlyRestoreHeight: 0,
+          viewOnlyNodeUrl: REMOTE_NODES[0].url,
+          viewOnlySetupComplete: true,
+          viewOnlySubaddressIndex: 1,
+          nodeStatus: 'connecting',
+        });
+        // Auto-connect in background
+        get().autoConnectNode();
+      } catch (e) {
+        console.error('[Store] Auto wallet generation failed:', e);
+      }
+    } else if (m.viewOnlySetupComplete && m.nodeStatus !== 'online') {
+      // Wallet exists but not connected — reconnect
+      get().autoConnectNode();
+    }
+  },
   logout: () => set({ isAuthenticated: false }),
 
   getRpcConfig: () => {

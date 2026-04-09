@@ -17,7 +17,7 @@ export default function SignupPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     login();
-    navigate('/onboarding');
+    navigate('/dashboard');
   };
 
   return (
