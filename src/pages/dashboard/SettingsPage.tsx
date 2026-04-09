@@ -476,8 +476,27 @@ export default function SettingsPage() {
                   Remove Wallet
                 </Button>
               </div>
+
+              {/* Advanced Setup Button */}
+              <div className="pt-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAdvancedSetup(true)}
+                  className="w-full border-border hover:border-primary/50 text-xs"
+                >
+                  <Settings2 className="w-3 h-3 mr-1.5" />
+                  Advanced Setup — Send Mode ({merchant.sendMode === 'wasm' ? 'Full WASM' : 'Daemon Proxy'})
+                </Button>
+                <p className="text-[10px] text-muted-foreground mt-1.5 text-center">
+                  Configure how real Monero transactions are constructed and broadcast
+                </p>
+              </div>
             </div>
           )}
+
+          {/* Advanced Wallet Setup Dialog */}
+          <AdvancedWalletSetup open={showAdvancedSetup} onOpenChange={setShowAdvancedSetup} />
 
 
 
