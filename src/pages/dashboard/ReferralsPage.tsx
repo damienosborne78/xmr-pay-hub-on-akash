@@ -3,12 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Users, TrendingUp, Coins, Gift, Zap, Crown, Shield, ArrowRight, QrCode, Wallet } from 'lucide-react';
+import { Copy, Check, Users, TrendingUp, Coins, Gift, Zap, Crown, Shield, QrCode, Wallet, AlertTriangle, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { formatXMR, formatUSD, usdToXmr, PRO_MONTHLY_XMR, PRO_REFERRAL_UNLOCK_COUNT, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT } from '@/lib/mock-data';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TreasuryAccess } from '@/components/TreasuryAccess';
 
 const COMMISSION_TIERS = [
   { level: 1, label: 'Direct Referral', percent: 25 },
@@ -17,20 +18,29 @@ const COMMISSION_TIERS = [
   { level: 4, label: 'Level 4+', percent: 2 },
 ];
 
+// Anti-gaming: minimum requirements to be eligible for referral rewards
+const REFERRAL_ELIGIBILITY = {
+  minAccountAgeDays: 14,    // Account must be at least 14 days old
+  minValidTxCount: 5,       // Must have at least 5 valid paid invoices
+  minTotalVolumeUsd: 50,    // Must have processed at least $50 in total volume
+};
+
 export default function ReferralsPage() {
   const merchant = useStore(s => s.merchant);
+  const invoices = useStore(s => s.invoices);
   const referrals = useStore(s => s.referrals);
   const referralPayouts = useStore(s => s.referralPayouts);
   const activateProSubscription = useStore(s => s.activateProSubscription);
-  const checkReferralProUnlock = useStore(s => s.checkReferralProUnlock);
+  const updateMerchant = useStore(s => s.updateMerchant);
   const [copied, setCopied] = useState(false);
   const [copiedTreasury, setCopiedTreasury] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showProActivation, setShowProActivation] = useState(false);
+  const [showTreasury, setShowTreasury] = useState(false);
   const [proTxid, setProTxid] = useState('');
+  const [referralInput, setReferralInput] = useState('');
 
   const fingerprint = merchant.referralWalletFingerprint || merchant.referralCode || 'LOADING';
-  const refLink = `https://moneroflow.com/ref/${fingerprint}`;
   const directReferrals = referrals.filter(r => r.level === 1).length;
   const totalReferred = referrals.length;
   const monthlyEarnings = referrals.reduce((sum, r) => sum + (r.monthlyCommission || 0), 0);
@@ -39,13 +49,27 @@ export default function ReferralsPage() {
   const isPro = merchant.proStatus === 'pro' || merchant.proStatus === 'pro_referral';
   const isProViaReferral = merchant.proStatus === 'pro_referral';
 
-  // Payment ID for pro subscription = fingerprint padded to 16 hex chars
+  // Anti-gaming eligibility check
+  const accountAgeDays = Math.floor((Date.now() - new Date(merchant.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+  const paidInvoices = invoices.filter(i => i.status === 'paid');
+  const totalVolumeUsd = paidInvoices.reduce((sum, i) => sum + i.fiatAmount, 0);
+  const isEligibleForReferrals = 
+    accountAgeDays >= REFERRAL_ELIGIBILITY.minAccountAgeDays &&
+    paidInvoices.length >= REFERRAL_ELIGIBILITY.minValidTxCount &&
+    totalVolumeUsd >= REFERRAL_ELIGIBILITY.minTotalVolumeUsd;
+
+  const eligibilityChecks = [
+    { label: `Account age ≥ ${REFERRAL_ELIGIBILITY.minAccountAgeDays} days`, met: accountAgeDays >= REFERRAL_ELIGIBILITY.minAccountAgeDays, current: `${accountAgeDays} days` },
+    { label: `≥ ${REFERRAL_ELIGIBILITY.minValidTxCount} paid invoices`, met: paidInvoices.length >= REFERRAL_ELIGIBILITY.minValidTxCount, current: `${paidInvoices.length} invoices` },
+    { label: `≥ $${REFERRAL_ELIGIBILITY.minTotalVolumeUsd} total volume`, met: totalVolumeUsd >= REFERRAL_ELIGIBILITY.minTotalVolumeUsd, current: `$${totalVolumeUsd.toFixed(2)}` },
+  ];
+
   const proPaymentId = fingerprint.padEnd(16, '0').slice(0, 16);
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(refLink);
+  const copyCode = () => {
+    navigator.clipboard.writeText(fingerprint);
     setCopied(true);
-    toast.success('Referral link copied! 🎉');
+    toast.success('Referral code copied!');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -54,6 +78,25 @@ export default function ReferralsPage() {
     setCopiedTreasury(true);
     toast.success('Treasury address copied!');
     setTimeout(() => setCopiedTreasury(false), 2000);
+  };
+
+  const handleApplyReferral = () => {
+    const code = referralInput.trim().toUpperCase();
+    if (!code || code.length < 4) {
+      toast.error('Please enter a valid referral code');
+      return;
+    }
+    if (code === fingerprint) {
+      toast.error('You cannot refer yourself!');
+      return;
+    }
+    if (merchant.referredBy) {
+      toast.error('You already have a referrer set');
+      return;
+    }
+    updateMerchant({ referredBy: code });
+    setReferralInput('');
+    toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
   const handleProActivation = () => {
@@ -67,7 +110,6 @@ export default function ReferralsPage() {
     toast.success('🎉 Pro activated! Welcome to the elite.');
   };
 
-  // Monero URI for pro payment
   const proPaymentUri = `monero:${CREATOR_TREASURY_ADDRESS}?tx_amount=${PRO_MONTHLY_XMR.toFixed(6)}&tx_payment_id=${proPaymentId}&tx_description=MoneroFlow%20Pro%20Subscription`;
 
   return (
@@ -80,21 +122,88 @@ export default function ReferralsPage() {
             </h1>
             <p className="text-muted-foreground text-sm">Earn XMR by referring merchants — decentralized, on-chain, forever.</p>
           </div>
-          {isPro ? (
-            <Badge className="bg-gradient-orange text-primary-foreground border-0 gap-1">
-              <Crown className="w-3.5 h-3.5" /> {isProViaReferral ? 'Pro (Earned)' : 'Pro Active'}
-            </Badge>
-          ) : (
-            <Button size="sm" className="bg-gradient-orange hover:opacity-90" onClick={() => setShowProActivation(true)}>
-              <Zap className="w-3.5 h-3.5 mr-1.5" /> Upgrade to Pro
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isPro ? (
+              <Badge className="bg-gradient-orange text-primary-foreground border-0 gap-1">
+                <Crown className="w-3.5 h-3.5" /> {isProViaReferral ? 'Pro (Earned)' : 'Pro Active'}
+              </Badge>
+            ) : (
+              <Button size="sm" className="bg-gradient-orange hover:opacity-90" onClick={() => setShowProActivation(true)}>
+                <Zap className="w-3.5 h-3.5 mr-1.5" /> Upgrade to Pro
+              </Button>
+            )}
+          </div>
         </div>
       </FadeIn>
 
+      {/* Enter Referral Code */}
+      {!merchant.referredBy && (
+        <FadeIn delay={0.01}>
+          <div className="p-5 rounded-xl bg-card border border-primary/20 space-y-3">
+            <div className="flex items-center gap-2">
+              <Gift className="w-5 h-5 text-primary" />
+              <span className="font-semibold text-foreground">Got a referral code from a friend?</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={referralInput}
+                onChange={e => setReferralInput(e.target.value.toUpperCase())}
+                placeholder="Enter code e.g. 9IB8LK"
+                className="bg-background border-border font-mono text-sm uppercase tracking-wider flex-1 max-w-xs"
+                maxLength={12}
+              />
+              <Button onClick={handleApplyReferral} disabled={!referralInput.trim()} className="bg-gradient-orange hover:opacity-90">
+                Apply Code
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Enter a code to link your account. Your referrer earns commissions when you go Pro.</p>
+          </div>
+        </FadeIn>
+      )}
+
+      {merchant.referredBy && (
+        <FadeIn delay={0.01}>
+          <div className="p-3 rounded-xl bg-card border border-border flex items-center gap-2">
+            <Check className="w-4 h-4 text-primary" />
+            <span className="text-sm text-muted-foreground">Referred by:</span>
+            <Badge variant="outline" className="font-mono text-primary border-primary/20">{merchant.referredBy}</Badge>
+          </div>
+        </FadeIn>
+      )}
+
+      {/* Anti-Gaming Eligibility */}
+      {!isEligibleForReferrals && (
+        <FadeIn delay={0.02}>
+          <div className="p-5 rounded-xl bg-card border border-warning/30 space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+              <span className="font-semibold text-foreground">Referral Eligibility</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              To prevent gaming, you must meet these requirements before your referral code becomes active:
+            </p>
+            <div className="space-y-1.5">
+              {eligibilityChecks.map((c, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    {c.met ? (
+                      <Check className="w-4 h-4 text-primary" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30" />
+                    )}
+                    <span className={c.met ? 'text-foreground' : 'text-muted-foreground'}>{c.label}</span>
+                  </div>
+                  <span className={`text-xs font-mono ${c.met ? 'text-primary' : 'text-muted-foreground'}`}>{c.current}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </FadeIn>
+      )}
+
       {/* Earn-to-Unlock Progress */}
       {!isPro && (
-        <FadeIn delay={0.02}>
+        <FadeIn delay={0.03}>
           <div className="p-5 rounded-xl bg-card border border-primary/20 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -104,10 +213,7 @@ export default function ReferralsPage() {
               <span className="text-sm text-muted-foreground">{directReferrals}/{PRO_REFERRAL_UNLOCK_COUNT} merchants</span>
             </div>
             <div className="w-full h-3 bg-background rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-orange rounded-full transition-all duration-500"
-                style={{ width: `${progressToFreePro}%` }}
-              />
+              <div className="h-full bg-gradient-orange rounded-full transition-all duration-500" style={{ width: `${progressToFreePro}%` }} />
             </div>
             <p className="text-xs text-muted-foreground">
               Refer {PRO_REFERRAL_UNLOCK_COUNT - directReferrals} more merchants to unlock Pro forever — no payment needed!
@@ -117,7 +223,7 @@ export default function ReferralsPage() {
       )}
 
       {/* Revenue Split Banner */}
-      <FadeIn delay={0.03}>
+      <FadeIn delay={0.04}>
         <div className="p-5 rounded-xl bg-gradient-orange text-primary-foreground relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.15),transparent)]" />
           <div className="relative flex items-center justify-between">
@@ -154,21 +260,22 @@ export default function ReferralsPage() {
         </div>
       </FadeIn>
 
-      {/* Your Referral Identity */}
+      {/* Your Referral Identity — code only, no URL */}
       <FadeIn delay={0.06}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Your Referral Identity</h2>
-            <Badge variant="outline" className="font-mono text-primary border-primary/20">{fingerprint}</Badge>
-          </div>
+          <h2 className="text-lg font-semibold text-foreground">Your Referral Code</h2>
           <p className="text-xs text-muted-foreground">
-            Your referral fingerprint is derived from your wallet — no signup needed. 
-            Share your link and earn XMR when referred merchants subscribe to Pro.
+            Your code is derived from your wallet — no signup needed. Share it with other merchants to earn XMR.
+            {!isEligibleForReferrals && (
+              <span className="text-warning ml-1 font-medium">⚠ Code inactive — meet eligibility requirements above first.</span>
+            )}
           </p>
-          <div className="flex items-center gap-2">
-            <Input value={refLink} readOnly className="bg-background border-border font-mono text-sm flex-1" />
-            <Button variant="outline" size="icon" onClick={copyLink} className="border-border hover:border-primary/50 shrink-0">
-              {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+          <div className="flex items-center gap-4">
+            <span className="text-4xl sm:text-5xl font-black font-mono text-primary tracking-[0.2em] select-all">
+              {fingerprint}
+            </span>
+            <Button variant="outline" size="icon" onClick={copyCode} className="border-border hover:border-primary/50 shrink-0 h-12 w-12">
+              {copied ? <Check className="w-5 h-5 text-primary" /> : <Copy className="w-5 h-5" />}
             </Button>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setShowQR(v => !v)} className="text-muted-foreground text-xs">
@@ -177,7 +284,7 @@ export default function ReferralsPage() {
           </Button>
           {showQR && (
             <div className="flex justify-center p-4 bg-white rounded-lg w-fit mx-auto">
-              <QRCodeSVG value={refLink} size={160} />
+              <QRCodeSVG value={`moneroflow:ref:${fingerprint}`} size={160} />
             </div>
           )}
         </div>
@@ -206,6 +313,25 @@ export default function ReferralsPage() {
               <p className="text-xs text-muted-foreground">Half of every Pro payment flows to referrers. Or refer {PRO_REFERRAL_UNLOCK_COUNT} → free Pro forever.</p>
             </div>
           </div>
+        </div>
+      </FadeIn>
+
+      {/* Anti-Gaming Explainer */}
+      <FadeIn delay={0.09}>
+        <div className="p-6 rounded-xl bg-card border border-border space-y-3">
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" /> Anti-Gaming Protection
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            To ensure the referral ecosystem is fair and sustainable, the following measures are enforced:
+          </p>
+          <ul className="space-y-1.5 text-xs text-muted-foreground list-disc list-inside">
+            <li>Accounts must be <strong className="text-foreground">{REFERRAL_ELIGIBILITY.minAccountAgeDays}+ days old</strong> before their referral code activates</li>
+            <li>Must have processed <strong className="text-foreground">{REFERRAL_ELIGIBILITY.minValidTxCount}+ verified paid invoices</strong></li>
+            <li>Must have <strong className="text-foreground">${REFERRAL_ELIGIBILITY.minTotalVolumeUsd}+ total volume</strong> in real transactions</li>
+            <li>Self-referral detection: same wallet fingerprint chains are rejected</li>
+            <li>Referral rewards only pay out when the referred merchant's Pro subscription is active and verified on-chain</li>
+          </ul>
         </div>
       </FadeIn>
 
@@ -244,7 +370,7 @@ export default function ReferralsPage() {
             <div className="text-center py-8">
               <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground mb-2">No referrals yet</p>
-              <p className="text-xs text-muted-foreground">Share your referral link to start building your network and earning XMR!</p>
+              <p className="text-xs text-muted-foreground">Share your referral code to start building your network and earning XMR!</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -294,6 +420,23 @@ export default function ReferralsPage() {
           )}
         </div>
       </FadeIn>
+
+      {/* Creator Treasury Access — hidden, only appears with secret key combo */}
+      <FadeIn delay={0.18}>
+        <div className="flex justify-center pt-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground/20 hover:text-muted-foreground/50 text-xs"
+            onClick={() => setShowTreasury(true)}
+          >
+            <KeyRound className="w-3 h-3 mr-1" /> Treasury
+          </Button>
+        </div>
+      </FadeIn>
+
+      {/* Treasury Access Dialog */}
+      <TreasuryAccess open={showTreasury} onOpenChange={setShowTreasury} />
 
       {/* Pro Activation Dialog */}
       <Dialog open={showProActivation} onOpenChange={setShowProActivation}>
