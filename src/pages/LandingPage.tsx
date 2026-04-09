@@ -1,40 +1,43 @@
-import { Link } from 'react-router-dom';
-import { BrandLogo } from '@/components/BrandLogo';
+import { useNavigate, Link } from 'react-router-dom';
+import { BrandLogo, MoneroLogo } from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { FadeIn } from '@/components/FadeIn';
 import { Badge } from '@/components/ui/badge';
+import { useStore } from '@/lib/store';
 import {
-  Zap, Shield, Globe, ArrowRight, Check, X, Clock,
-  Wallet, Code, BarChart3, Lock, RefreshCw
+  Zap, Shield, ArrowRight, Check, Lock,
+  Wallet, BarChart3, MonitorSmartphone, Globe, Gift
 } from 'lucide-react';
 
 const features = [
-  { icon: Zap, title: 'Ready in 60 Seconds', desc: 'One-click onboarding. No node setup. No Docker. Just paste and go.' },
-  { icon: Shield, title: 'Hybrid Custody', desc: 'Managed convenience or full self-sovereign mode — your keys, your choice.' },
-  { icon: Globe, title: 'Fiat → XMR Conversion', desc: 'Invoice in USD, customer pays in XMR. Live conversion, zero friction.' },
-  { icon: Wallet, title: 'Auto Cold Settlement', desc: 'Funds automatically settle to your cold wallet on a schedule you control.' },
-  { icon: Code, title: 'Developer-First API', desc: 'RESTful API with webhooks. Shopify & WooCommerce plugins coming soon.' },
-  { icon: BarChart3, title: 'Beautiful Dashboard', desc: 'Real-time analytics, invoice management, and payment tracking — finally done right.' },
+  { icon: Zap, title: 'Instant Setup', desc: 'Click one button — your Monero wallet is auto-generated. Start accepting payments in seconds.' },
+  { icon: Shield, title: 'Self-Custody by Default', desc: 'Your keys, your coins. Browser wallet with seed phrase backup — no third parties ever touch your funds.' },
+  { icon: Globe, title: 'Multi-Currency Invoicing', desc: 'Invoice in any fiat currency, customer pays in XMR. Live rate conversion at time of order.' },
+  { icon: MonitorSmartphone, title: 'Elite PoS Terminal', desc: 'Full-featured point-of-sale with quick items, modifiers, combos, multi-user support, and parked orders.' },
+  { icon: BarChart3, title: 'Analytics & Reporting', desc: 'Real-time dashboard with revenue tracking, user performance, and exportable accounting reports.' },
+  { icon: Gift, title: 'Earn XMR Referrals', desc: 'Refer merchants, earn multi-level XMR commissions forever. Refer enough and unlock Pro for free.' },
 ];
 
 const comparisons = [
-  { feature: 'Self-custody option', us: true, nowpay: false, moneropay: true },
-  { feature: 'No Docker/SQL needed', us: true, nowpay: true, moneropay: false },
-  { feature: 'Managed infrastructure', us: true, nowpay: true, moneropay: false },
-  { feature: 'Fiat conversion', us: true, nowpay: true, moneropay: false },
-  { feature: 'Modern dashboard', us: true, nowpay: false, moneropay: false },
-  { feature: 'Webhook notifications', us: true, nowpay: true, moneropay: true },
-  { feature: 'Free tier', us: true, nowpay: false, moneropay: true },
-  { feature: 'No custodial fees', us: true, nowpay: false, moneropay: true },
-];
-
-const testimonials = [
-  { name: 'Alex K.', role: 'E-commerce Owner', text: 'Finally a Monero payment solution that doesn\'t look like it was built in 2015. My customers love the checkout experience.' },
-  { name: 'Sarah M.', role: 'SaaS Founder', text: 'Integrated MoneroFlow in under 10 minutes. The webhooks just work. This is what Monero payments should have always been.' },
-  { name: 'Dmitri V.', role: 'Privacy Advocate', text: 'Self-sovereign mode means I never give up my keys. The managed option is there when I need convenience. Best of both worlds.' },
+  { feature: 'Self-custody by default', us: true, nowpay: false, moneropay: true },
+  { feature: 'No server / Docker needed', us: true, nowpay: true, moneropay: false },
+  { feature: 'Browser-based wallet', us: true, nowpay: false, moneropay: false },
+  { feature: 'Multi-currency invoicing', us: true, nowpay: true, moneropay: false },
+  { feature: 'Elite PoS terminal', us: true, nowpay: false, moneropay: false },
+  { feature: 'Multi-user / cashier support', us: true, nowpay: false, moneropay: false },
+  { feature: 'On-chain pro subscriptions', us: true, nowpay: false, moneropay: false },
+  { feature: 'Earn-to-unlock referrals', us: true, nowpay: false, moneropay: false },
 ];
 
 export default function LandingPage() {
+  const navigate = useNavigate();
+  const login = useStore(s => s.login);
+
+  const handleStart = () => {
+    login();
+    navigate('/dashboard');
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -45,9 +48,9 @@ export default function LandingPage() {
             <Link to="/login">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">Log in</Button>
             </Link>
-            <Link to="/signup">
-              <Button size="sm" className="bg-gradient-orange hover:opacity-90">Get Started Free</Button>
-            </Link>
+            <Button size="sm" className="bg-gradient-orange hover:opacity-90" onClick={handleStart}>
+              Get Started Free
+            </Button>
           </div>
         </div>
       </nav>
@@ -59,28 +62,27 @@ export default function LandingPage() {
         <div className="container relative z-10 text-center">
           <FadeIn>
             <Badge variant="outline" className="mb-6 border-primary/30 text-primary px-4 py-1.5 text-sm">
-              <Lock className="w-3.5 h-3.5 mr-1.5" /> Privacy-First Payments
+              <Lock className="w-3.5 h-3.5 mr-1.5" /> Self-Custody · Zero Setup · Privacy-First
             </Badge>
           </FadeIn>
           <FadeIn delay={0.1}>
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6">
-              Stripe for{' '}
+              Accept{' '}
               <span className="text-gradient-orange">Monero</span>
+              {' '}Instantly
             </h1>
           </FadeIn>
           <FadeIn delay={0.2}>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 leading-relaxed">
-              Accept XMR payments in 60 seconds. Beautiful dashboard, instant invoicing,
-              webhook notifications — without giving up custody of your keys.
+              One click to a full merchant dashboard with browser wallet, elite PoS terminal, 
+              multi-currency invoicing, and XMR referral rewards — all without giving up custody.
             </p>
           </FadeIn>
           <FadeIn delay={0.3}>
             <div className="flex items-center justify-center gap-4">
-              <Link to="/signup">
-                <Button size="lg" className="bg-gradient-orange hover:opacity-90 glow-orange-sm text-base px-8 h-12">
-                  Start Accepting XMR <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-              </Link>
+              <Button size="lg" className="bg-gradient-orange hover:opacity-90 glow-orange-sm text-base px-8 h-12" onClick={handleStart}>
+                Start Accepting XMR <ArrowRight className="ml-2 w-4 h-4" />
+              </Button>
               <Link to="/invoice/inv_a1b2c3">
                 <Button variant="outline" size="lg" className="border-border hover:border-primary/50 text-base px-8 h-12">
                   See Demo Invoice
@@ -89,7 +91,7 @@ export default function LandingPage() {
             </div>
           </FadeIn>
           <FadeIn delay={0.4}>
-            <p className="mt-4 text-sm text-muted-foreground">Free tier · No credit card · 10 tx/month included</p>
+            <p className="mt-4 text-sm text-muted-foreground">No signup required · No email · Your keys, your coins</p>
           </FadeIn>
         </div>
       </section>
@@ -100,7 +102,7 @@ export default function LandingPage() {
           <FadeIn>
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need to accept <span className="text-primary">Monero</span></h2>
-              <p className="text-muted-foreground text-lg max-w-xl mx-auto">Built for merchants who want privacy-preserving payments without the operational headache.</p>
+              <p className="text-muted-foreground text-lg max-w-xl mx-auto">Built for merchants who want privacy and simplicity without compromise.</p>
             </div>
           </FadeIn>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -143,9 +145,9 @@ export default function LandingPage() {
                   {comparisons.map((row) => (
                     <tr key={row.feature} className="border-b border-border/50 hover:bg-card/50 transition-colors">
                       <td className="py-3 px-4 text-foreground">{row.feature}</td>
-                      <td className="py-3 px-4 text-center">{row.us ? <Check className="w-4 h-4 text-primary mx-auto" /> : <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />}</td>
-                      <td className="py-3 px-4 text-center">{row.nowpay ? <Check className="w-4 h-4 text-muted-foreground mx-auto" /> : <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />}</td>
-                      <td className="py-3 px-4 text-center">{row.moneropay ? <Check className="w-4 h-4 text-muted-foreground mx-auto" /> : <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />}</td>
+                      <td className="py-3 px-4 text-center">{row.us ? <Check className="w-4 h-4 text-primary mx-auto" /> : <span className="text-muted-foreground/40">✕</span>}</td>
+                      <td className="py-3 px-4 text-center">{row.nowpay ? <Check className="w-4 h-4 text-muted-foreground mx-auto" /> : <span className="text-muted-foreground/40">✕</span>}</td>
+                      <td className="py-3 px-4 text-center">{row.moneropay ? <Check className="w-4 h-4 text-muted-foreground mx-auto" /> : <span className="text-muted-foreground/40">✕</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -155,24 +157,48 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* How Monetization Works */}
       <section className="py-24 bg-surface-elevated/50">
         <div className="container">
           <FadeIn>
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">Trusted by <span className="text-primary">privacy-first</span> merchants</h2>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                <span className="text-primary">On-Chain</span> Pro Subscriptions
+              </h2>
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                No accounts. No email. Pay XMR on-chain to unlock Pro — your payment ID is your receipt.
+                50% of every Pro subscription rewards the referral network.
+              </p>
+            </div>
           </FadeIn>
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {testimonials.map((t, i) => (
-              <FadeIn key={t.name} delay={i * 0.1}>
-                <div className="p-6 rounded-xl bg-card border border-border">
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-4">"{t.text}"</p>
-                  <div>
-                    <p className="font-semibold text-foreground text-sm">{t.name}</p>
-                    <p className="text-muted-foreground text-xs">{t.role}</p>
-                  </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <FadeIn delay={0.1}>
+              <div className="text-center p-6">
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Wallet className="w-7 h-7 text-primary" />
                 </div>
-              </FadeIn>
-            ))}
+                <h3 className="font-bold text-foreground mb-2">1. Pay On-Chain</h3>
+                <p className="text-sm text-muted-foreground">Send XMR to the MoneroFlow treasury address with your unique payment ID. No account needed.</p>
+              </div>
+            </FadeIn>
+            <FadeIn delay={0.2}>
+              <div className="text-center p-6">
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-7 h-7 text-primary" />
+                </div>
+                <h3 className="font-bold text-foreground mb-2">2. Auto-Verified</h3>
+                <p className="text-sm text-muted-foreground">The app checks the blockchain for your payment. Pro unlocks instantly — no middleman, no KYC.</p>
+              </div>
+            </FadeIn>
+            <FadeIn delay={0.3}>
+              <div className="text-center p-6">
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Gift className="w-7 h-7 text-primary" />
+                </div>
+                <h3 className="font-bold text-foreground mb-2">3. Earn & Unlock</h3>
+                <p className="text-sm text-muted-foreground">Refer 10 active merchants → Pro unlocks for free, forever. 50% of Pro revenue feeds the referral pool.</p>
+              </div>
+            </FadeIn>
           </div>
         </div>
       </section>
@@ -182,38 +208,43 @@ export default function LandingPage() {
         <div className="container">
           <FadeIn>
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">Simple, transparent <span className="text-primary">pricing</span></h2>
-            <p className="text-center text-muted-foreground mb-16 text-lg">No hidden fees. No percentage cuts on your transactions.</p>
+            <p className="text-center text-muted-foreground mb-16 text-lg">No percentage cuts. No hidden fees. Pay in XMR, on-chain.</p>
           </FadeIn>
           <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             <FadeIn delay={0.1}>
               <div className="p-8 rounded-xl bg-card border border-border">
                 <h3 className="text-xl font-bold mb-2 text-foreground">Free</h3>
                 <div className="mb-4">
-                  <span className="text-4xl font-extrabold text-foreground">$0</span>
-                  <span className="text-muted-foreground">/month</span>
+                  <span className="text-4xl font-extrabold text-foreground">0 XMR</span>
+                  <span className="text-muted-foreground">/forever</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['10 transactions/month', 'Dashboard & analytics', 'Webhook notifications', 'API access', 'Community support'].map(f => (
+                  {['Unlimited invoices', 'Browser wallet (self-custody)', 'Basic PoS terminal', 'Multi-currency invoicing', 'Dashboard & analytics', 'Referral program access'].map(f => (
                     <li key={f} className="flex items-center text-sm text-muted-foreground"><Check className="w-4 h-4 text-primary mr-2 shrink-0" />{f}</li>
                   ))}
                 </ul>
-                <Link to="/signup"><Button variant="outline" className="w-full border-border hover:border-primary/50">Get Started</Button></Link>
+                <Button variant="outline" className="w-full border-border hover:border-primary/50" onClick={handleStart}>
+                  Start Free
+                </Button>
               </div>
             </FadeIn>
             <FadeIn delay={0.2}>
               <div className="p-8 rounded-xl bg-card border border-primary/30 glow-orange relative">
                 <Badge className="absolute -top-3 right-6 bg-gradient-orange text-primary-foreground border-0">Popular</Badge>
                 <h3 className="text-xl font-bold mb-2 text-foreground">Pro</h3>
-                <div className="mb-4">
-                  <span className="text-4xl font-extrabold text-foreground">$29</span>
+                <div className="mb-1">
+                  <span className="text-4xl font-extrabold text-foreground">0.05 XMR</span>
                   <span className="text-muted-foreground">/month</span>
                 </div>
+                <p className="text-xs text-muted-foreground mb-4">Or refer 10 merchants → free forever</p>
                 <ul className="space-y-3 mb-8">
-                  {['Unlimited transactions', 'Priority support', 'Custom branding', 'Advanced analytics', 'Self-sovereign mode', 'Multiple settlement wallets'].map(f => (
+                  {['Everything in Free', 'Elite PoS with combos & modifiers', 'Encrypted cloud backups', 'Accounting exports (PDF/CSV)', 'White-label branding', 'Priority node connections', 'Multi-user / cashier system'].map(f => (
                     <li key={f} className="flex items-center text-sm text-muted-foreground"><Check className="w-4 h-4 text-primary mr-2 shrink-0" />{f}</li>
                   ))}
                 </ul>
-                <Link to="/signup"><Button className="w-full bg-gradient-orange hover:opacity-90">Upgrade to Pro</Button></Link>
+                <Button className="w-full bg-gradient-orange hover:opacity-90" onClick={handleStart}>
+                  Start Free, Upgrade Anytime
+                </Button>
               </div>
             </FadeIn>
           </div>
@@ -224,13 +255,12 @@ export default function LandingPage() {
       <section className="py-24 bg-surface-elevated/50">
         <div className="container text-center">
           <FadeIn>
+            <MoneroLogo size={48} className="mx-auto mb-6" />
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to accept <span className="text-primary">Monero</span>?</h2>
-            <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">Join merchants worldwide who trust MoneroFlow for private, frictionless payments.</p>
-            <Link to="/signup">
-              <Button size="lg" className="bg-gradient-orange hover:opacity-90 glow-orange-sm text-base px-10 h-12">
-                Get Started Free <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </Link>
+            <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">One click. No signup. Your keys, your coins.</p>
+            <Button size="lg" className="bg-gradient-orange hover:opacity-90 glow-orange-sm text-base px-10 h-12" onClick={handleStart}>
+              Start Accepting XMR <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
           </FadeIn>
         </div>
       </section>

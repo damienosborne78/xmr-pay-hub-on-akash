@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
@@ -86,6 +86,9 @@ interface AppState {
   refreshNodeStatus: () => Promise<void>;
   restoreFromBackup: (data: any) => void;
   deleteAccount: () => void;
+  activateProSubscription: (txid: string) => void;
+  checkReferralProUnlock: () => boolean;
+  generateReferralFingerprint: () => string;
 }
 
 export const useStore = create<AppState>()(persist((set, get) => ({
@@ -119,14 +122,19 @@ export const useStore = create<AppState>()(persist((set, get) => ({
           viewOnlySubaddressIndex: 1,
           nodeStatus: 'connecting',
         });
+        // Generate referral fingerprint
+        get().generateReferralFingerprint();
         // Auto-connect in background
         get().autoConnectNode();
       } catch (e) {
         console.error('[Store] Auto wallet generation failed:', e);
       }
     } else if (m.viewOnlySetupComplete && m.nodeStatus !== 'online') {
-      // Wallet exists but not connected — reconnect
       get().autoConnectNode();
+    }
+    // Ensure referral fingerprint exists
+    if (!get().merchant.referralWalletFingerprint) {
+      get().generateReferralFingerprint();
     }
   },
   logout: () => set({ isAuthenticated: false }),
@@ -483,7 +491,6 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   },
 
   deleteAccount: () => {
-    // Clear all state
     set({
       isAuthenticated: false,
       merchant: defaultMerchant,
@@ -493,15 +500,53 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       referrals: [],
       referralPayouts: [],
     });
-    // Clear IndexedDB
     try { indexedDB.deleteDatabase('moneroflow_store'); } catch {}
-    // Clear all storage
     try { localStorage.clear(); } catch {}
     try { sessionStorage.clear(); } catch {}
-    // Clear cookies
     document.cookie.split(';').forEach(c => {
       document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
     });
+  },
+
+  generateReferralFingerprint: () => {
+    const m = get().merchant;
+    if (m.referralWalletFingerprint) return m.referralWalletFingerprint;
+    // Generate from wallet address or random
+    const source = m.viewOnlyAddress || m.id || Math.random().toString(36);
+    let hash = 0;
+    for (let i = 0; i < source.length; i++) {
+      hash = ((hash << 5) - hash + source.charCodeAt(i)) | 0;
+    }
+    const fingerprint = Math.abs(hash).toString(36).slice(0, 8).toUpperCase();
+    get().updateMerchant({ referralWalletFingerprint: fingerprint, referralCode: fingerprint });
+    return fingerprint;
+  },
+
+  activateProSubscription: (txid: string) => {
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + 1);
+    get().updateMerchant({
+      plan: 'pro',
+      proStatus: 'pro',
+      proTxid: txid,
+      proActivatedAt: new Date().toISOString(),
+      proExpiresAt: expiresAt.toISOString(),
+    });
+  },
+
+  checkReferralProUnlock: () => {
+    const m = get().merchant;
+    const activeRefs = get().referrals.filter(r => r.level === 1).length;
+    if (activeRefs >= PRO_REFERRAL_UNLOCK_COUNT && !m.proUnlockedViaReferrals) {
+      get().updateMerchant({
+        plan: 'pro',
+        proStatus: 'pro_referral',
+        proUnlockedViaReferrals: true,
+        proExpiresAt: '', // never expires
+      });
+      return true;
+    }
+    return false;
   },
 }), {
   name: 'moneroflow-state',
