@@ -85,39 +85,52 @@ export default function BackupsPage() {
     setExporting(false);
   };
 
-  const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [restorePassphrase, setRestorePassphrase] = useState('');
+  const [showRestorePassphrasePrompt, setShowRestorePassphrasePrompt] = useState(false);
+  const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
+
+  const doRestore = async (file: File, passphrase: string) => {
     setRestoring(true);
     try {
       let json: string;
       if (file.name.endsWith('.aes')) {
-        if (!merchant.privacyPassphrase) {
-          toast.error('Set a passphrase in Settings → Privacy Mode first');
-          setRestoring(false);
-          return;
-        }
-        json = await importEncryptedBackup(file, merchant.privacyPassphrase);
+        json = await importEncryptedBackup(file, passphrase);
       } else {
         json = await file.text();
       }
       const parsed = JSON.parse(json);
-
-      // Restore ALL data using the dedicated store action
       restoreFromBackup(parsed);
-
-      // Restore backup settings
       if (parsed.connectedCloud) setConnectedCloud(parsed.connectedCloud);
       if (parsed.autoBackupEnabled) setAutoBackupEnabled(parsed.autoBackupEnabled);
       if (parsed.backupFrequency) setBackupFrequency(parsed.backupFrequency);
-
       const invoiceCount = parsed.invoices?.length || 0;
       const subCount = parsed.subscriptions?.length || 0;
       toast.success(`Backup restored! ${invoiceCount} invoices, ${subCount} subscriptions recovered.`);
+      setShowRestorePassphrasePrompt(false);
+      setPendingRestoreFile(null);
+      setRestorePassphrase('');
     } catch {
       toast.error('Restore failed — wrong passphrase or corrupted file');
     }
     setRestoring(false);
+  };
+
+  const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.name.endsWith('.aes')) {
+      // If we have a passphrase in state, use it. Otherwise prompt.
+      if (merchant.privacyPassphrase) {
+        await doRestore(file, merchant.privacyPassphrase);
+      } else {
+        // Prompt user for passphrase — they may have reset browser
+        setPendingRestoreFile(file);
+        setShowRestorePassphrasePrompt(true);
+      }
+    } else {
+      await doRestore(file, '');
+    }
     if (e.target) e.target.value = '';
   };
 

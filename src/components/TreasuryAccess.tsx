@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, Eye, EyeOff, Copy, Check, AlertTriangle, Lock, Gift, Sparkles } from 'lucide-react';
+import { Shield, Eye, EyeOff, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Server } from 'lucide-react';
 import { toast } from 'sonner';
+import { useStore } from '@/lib/store';
 
 // Treasury seed phrase — in production this would be generated once and shown to the creator
 const TREASURY_SEED = [
@@ -28,7 +29,7 @@ interface TreasuryAccessProps {
 }
 
 function generateProCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 for clarity
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = 'MF-PRO-';
   for (let i = 0; i < 8; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
@@ -37,25 +38,19 @@ function generateProCode(): string {
 }
 
 export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
+  const merchant = useStore(s => s.merchant);
+  const updateMerchant = useStore(s => s.updateMerchant);
+
   const [step, setStep] = useState<'auth' | 'reveal' | 'locked'>('auth');
   const [passphrase, setPassphrase] = useState('');
   const [showSeed, setShowSeed] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [revealed, setRevealed] = useState(false);
   const [countdown, setCountdown] = useState(60);
-  const [generatedCodes, setGeneratedCodes] = useState<{ code: string; createdAt: string; used: boolean }[]>(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('mf_lifetime_pro_codes') || '[]');
-      const used: string[] = JSON.parse(localStorage.getItem('mf_used_pro_codes') || '[]');
-      return stored.map((c: any) => ({
-        code: typeof c === 'object' ? c.code : c,
-        createdAt: typeof c === 'object' ? c.createdAt : new Date().toISOString(),
-        used: used.includes(typeof c === 'object' ? c.code : c),
-      }));
-    } catch { return []; }
-  });
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [fqdnInput, setFqdnInput] = useState(merchant.creatorServerFqdn || '');
+
+  const generatedCodes = merchant.lifetimeProCodes || [];
 
   const handleAuth = () => {
     if (passphrase === CREATOR_PASSPHRASE) {
@@ -81,18 +76,25 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
   const copySeed = () => {
     navigator.clipboard.writeText(TREASURY_SEED.join(' '));
     setCopied(true);
-    setRevealed(true);
     toast.success('Seed copied — store it OFFLINE immediately');
     setTimeout(() => setCopied(false), 3000);
   };
 
   const handleGenerateProCode = () => {
     const code = generateProCode();
-    const entry = { code, createdAt: new Date().toISOString(), used: false };
+    const entry = { code, createdAt: new Date().toISOString() };
     const updated = [...generatedCodes, entry];
-    setGeneratedCodes(updated);
-    // Store codes for validation
-    localStorage.setItem('mf_lifetime_pro_codes', JSON.stringify(updated.map(c => ({ code: c.code, createdAt: c.createdAt }))));
+    updateMerchant({ lifetimeProCodes: updated });
+
+    // Sync to creator server if configured
+    if (merchant.creatorServerFqdn) {
+      fetch(`https://${merchant.creatorServerFqdn}/api/mf/codes/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+    }
+
     toast.success(`Lifetime Pro code generated: ${code}`);
   };
 
@@ -101,6 +103,12 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     setCopiedCode(code);
     toast.success('Code copied!');
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const handleSaveFqdn = () => {
+    const clean = fqdnInput.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    updateMerchant({ creatorServerFqdn: clean });
+    toast.success(`Creator server set to: ${clean}`);
   };
 
   const handleClose = () => {
@@ -160,6 +168,31 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
               <Badge variant="outline" className="text-destructive border-destructive/30 font-mono">
                 Auto-lock: {countdown}s
               </Badge>
+            </div>
+
+            {/* Creator Server FQDN */}
+            <div className="space-y-2 p-4 rounded-lg bg-background border border-border">
+              <div className="flex items-center gap-2">
+                <Server className="w-4 h-4 text-primary" />
+                <label className="text-sm font-medium text-foreground">Creator Server FQDN</label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Set your self-hosted server domain. Pro codes are stored in the app database and synced to this server for cross-browser validation.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={fqdnInput}
+                  onChange={e => setFqdnInput(e.target.value)}
+                  placeholder="api.yourdomain.com"
+                  className="bg-card border-border font-mono text-sm flex-1"
+                />
+                <Button variant="outline" size="sm" onClick={handleSaveFqdn} className="border-border shrink-0">
+                  Save
+                </Button>
+              </div>
+              {merchant.creatorServerFqdn && (
+                <p className="text-[10px] text-primary">✓ Server: {merchant.creatorServerFqdn}</p>
+              )}
             </div>
 
             {/* Seed Phrase */}
@@ -225,7 +258,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Generate one-time-use codes that unlock Pro for LIFE when entered by a recipient. Use for key leverage players and early adopters.
+                Codes are stored in the app database (synced via backups &amp; creator server). When a recipient enters a code, it unlocks Pro for LIFE.
               </p>
 
               {generatedCodes.length > 0 && (
@@ -233,14 +266,14 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
                   {generatedCodes.map((entry, i) => (
                     <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border">
                       <div className="flex items-center gap-2">
-                        <span className={`font-mono text-sm font-bold tracking-wider ${entry.used ? 'text-muted-foreground line-through' : 'text-primary'}`}>
+                        <span className={`font-mono text-sm font-bold tracking-wider ${entry.usedBy ? 'text-muted-foreground line-through' : 'text-primary'}`}>
                           {entry.code}
                         </span>
-                        {entry.used && <Badge className="bg-muted/10 text-muted-foreground border-muted/20 text-[9px]">USED</Badge>}
+                        {entry.usedBy && <Badge className="bg-muted/10 text-muted-foreground border-muted/20 text-[9px]">USED</Badge>}
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] text-muted-foreground">{new Date(entry.createdAt).toLocaleDateString()}</span>
-                        {!entry.used && (
+                        {!entry.usedBy && (
                           <Button variant="ghost" size="sm" onClick={() => handleCopyCode(entry.code)} className="h-7 px-1.5">
                             {copiedCode === entry.code ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
                           </Button>

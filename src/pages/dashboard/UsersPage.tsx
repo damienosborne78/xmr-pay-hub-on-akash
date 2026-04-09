@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 export default function UsersPage() {
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const isPro = merchant.plan === 'pro';
   const [showSetAdmin, setShowSetAdmin] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [adminPassConfirm, setAdminPassConfirm] = useState('');
