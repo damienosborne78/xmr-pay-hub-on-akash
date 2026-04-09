@@ -54,6 +54,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
+  const effectiveNodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
   const totalWithFee = parsedAmount + selectedFee.feeXmr;
 
   const fiatEquivalent = xmrPrice ? parsedAmount * xmrPrice : null;
@@ -159,7 +160,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
       }
 
       const sendMode: SendMode = merchant.sendMode || 'proxy';
-      const nodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
+      const nodeUrl = effectiveNodeUrl;
 
       setStep('syncing');
 
@@ -501,7 +502,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
             <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-[10px] text-muted-foreground">
                 <strong className="text-foreground">Mode:</strong> {merchant.sendMode === 'wasm' ? 'Full WASM Wallet' : 'Daemon Proxy'} · 
-                <strong className="text-foreground ml-1">Node:</strong> {merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'auto'}
+                <strong className="text-foreground ml-1">Node:</strong> {effectiveNodeUrl}
               </p>
             </div>
 

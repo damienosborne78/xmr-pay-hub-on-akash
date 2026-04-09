@@ -1,14 +1,16 @@
+import { REMOTE_NODES } from './node-manager';
+
 /**
  * Real Monero Transaction Sending Service
- * 
+ *
  * Two modes:
  * 1. "proxy" (Daemon Proxy) — Lazy-loads monero-ts WASM only when sending.
  *    Creates a temporary in-memory wallet from seed, syncs minimally, constructs
  *    and broadcasts the TX, then closes. Lower memory footprint, slower per-send.
- * 
+ *
  * 2. "wasm" (Full WASM) — Keeps a persistent WASM wallet instance synced in
  *    the background. Instant sends but uses more CPU/memory continuously.
- * 
+ *
  * Both use the same underlying monero-ts library for real RingCT transaction
  * construction and signing. All keys stay in the browser.
  */
@@ -40,6 +42,90 @@ export interface SyncProgress {
 let persistentWallet: any = null;
 let persistentDaemonConnection: any = null;
 
+function isSecureBrowserContext(): boolean {
+  return typeof window !== 'undefined' && window.location.protocol === 'https:';
+}
+
+function normalizeNodeUrl(nodeUrl: string): string {
+  return nodeUrl.trim().replace(/\/+$/, '');
+}
+
+function getDaemonUrlCandidates(nodeUrl: string): string[] {
+  const normalized = normalizeNodeUrl(nodeUrl);
+  if (!normalized) return [];
+
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return [normalized];
+  }
+
+  const knownNode = REMOTE_NODES.find((node) => node.url === normalized);
+  const candidates = new Set<string>();
+
+  // Production preview runs over HTTPS, so browser wallet nodes must also be HTTPS-capable.
+  if (knownNode?.ssl || isSecureBrowserContext() || normalized.includes(':443')) {
+    candidates.add(`https://${normalized}`);
+  }
+
+  // Only try plain HTTP outside secure browser contexts to avoid mixed-content failures.
+  if (!isSecureBrowserContext()) {
+    candidates.add(`http://${normalized}`);
+  }
+
+  return Array.from(candidates);
+}
+
+async function connectToReachableDaemon(moneroTs: any, nodeUrl: string): Promise<{ daemon: any; daemonUrl: string; daemonHeight: number }> {
+  const candidates = getDaemonUrlCandidates(nodeUrl);
+  const attempted: string[] = [];
+  let lastError = '';
+
+  for (const candidate of candidates) {
+    attempted.push(candidate);
+    try {
+      const daemon = await moneroTs.connectToDaemonRpc(candidate);
+      const daemonHeight = await daemon.getHeight();
+      return { daemon, daemonUrl: candidate, daemonHeight };
+    } catch (e: any) {
+      lastError = e?.message || String(e);
+    }
+  }
+
+  const secureHint = isSecureBrowserContext()
+    ? ' This app is running over HTTPS, so the connected Monero node must support HTTPS too.'
+    : '';
+
+  throw new Error(
+    `Could not reach Monero node. Tried: ${attempted.join(', ') || nodeUrl}.${secureHint}${lastError ? ` Last error: ${lastError}` : ''}`,
+  );
+}
+
+function mapSendError(errorMsg: string): SendResult {
+  if (errorMsg.includes('Could not reach Monero node')) {
+    return { success: false, error: errorMsg };
+  }
+  if (errorMsg.includes('not enough money') || errorMsg.includes('INSUFFICIENT')) {
+    return { success: false, error: 'Insufficient funds to cover amount + network fee.' };
+  }
+  if (errorMsg.includes('Invalid address')) {
+    return { success: false, error: 'Invalid recipient address. Please double-check.' };
+  }
+  if (
+    errorMsg.includes('Request failed without response') ||
+    errorMsg.includes('AxiosError: Network Error') ||
+    errorMsg.includes('Network Error') ||
+    errorMsg.includes('mixed content') ||
+    errorMsg.includes('daemon') ||
+    errorMsg.includes('connection')
+  ) {
+    return {
+      success: false,
+      error: 'Cannot connect to the selected Monero node from this browser. Use an HTTPS-enabled node in Settings → Wallet & Node.',
+    };
+  }
+
+  return { success: false, error: `Transaction failed: ${errorMsg}` };
+}
+
 /**
  * Send real XMR using the daemon proxy approach.
  * Lazy-loads monero-ts, creates a temporary wallet, syncs, sends, closes.
@@ -60,12 +146,7 @@ export async function sendViaDaemonProxy(
 
     onProgress?.({ percent: 15, height: 0, targetHeight: 0, message: 'Connecting to daemon...' });
 
-    // Connect to the remote daemon
-    const protocol = nodeUrl.includes('443') ? 'https' : 'http';
-    const daemonUrl = nodeUrl.startsWith('http') ? nodeUrl : `${protocol}://${nodeUrl}`;
-
-    const daemon = await moneroTs.connectToDaemonRpc(daemonUrl);
-    const daemonHeight = await daemon.getHeight();
+    const { daemonUrl, daemonHeight } = await connectToReachableDaemon(moneroTs, nodeUrl);
 
     onProgress?.({ percent: 25, height: 0, targetHeight: daemonHeight, message: 'Creating wallet from seed...' });
 
@@ -95,7 +176,6 @@ export async function sendViaDaemonProxy(
     onProgress?.({ percent: 80, height: daemonHeight, targetHeight: daemonHeight, message: 'Constructing transaction...' });
 
     // Get balance check
-    const balance = await wallet.getBalance();
     const unlockedBalance = await wallet.getUnlockedBalance();
     const amountPico = BigInt(Math.round(request.amountXmr * 1e12));
 
@@ -135,19 +215,7 @@ export async function sendViaDaemonProxy(
     try { if (wallet) await wallet.close(); } catch {}
 
     const errorMsg = e?.message || String(e);
-
-    // Provide user-friendly error messages
-    if (errorMsg.includes('not enough money') || errorMsg.includes('INSUFFICIENT')) {
-      return { success: false, error: 'Insufficient funds to cover amount + network fee.' };
-    }
-    if (errorMsg.includes('Invalid address')) {
-      return { success: false, error: 'Invalid recipient address. Please double-check.' };
-    }
-    if (errorMsg.includes('daemon') || errorMsg.includes('connection')) {
-      return { success: false, error: 'Cannot connect to Monero node. Try switching nodes in Settings.' };
-    }
-
-    return { success: false, error: `Transaction failed: ${errorMsg}` };
+    return mapSendError(errorMsg);
   }
 }
 
@@ -163,15 +231,12 @@ export async function sendViaWasmWallet(
 ): Promise<SendResult> {
   try {
     const moneroTs = await import('monero-ts');
-    const protocol = nodeUrl.includes('443') ? 'https' : 'http';
-    const daemonUrl = nodeUrl.startsWith('http') ? nodeUrl : `${protocol}://${nodeUrl}`;
 
     // Reuse or create persistent wallet
     if (!persistentWallet) {
       onProgress?.({ percent: 10, height: 0, targetHeight: 0, message: 'Initializing WASM wallet...' });
 
-      const daemon = await moneroTs.connectToDaemonRpc(daemonUrl);
-      const daemonHeight = await daemon.getHeight();
+      const { daemon, daemonUrl, daemonHeight } = await connectToReachableDaemon(moneroTs, nodeUrl);
       persistentDaemonConnection = daemon;
 
       persistentWallet = await moneroTs.createWalletFull({
@@ -235,10 +300,8 @@ export async function sendViaWasmWallet(
     // If persistent wallet errors, clean it up
     try { if (persistentWallet) { await persistentWallet.close(); persistentWallet = null; } } catch {}
 
-    return {
-      success: false,
-      error: `Transaction failed: ${e?.message || String(e)}`,
-    };
+    const errorMsg = e?.message || String(e);
+    return mapSendError(errorMsg);
   }
 }
 
