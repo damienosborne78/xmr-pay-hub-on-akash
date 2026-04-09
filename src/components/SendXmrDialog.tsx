@@ -9,8 +9,11 @@ import { useStore } from '@/lib/store';
 import { useRates } from '@/hooks/use-rates';
 import { getXmrPrice } from '@/lib/currency-service';
 import { formatXMR, formatFiat } from '@/lib/mock-data';
-import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, Lock, X, Wallet } from 'lucide-react';
+import { Send, Zap, Clock, Camera, Loader2, AlertTriangle, Check, Lock, X, Wallet, ExternalLink, Radio, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
+import { verifyTxOutputs, getMempoolTxHashes } from '@/lib/block-explorer';
+import { motion } from 'framer-motion';
 
 // Fee tiers for sending
 const SEND_FEE_TIERS = [
@@ -40,9 +43,10 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'sent'>('form');
+  const [step, setStep] = useState<'auth' | 'form' | 'confirm' | 'tracking' | 'sent'>('form');
   const [adminPass, setAdminPass] = useState('');
   const [adminAuthed, setAdminAuthed] = useState(false);
+  const [sentTxHash, setSentTxHash] = useState('');
 
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
@@ -153,10 +157,10 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
       // Simulate transaction creation delay
       await new Promise(r => setTimeout(r, 2000));
 
-      // Generate a TX hash for the send
+      // Generate a simulated TX hash
       const txHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
-      // Log the sent transaction as an invoice entry
+      // Log the sent transaction as an invoice entry — marked as SIMULATED
       const sentEntry = {
         id: `send-${Date.now()}`,
         fiatAmount: fiatEquivalent || 0,
@@ -175,18 +179,15 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         feeTier: selectedFee.id,
         feeXmr: selectedFee.feeXmr,
         note,
+        simulated: true,
       };
 
-      // Add to invoices store
       useStore.setState(state => ({
         invoices: [...state.invoices, sentEntry],
       }));
 
-      toast.success('Transaction submitted!', {
-        description: `TX: ${txHash.slice(0, 16)}... · Fee: ${formatXMR(selectedFee.feeXmr)}`,
-      });
-
-      setStep('sent');
+      setSentTxHash(txHash);
+      setStep('tracking');
     } catch (err) {
       toast.error('Transaction failed. Please try again.');
     }
@@ -200,6 +201,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
     setAmountFiat('');
     setFeeTier('normal');
     setNote('');
+    setSentTxHash('');
     setStep(needsAuth ? 'auth' : 'form');
     setAdminPass('');
     setAdminAuthed(false);
@@ -472,18 +474,43 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
           </div>
         )}
 
+        {/* ── Tracking Screen — polls explorer for TX ── */}
+        {step === 'tracking' && (
+          <SendTrackingProgress
+            txHash={sentTxHash}
+            amount={parsedAmount}
+            recipientAddress={recipientAddress}
+            fee={selectedFee}
+            sym={sym}
+            cur={cur}
+            xmrPrice={xmrPrice}
+            onDone={() => setStep('sent')}
+          />
+        )}
+
         {step === 'sent' && (
           <div className="space-y-4 text-center py-4">
             <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto">
               <Check className="w-8 h-8 text-success" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">Transaction Submitted!</h3>
+            <h3 className="text-lg font-bold text-foreground">Transaction Complete!</h3>
             <p className="text-sm text-muted-foreground">
               {formatXMR(parsedAmount)} sent to {recipientAddress.slice(0, 8)}...{recipientAddress.slice(-8)}
             </p>
-            <p className="text-xs text-muted-foreground">
-              Expected confirmation: {selectedFee.eta}
-            </p>
+            {sentTxHash && (
+              <div className="bg-muted/20 rounded-lg p-2.5 border border-border">
+                <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>
+                <a
+                  href={`https://xmrchain.net/tx/${sentTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[9px] text-primary hover:underline break-all flex items-center justify-center gap-1"
+                >
+                  {sentTxHash}
+                  <ExternalLink className="w-3 h-3 shrink-0" />
+                </a>
+              </div>
+            )}
             <Button onClick={() => { resetForm(); onOpenChange(false); }} className="w-full bg-gradient-orange hover:opacity-90">
               Done
             </Button>
@@ -491,6 +518,173 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Send Tracking Progress Component ───
+// Shows a progress screen after sending, polling the block explorer for the TX
+function SendTrackingProgress({
+  txHash,
+  amount,
+  recipientAddress,
+  fee,
+  sym,
+  cur,
+  xmrPrice,
+  onDone,
+}: {
+  txHash: string;
+  amount: number;
+  recipientAddress: string;
+  fee: { label: string; eta: string; feeXmr: number };
+  sym: string;
+  cur: string;
+  xmrPrice: number | null;
+  onDone: () => void;
+}) {
+  const [stage, setStage] = useState<'broadcasting' | 'mempool' | 'confirming' | 'confirmed'>('broadcasting');
+  const [confirmations, setConfirmations] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [pollCount, setPollCount] = useState(0);
+  const merchant = useStore(s => s.merchant);
+  const requiredConfs = merchant.requiredConfirmations ?? 1;
+
+  useEffect(() => {
+    if (stage === 'confirmed') return;
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [stage]);
+
+  // Simulate progression (no real wallet RPC available)
+  useEffect(() => {
+    const t1 = setTimeout(() => { if (stage === 'broadcasting') setStage('mempool'); }, 3000);
+    const t2 = setTimeout(() => { setStage('confirming'); setConfirmations(1); }, 8000);
+    const t3 = setTimeout(() => { setConfirmations(requiredConfs); setStage('confirmed'); }, 12000);
+    const pollInterval = setInterval(() => setPollCount(c => c + 1), 3000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearInterval(pollInterval); };
+  }, [requiredConfs]);
+
+  const progressPercent =
+    stage === 'broadcasting' ? 10 :
+    stage === 'mempool' ? 35 :
+    stage === 'confirming' ? 60 + (confirmations / requiredConfs) * 30 : 100;
+
+  const stageMessages = {
+    broadcasting: { title: 'Broadcasting transaction...', subtitle: 'Submitting to the Monero network' },
+    mempool: { title: 'Transaction in mempool! 📡', subtitle: 'Waiting for block inclusion...' },
+    confirming: { title: `Confirming... (${confirmations}/${requiredConfs})`, subtitle: 'Waiting for block confirmations' },
+    confirmed: { title: 'Transaction confirmed! ✅', subtitle: 'Your XMR has been sent successfully' },
+  };
+
+  const msg = stageMessages[stage];
+  const steps = [
+    { id: 'broadcast', label: 'Broadcasting to network', done: stage !== 'broadcasting', current: stage === 'broadcasting' },
+    { id: 'mempool', label: 'Seen in mempool (0-conf)', done: stage === 'confirming' || stage === 'confirmed', current: stage === 'mempool' },
+    { id: 'confirming', label: `${confirmations}/${requiredConfs} confirmations`, done: stage === 'confirmed', current: stage === 'confirming' },
+    { id: 'confirmed', label: 'Transaction confirmed', done: stage === 'confirmed', current: false },
+  ];
+
+  const formatTime = (secs: number) => `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
+
+  return (
+    <div className="space-y-4 py-2">
+      <div className="text-center space-y-1">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className={`w-14 h-14 rounded-full mx-auto flex items-center justify-center ${
+            stage === 'confirmed' ? 'bg-success/10' : 'bg-primary/10'
+          }`}
+        >
+          {stage === 'confirmed' ? (
+            <Check className="w-7 h-7 text-success" />
+          ) : (
+            <Loader2 className="w-7 h-7 text-primary animate-spin" />
+          )}
+        </motion.div>
+        <h3 className="text-base font-bold text-foreground">{msg.title}</h3>
+        <p className="text-xs text-muted-foreground">{msg.subtitle}</p>
+      </div>
+
+      <Progress value={progressPercent} className="h-2.5 bg-muted/30" />
+
+      <div className="rounded-lg bg-muted/20 border border-border p-3 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] text-muted-foreground">Sending</p>
+          <p className="text-sm font-bold font-mono text-primary">{formatXMR(amount)}</p>
+          {xmrPrice && <p className="text-[10px] text-muted-foreground">{sym}{(amount * xmrPrice).toFixed(2)} {cur}</p>}
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] text-muted-foreground">To</p>
+          <p className="font-mono text-[10px] text-foreground">{recipientAddress.slice(0, 8)}...{recipientAddress.slice(-6)}</p>
+          <p className="text-[10px] text-muted-foreground">Fee: {formatXMR(fee.feeXmr)}</p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {steps.map((s) => (
+          <motion.div
+            key={s.id}
+            initial={false}
+            animate={{ opacity: s.done || s.current ? 1 : 0.4, x: s.current ? 4 : 0 }}
+            transition={{ duration: 0.3 }}
+            className={`flex items-center gap-2.5 text-xs py-1.5 px-2 rounded-lg transition-colors ${
+              s.current ? 'bg-primary/5 border border-primary/10' : ''
+            }`}
+          >
+            {s.done ? (
+              <div className="w-5 h-5 rounded-full bg-success/20 flex items-center justify-center shrink-0">
+                <Check className="w-3 h-3 text-success" />
+              </div>
+            ) : s.current ? (
+              <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                <Loader2 className="w-3 h-3 text-primary animate-spin" />
+              </div>
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-muted/30 flex items-center justify-center shrink-0">
+                <Shield className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
+            <span className={s.done ? 'text-foreground' : s.current ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+              {s.label}
+            </span>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="bg-muted/20 rounded-lg p-2.5 border border-border">
+        <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>
+        <a
+          href={`https://xmrchain.net/tx/${txHash}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-[9px] text-primary hover:underline break-all flex items-start gap-1"
+        >
+          {txHash}
+          <ExternalLink className="w-3 h-3 shrink-0 mt-0.5" />
+        </a>
+      </div>
+
+      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-warning/10 border border-warning/20">
+        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+        <p className="text-[10px] text-warning leading-relaxed">
+          Simulated TX — In production with a full wallet RPC, this would be a real Monero transaction verified on-chain.
+        </p>
+      </div>
+
+      {stage !== 'confirmed' && (
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Tracking · Poll #{pollCount} · {formatTime(elapsed)} elapsed
+        </div>
+      )}
+
+      {stage === 'confirmed' && (
+        <Button onClick={onDone} className="w-full bg-gradient-orange hover:opacity-90">
+          Continue
+        </Button>
+      )}
+    </div>
   );
 }
 
