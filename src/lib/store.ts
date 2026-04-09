@@ -372,42 +372,23 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     const state = get();
     const invoice = state.invoices.find(i => i.id === invoiceId);
     if (!invoice || invoice.status === 'paid' || invoice.status === 'expired') return;
-    if (invoice.subaddressIndex === undefined) return;
 
     if (new Date(invoice.expiresAt).getTime() < Date.now()) {
       get().updateInvoice(invoiceId, { status: 'expired' });
       return;
     }
 
-    // For viewonly mode, we'd need a light client or indexer to check payments
-    // For now, RPC-based polling works for managed/remote/selfcustody modes
     const m = get().merchant;
-    if (m.walletMode === 'viewonly') {
-      // View-only mode: cannot poll via standard wallet RPC
-      // In production, this would use a view-key scanner service
-      return;
-    }
+    const requiredConfs = m.requiredConfirmations ?? 1;
+    const isZeroConfEligible = m.zeroConfEnabled && invoice.fiatAmount <= (m.zeroConfThresholdUsd || 30);
 
-    const config = get().getRpcConfig();
-    try {
-      const transfers = await getTransfers(config, [invoice.subaddressIndex]);
-      const incoming = [...transfers.in, ...transfers.pending].filter(
-        t => t.subaddrIndex.minor === invoice.subaddressIndex
-      );
-      if (incoming.length === 0) return;
-
-      const totalReceived = incoming.reduce((sum, t) => sum + t.amount, 0);
-      const totalReceivedXmr = totalReceived / 1e12;
+    // Helper to process found payment data
+    const processPayment = (totalReceivedXmr: number, confirmations: number, txid: string) => {
       const expectedXmr = invoice.xmrAmount;
-      const primaryTx = incoming[0];
-      const confirmations = primaryTx.confirmations || 0;
-      const requiredConfs = m.requiredConfirmations ?? 1;
-      const isZeroConfEligible = m.zeroConfEnabled && invoice.fiatAmount <= (m.zeroConfThresholdUsd || 30);
-
       let newStatus: Invoice['status'];
-      if (totalReceivedXmr >= expectedXmr * 0.99) {
+
+      if (totalReceivedXmr >= expectedXmr * 0.95) {
         if (isZeroConfEligible && confirmations === 0) {
-          // 0-conf auto-approve for small amounts
           newStatus = 'paid';
         } else if (confirmations >= requiredConfs) {
           newStatus = 'paid';
@@ -416,44 +397,151 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         } else {
           newStatus = 'seen_on_chain';
         }
-        if (totalReceivedXmr > expectedXmr * 1.01 && confirmations >= requiredConfs) newStatus = 'overpaid';
-      } else {
+        if (totalReceivedXmr > expectedXmr * 1.05 && confirmations >= requiredConfs) newStatus = 'overpaid';
+      } else if (totalReceivedXmr > 0) {
         newStatus = 'underpaid';
+      } else {
+        return; // nothing received
       }
 
-      const wasPaid = (invoice.status as string) === 'paid';
+      const wasPaid = invoice.status === 'paid';
       get().updateInvoice(invoiceId, {
         status: newStatus,
         confirmations,
-        txid: primaryTx.txid,
+        txid,
         paidAt: newStatus === 'paid' && !wasPaid ? new Date().toISOString() : invoice.paidAt,
       });
 
       // Fire webhook on payment confirmation
       if (newStatus === 'paid' && !wasPaid && m.webhookPaymentUrl) {
-        try {
-          fetch(m.webhookPaymentUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              event: 'payment.confirmed',
-              invoiceId,
-              txid: primaryTx.txid,
-              amount: invoice.xmrAmount,
-              fiatAmount: invoice.fiatAmount,
-              fiatCurrency: invoice.fiatCurrency,
-              confirmations,
-              timestamp: new Date().toISOString(),
-            }),
-          }).catch(() => {});
-        } catch {}
+        fetch(m.webhookPaymentUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'payment.confirmed',
+            invoiceId, txid,
+            amount: invoice.xmrAmount,
+            fiatAmount: invoice.fiatAmount,
+            fiatCurrency: invoice.fiatCurrency,
+            confirmations,
+            timestamp: new Date().toISOString(),
+          }),
+        }).catch(() => {});
       }
-    } catch (e) {
-      console.error('Payment polling error:', e);
+    };
+
+    // ── Strategy 1: Block Explorer scan (works for ALL wallet modes) ──
+    // Use the subaddress + private view key to scan recent blocks via public explorer
+    if (m.viewOnlyViewKey && invoice.subaddress) {
+      try {
+        console.log(`[Poll] Explorer scan for invoice ${invoiceId} → ${invoice.subaddress.slice(0, 12)}...`);
+        const outputs = await scanRecentOutputs(invoice.subaddress, m.viewOnlyViewKey, 10, true);
+        
+        if (outputs.length > 0) {
+          const totalPico = outputs.reduce((sum, o) => sum + o.amount, 0);
+          const totalXmr = totalPico / 1e12;
+          const bestConf = Math.max(...outputs.map(o => o.confirmations));
+          const primaryTxHash = outputs[0].txHash;
+          console.log(`[Poll] Explorer found ${outputs.length} output(s), total: ${totalXmr} XMR, confs: ${bestConf}`);
+          processPayment(totalXmr, bestConf, primaryTxHash);
+          return;
+        }
+      } catch (e) {
+        console.warn('[Poll] Explorer scan failed, trying RPC fallback:', e);
+      }
     }
+
+    // ── Strategy 2: If we have a known txid (from manual entry), verify it ──
+    if (invoice.txid && m.viewOnlyViewKey) {
+      try {
+        const result = await verifyTxOutputs(invoice.txid, invoice.subaddress, m.viewOnlyViewKey);
+        if (result && result.matched) {
+          processPayment(result.totalAmount / 1e12, result.confirmations, invoice.txid);
+          return;
+        }
+      } catch (e) {
+        console.warn('[Poll] TX verify failed:', e);
+      }
+    }
+
+    // ── Strategy 3: Wallet RPC (for managed/remote/selfcustody modes with real wallet-rpc) ──
+    if (m.walletMode !== 'viewonly' && invoice.subaddressIndex !== undefined) {
+      const config = get().getRpcConfig();
+      try {
+        const transfers = await getTransfers(config, [invoice.subaddressIndex]);
+        const incoming = [...transfers.in, ...transfers.pending].filter(
+          t => t.subaddrIndex.minor === invoice.subaddressIndex
+        );
+        if (incoming.length > 0) {
+          const totalReceived = incoming.reduce((sum, t) => sum + t.amount, 0);
+          processPayment(totalReceived / 1e12, incoming[0].confirmations || 0, incoming[0].txid);
+          return;
+        }
+      } catch (e) {
+        console.error('[Poll] RPC polling error:', e);
+      }
+    }
+
+    console.log(`[Poll] No payment found yet for invoice ${invoiceId}`);
   },
 
-  updateMerchant: (updates: Partial<Merchant>) => {
+  verifyInvoiceTxHash: async (invoiceId: string, txHash: string) => {
+    const state = get();
+    const invoice = state.invoices.find(i => i.id === invoiceId);
+    if (!invoice) return { success: false, error: 'Invoice not found' };
+
+    const m = state.merchant;
+    const cleanHash = txHash.trim();
+
+    if (!/^[a-fA-F0-9]{64}$/.test(cleanHash)) {
+      return { success: false, error: 'Invalid TX hash format. Must be 64 hex characters.' };
+    }
+
+    // First, save the txid so future polls can verify it
+    get().updateInvoice(invoiceId, { txid: cleanHash });
+
+    // Try to verify via explorer
+    if (m.viewOnlyViewKey && invoice.subaddress) {
+      try {
+        const result = await verifyTxOutputs(cleanHash, invoice.subaddress, m.viewOnlyViewKey);
+        if (result) {
+          if (result.matched) {
+            const totalXmr = result.totalAmount / 1e12;
+            const requiredConfs = m.requiredConfirmations ?? 1;
+            const isZeroConf = m.zeroConfEnabled && invoice.fiatAmount <= (m.zeroConfThresholdUsd || 30);
+            
+            let status: Invoice['status'] = 'seen_on_chain';
+            if (totalXmr >= invoice.xmrAmount * 0.95) {
+              if (isZeroConf || result.confirmations >= requiredConfs) {
+                status = 'paid';
+              } else if (result.confirmations >= 1) {
+                status = 'confirming';
+              }
+            } else if (totalXmr > 0) {
+              status = 'underpaid';
+            }
+
+            get().updateInvoice(invoiceId, {
+              status,
+              confirmations: result.confirmations,
+              txid: cleanHash,
+              paidAt: status === 'paid' ? new Date().toISOString() : undefined,
+            });
+
+            return { success: true };
+          }
+          return { success: false, error: 'TX found but no outputs match this payment address. Wrong transaction?' };
+        }
+      } catch (e) {
+        console.warn('[VerifyTX] Explorer verification failed:', e);
+      }
+    }
+
+    // Fallback: just mark as seen if we can't verify (will continue polling)
+    get().updateInvoice(invoiceId, { txid: cleanHash, status: 'seen_on_chain' });
+    return { success: true };
+  },
+
     set(state => ({ merchant: { ...state.merchant, ...updates } }));
   },
 
