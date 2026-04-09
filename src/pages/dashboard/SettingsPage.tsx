@@ -701,6 +701,7 @@ export default function SettingsPage() {
       </FadeIn>
 
 
+      <FadeIn delay={0.05}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary" />
