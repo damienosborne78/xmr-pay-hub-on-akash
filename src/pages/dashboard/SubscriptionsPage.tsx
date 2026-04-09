@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { formatUSD } from '@/lib/mock-data';
+import { formatUSD, formatXMR, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,19 +8,25 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FadeIn } from '@/components/FadeIn';
-import { Plus, RefreshCw, Pause, Play, X } from 'lucide-react';
+import { Plus, RefreshCw, Pause, Play, X, Crown, Zap, Shield, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SubscriptionsPage() {
+  const merchant = useStore(s => s.merchant);
   const subscriptions = useStore(s => s.subscriptions);
   const createSubscription = useStore(s => s.createSubscription);
   const toggleSubscription = useStore(s => s.toggleSubscription);
   const cancelSubscription = useStore(s => s.cancelSubscription);
+  const activateProSubscription = useStore(s => s.activateProSubscription);
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
   const [interval, setInterval] = useState<'weekly' | 'monthly'>('monthly');
+  const [showProSignup, setShowProSignup] = useState(false);
+  const [proTxid, setProTxid] = useState('');
+
+  const isPro = merchant.proStatus === 'pro' || merchant.proStatus === 'pro_referral' || merchant.proUnlockedViaReferrals;
 
   const handleCreate = () => {
     if (!email || !desc || !amount || isNaN(Number(amount))) return;
@@ -30,15 +36,126 @@ export default function SubscriptionsPage() {
     setEmail(''); setDesc(''); setAmount('');
   };
 
+  const handleProActivate = () => {
+    if (!proTxid || proTxid.length < 10) {
+      toast.error('Enter a valid transaction hash');
+      return;
+    }
+    activateProSubscription(proTxid);
+    setShowProSignup(false);
+    setProTxid('');
+    toast.success('Pro subscription activated!');
+  };
+
   const statusColors: Record<string, string> = {
     active: 'bg-success/10 text-success border-success/20',
     paused: 'bg-warning/10 text-warning border-warning/20',
     cancelled: 'bg-destructive/10 text-destructive border-destructive/20',
   };
 
+  const proFeatures = [
+    'Privacy Mode (encrypted backups)',
+    'Multiple POS Users & Roles',
+    'Priority support & early features',
+    'White-label branding',
+  ];
+
   return (
     <div className="space-y-6">
+      {/* ── Pro Plan Status ── */}
       <FadeIn>
+        <div className={`p-5 rounded-xl border ${isPro ? 'bg-primary/5 border-primary/20' : 'bg-card border-border'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${isPro ? 'bg-primary/10' : 'bg-muted'}`}>
+                <Crown className={`w-5 h-5 ${isPro ? 'text-primary' : 'text-muted-foreground'}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-foreground">Pro Plan</h2>
+                  <Badge variant="outline" className={isPro ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted-foreground'}>
+                    {isPro ? (merchant.proUnlockedViaReferrals ? 'Referral Pro' : merchant.proStatus === 'pro_referral' ? 'Lifetime' : 'Active') : 'Free Plan'}
+                  </Badge>
+                </div>
+                {isPro && merchant.proExpiresAt && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Expires: {new Date(merchant.proExpiresAt).toLocaleDateString()}
+                  </p>
+                )}
+                {isPro && merchant.proUnlockedViaReferrals && (
+                  <p className="text-xs text-success mt-0.5">Unlocked via referrals — free forever!</p>
+                )}
+                {!isPro && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Upgrade for {formatXMR(PRO_MONTHLY_XMR)}/month to unlock all features
+                  </p>
+                )}
+              </div>
+            </div>
+            {!isPro && (
+              <Dialog open={showProSignup} onOpenChange={setShowProSignup}>
+                <DialogTrigger asChild>
+                  <Button className="bg-gradient-orange hover:opacity-90">
+                    <Zap className="w-4 h-4 mr-2" /> Upgrade to Pro
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-border max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-foreground flex items-center gap-2">
+                      <Crown className="w-5 h-5 text-primary" /> Upgrade to Pro
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-2">
+                    <div className="space-y-2">
+                      {proFeatures.map(f => (
+                        <div key={f} className="flex items-center gap-2 text-sm text-foreground">
+                          <Check className="w-4 h-4 text-success shrink-0" />
+                          {f}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">Send <strong className="text-primary">{formatXMR(PRO_MONTHLY_XMR)}</strong>/month to:</p>
+                      <p className="font-mono text-[9px] text-foreground break-all select-all bg-background rounded p-2 border border-border">
+                        {CREATOR_TREASURY_ADDRESS}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Transaction Hash (after sending)</Label>
+                      <Input
+                        value={proTxid}
+                        onChange={e => setProTxid(e.target.value)}
+                        placeholder="Paste your TX hash here..."
+                        className="bg-background border-border font-mono text-xs"
+                      />
+                    </div>
+
+                    <Button onClick={handleProActivate} className="w-full bg-gradient-orange hover:opacity-90">
+                      <Shield className="w-4 h-4 mr-2" /> Activate Pro
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {!isPro && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-border/50">
+              {proFeatures.map(f => (
+                <div key={f} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Check className="w-3 h-3 text-primary shrink-0" />
+                  {f}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </FadeIn>
+
+      {/* ── Recurring Subscriptions ── */}
+      <FadeIn delay={0.05}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Subscriptions</h1>
