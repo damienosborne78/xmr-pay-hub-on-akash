@@ -399,23 +399,53 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       const expectedXmr = invoice.xmrAmount;
       const primaryTx = incoming[0];
       const confirmations = primaryTx.confirmations || 0;
+      const requiredConfs = m.requiredConfirmations ?? 1;
+      const isZeroConfEligible = m.zeroConfEnabled && invoice.fiatAmount <= (m.zeroConfThresholdUsd || 30);
 
       let newStatus: Invoice['status'];
       if (totalReceivedXmr >= expectedXmr * 0.99) {
-        if (confirmations >= 10) newStatus = 'paid';
-        else if (confirmations >= 1) newStatus = 'confirming';
-        else newStatus = 'seen_on_chain';
-        if (totalReceivedXmr > expectedXmr * 1.01 && confirmations >= 10) newStatus = 'overpaid';
+        if (isZeroConfEligible && confirmations === 0) {
+          // 0-conf auto-approve for small amounts
+          newStatus = 'paid';
+        } else if (confirmations >= requiredConfs) {
+          newStatus = 'paid';
+        } else if (confirmations >= 1) {
+          newStatus = 'confirming';
+        } else {
+          newStatus = 'seen_on_chain';
+        }
+        if (totalReceivedXmr > expectedXmr * 1.01 && confirmations >= requiredConfs) newStatus = 'overpaid';
       } else {
         newStatus = 'underpaid';
       }
 
+      const wasPaid = invoice.status === 'paid';
       get().updateInvoice(invoiceId, {
         status: newStatus,
         confirmations,
         txid: primaryTx.txid,
-        paidAt: newStatus === 'paid' ? new Date().toISOString() : undefined,
+        paidAt: newStatus === 'paid' && !wasPaid ? new Date().toISOString() : invoice.paidAt,
       });
+
+      // Fire webhook on payment confirmation
+      if (newStatus === 'paid' && !wasPaid && m.webhookPaymentUrl) {
+        try {
+          fetch(m.webhookPaymentUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'payment.confirmed',
+              invoiceId,
+              txid: primaryTx.txid,
+              amount: invoice.xmrAmount,
+              fiatAmount: invoice.fiatAmount,
+              fiatCurrency: invoice.fiatCurrency,
+              confirmations,
+              timestamp: new Date().toISOString(),
+            }),
+          }).catch(() => {});
+        } catch {}
+      }
     } catch (e) {
       console.error('Payment polling error:', e);
     }
