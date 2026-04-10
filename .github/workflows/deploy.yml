@@ -24,30 +24,18 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
-      - name: Build the app
+      - name: Build & Deploy
         working-directory: ${{ github.workspace }}/xmrpay-flow-main
         run: |
           set -euo pipefail
           bun install --frozen-lockfile
           bun run build
-
-      - name: Deploy new build
-        run: |
-          set -euo pipefail
           rm -rf "$TARGET_DIR/dist"
-          cp -r "$WORK_DIR/dist" "$TARGET_DIR/"
-          echo "✅ New build deployed"
-
-      - name: Restart service
-        run: |
-          set -euo pipefail
-          systemctl --user restart xmrpay-flow || true
-          sleep 5
-          systemctl --user status xmrpay-flow --no-pager
+          cp -r dist "$TARGET_DIR/"
+          echo "✅ Deployed to $TARGET_DIR - npx serve auto-reloads"
 
       - name: Health check
         run: |
-          curl -f http://localhost:3001 || echo "Health check failed"
+          sleep 2
+          curl -f http://localhost:3001 || echo "Site may need manual restart"
