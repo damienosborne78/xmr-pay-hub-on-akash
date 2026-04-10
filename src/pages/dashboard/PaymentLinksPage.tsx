@@ -21,10 +21,23 @@ export default function PaymentLinksPage() {
   const [slug, setSlug] = useState('');
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');
+  const payoutAddress = merchant.viewOnlyAddress || merchant.settlementAddress || merchant.primarySubaddress;
+
+  const buildPayUrl = (link: typeof paymentLinks[number]) => {
+    const url = new URL(`${baseUrl}/pay/${link.fiatAmount}/${encodeURIComponent(link.slug)}`);
+    if (payoutAddress) url.searchParams.set('address', payoutAddress);
+    url.searchParams.set('currency', link.fiatCurrency || cur);
+    url.searchParams.set('symbol', sym);
+    return url.toString();
+  };
 
   const handleCreate = () => {
     if (!slug || !amount || !label || isNaN(Number(amount))) return;
-    createPaymentLink(slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'), Number(amount), label);
+    if (!payoutAddress) {
+      toast.error('Add a wallet receiving address first in Settings → Wallet & Node.');
+      return;
+    }
+    createPaymentLink(slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'), Number(amount), label, cur);
     toast.success('Payment link created!');
     setOpen(false);
     setSlug(''); setAmount(''); setLabel('');
@@ -33,7 +46,7 @@ export default function PaymentLinksPage() {
   const baseUrl = fqdn ? `https://${fqdn}` : window.location.origin;
 
   const copyLink = (link: typeof paymentLinks[0]) => {
-    navigator.clipboard.writeText(`${baseUrl}/pay/${link.fiatAmount}/${link.slug}`);
+    navigator.clipboard.writeText(buildPayUrl(link));
     toast.success('Link copied!');
   };
 
@@ -97,7 +110,7 @@ export default function PaymentLinksPage() {
             <div>
               <p className="text-sm font-medium text-foreground">Payment Links</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Share simple links like <span className="font-mono text-primary">{baseUrl}/pay/49.99/coffee</span> — customers get a checkout page instantly. Embed as buttons on any website.
+                 Share simple links like <span className="font-mono text-primary">{baseUrl}/pay/49.99/coffee</span> — customers get a checkout page instantly. Embed as buttons on any website.
               </p>
             </div>
           </div>
@@ -114,7 +127,7 @@ export default function PaymentLinksPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-foreground font-medium">{link.label}</p>
-                  <p className="text-primary font-mono text-sm mt-1">{baseUrl}/pay/{link.fiatAmount}/{link.slug}</p>
+                   <p className="text-primary font-mono text-sm mt-1 break-all">{buildPayUrl(link)}</p>
                   <p className="text-muted-foreground text-xs mt-1">{link.uses} uses · Created {new Date(link.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -123,7 +136,7 @@ export default function PaymentLinksPage() {
                     <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-primary" onClick={() => copyLink(link)}>
                       <Copy className="w-3.5 h-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-primary" onClick={() => window.open(`/pay/${link.fiatAmount}/${link.slug}`, '_blank')}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-primary" onClick={() => window.open(buildPayUrl(link), '_blank')}>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-destructive" onClick={() => { deletePaymentLink(link.id); toast.info('Link deleted'); }}>

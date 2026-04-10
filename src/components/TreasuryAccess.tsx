@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
+import { fetchCreatorApi } from '@/lib/creator-server';
 
 
 const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026';
@@ -55,20 +56,27 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     }
   };
 
-  const handleGenerateProCode = () => {
+  const handleGenerateProCode = async () => {
     const code = generateProCode();
     const entry = { code, createdAt: new Date().toISOString() };
-    const updated = [...generatedCodes, entry];
-    updateMerchant({ lifetimeProCodes: updated });
 
-    // Persist to server-side JSON file via local API
-    fetch(`${window.location.origin}/api/mf/codes/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
-    }).catch(() => {});
+    try {
+      const response = await fetchCreatorApi('/api/mf/codes/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      });
 
-    toast.success(`Lifetime Pro code generated: ${code}`);
+      if (!response.ok) {
+        throw new Error('Could not persist the code to the shared server');
+      }
+
+      updateMerchant({ lifetimeProCodes: [...generatedCodes, entry] });
+      toast.success(`Lifetime Pro code generated: ${code}`);
+    } catch {
+      toast.error('Could not save the code to the shared server. It was not generated.');
+    }
+
   };
 
   const handleCopyCode = (code: string) => {

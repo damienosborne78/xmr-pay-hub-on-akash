@@ -2,20 +2,21 @@ import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { formatUSD, formatXMR, usdToXmr, XMR_USD_RATE } from '@/lib/mock-data';
 import { useStore } from '@/lib/store';
-import { createSubaddress } from '@/lib/monero-rpc';
 import { QRCodeSVG } from 'qrcode.react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MoneroLogo } from '@/components/BrandLogo';
 import { Check, Clock, Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PaymentProgress } from '@/components/PaymentProgress';
+import { fiatToXmr, getRates, getStaleCache, getXmrPrice } from '@/lib/currency-service';
 
 export default function PayPage() {
   const { amount, label } = useParams();
   const fiatAmount = parseFloat(amount || '0');
-  const xmrAmount = usdToXmr(fiatAmount);
-  const getRpcConfig = useStore(s => s.getRpcConfig);
+  const search = new URLSearchParams(window.location.search);
+  const directAddress = search.get('address') || '';
+  const displayCurrency = (search.get('currency') || 'USD').toUpperCase();
+  const displaySymbol = search.get('symbol') || (displayCurrency === 'USD' ? '$' : `${displayCurrency} `);
   const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
   const createInvoice = useStore(s => s.createInvoice);
   const invoices = useStore(s => s.invoices);
@@ -26,13 +27,45 @@ export default function PayPage() {
   const [error, setError] = useState('');
   const [timeLeft, setTimeLeft] = useState(3600);
   const [copied, setCopied] = useState(false);
+  const [xmrAmount, setXmrAmount] = useState(usdToXmr(fiatAmount));
+  const [referenceRate, setReferenceRate] = useState(XMR_USD_RATE);
 
   const invoice = invoices.find(i => i.id === invoiceId);
   const paid = invoice?.status === 'paid';
+  const directLinkMode = Boolean(directAddress);
+
+  const formattedFiatAmount = `${displaySymbol}${fiatAmount.toFixed(2)}${displayCurrency === 'USD' ? '' : ` ${displayCurrency}`}`;
+
+  useEffect(() => {
+    let active = true;
+
+    const loadQuote = async () => {
+      try {
+        const rates = await getRates();
+        if (!active) return;
+        setXmrAmount(fiatToXmr(fiatAmount, displayCurrency, rates));
+        setReferenceRate(getXmrPrice(displayCurrency, rates));
+      } catch {
+        const stale = getStaleCache();
+        if (stale && active) {
+          setXmrAmount(fiatToXmr(fiatAmount, displayCurrency, stale));
+          setReferenceRate(getXmrPrice(displayCurrency, stale));
+        }
+      }
+    };
+
+    if (fiatAmount > 0) loadQuote();
+    return () => { active = false; };
+  }, [displayCurrency, fiatAmount]);
 
   // Create invoice with real subaddress on mount
   useEffect(() => {
     if (!fiatAmount || fiatAmount <= 0) { setLoading(false); return; }
+    if (directAddress) {
+      setSubaddress(directAddress);
+      setLoading(false);
+      return;
+    }
 
     const init = async () => {
       try {
@@ -48,7 +81,7 @@ export default function PayPage() {
       setLoading(false);
     };
     init();
-  }, [fiatAmount]);
+  }, [createInvoice, directAddress, fiatAmount, label]);
 
   // Poll for payment
   useEffect(() => {
@@ -89,7 +122,7 @@ export default function PayPage() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground text-sm">Creating payment address via RPC...</p>
+           <p className="text-muted-foreground text-sm">Preparing payment link...</p>
         </div>
       </div>
     );
@@ -124,7 +157,7 @@ export default function PayPage() {
                 <Check className="w-10 h-10 text-success" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">Payment Confirmed</h2>
-              <p className="text-muted-foreground">{formatUSD(fiatAmount)} received — thank you!</p>
+               <p className="text-muted-foreground">{formattedFiatAmount} received — thank you!</p>
               {invoice?.txid && (
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-[10px] text-muted-foreground mb-1">TX ID</p>
@@ -135,9 +168,9 @@ export default function PayPage() {
           ) : (
             <>
               <div className="text-center">
-                <p className="text-4xl font-bold text-foreground">{formatUSD(fiatAmount)}</p>
+                 <p className="text-4xl font-bold text-foreground">{formattedFiatAmount}</p>
                 <p className="text-primary font-mono mt-1">{formatXMR(xmrAmount)}</p>
-                <p className="text-muted-foreground text-xs mt-1">1 XMR = {formatUSD(XMR_USD_RATE)}</p>
+                 <p className="text-muted-foreground text-xs mt-1">1 XMR = {displaySymbol}{referenceRate.toFixed(2)} {displayCurrency}</p>
               </div>
 
               <div className="flex justify-center">
@@ -162,7 +195,7 @@ export default function PayPage() {
               </div>
 
               {/* Smart confirmation progress */}
-              {invoiceId && (
+               {invoiceId && (
                 <PaymentProgress
                   invoiceId={invoiceId}
                   fiatAmount={fiatAmount}
@@ -170,6 +203,12 @@ export default function PayPage() {
                   subaddress={subaddress}
                 />
               )}
+
+               {directLinkMode && !invoiceId && (
+                 <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
+                   Direct payment link mode — this checkout uses the merchant address embedded in the link.
+                 </div>
+               )}
             </>
           )}
 
