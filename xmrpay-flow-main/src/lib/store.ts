@@ -79,7 +79,7 @@ interface AppState {
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
   verifyInvoiceTxHash: (invoiceId: string, txHash: string) => Promise<{ success: boolean; error?: string }>;
   verifyAllPendingInvoices: () => Promise<{ verified: number; failed: number }>;
-  activateProWithCode: (code: string) => boolean;
+  activateProWithCode: (code: string) => Promise<boolean>;
   updateMerchant: (updates: Partial<Merchant>) => void;
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
   toggleSubscription: (id: string) => void;
@@ -631,45 +631,48 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return { verified, failed };
   },
 
-  activateProWithCode: (code: string) => {
+  activateProWithCode: async (code: string): Promise<boolean> => {
     const m = get().merchant;
     const upperCode = code.toUpperCase().trim();
     
-    // Validate code format: MF-PRO-XXXXXXXX (8 chars after prefix)
-    const CODE_FORMAT = /^MF-PRO-[A-Z0-9]{8}$/;
-    if (!CODE_FORMAT.test(upperCode)) return false;
+    // First, try validating against the server API (works for ALL clients)
+    try {
+      const baseUrl = window.location.origin;
+      const res = await fetch(`${baseUrl}/api/mf/codes/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: upperCode }),
+      });
+      const data = await res.json();
+      
+      if (!data.valid) return false;
+      
+      // Redeem on server
+      await fetch(`${baseUrl}/api/mf/codes/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint || 'unknown' }),
+      });
+    } catch {
+      // Fallback: check local state if server unreachable
+      const storedCodes = m.lifetimeProCodes || [];
+      const codeEntry = storedCodes.find(c => c.code === upperCode);
+      if (!codeEntry || codeEntry.usedBy) return false;
+      
+      const updatedCodes = storedCodes.map(c => 
+        c.code === upperCode ? { ...c, usedBy: m.referralWalletFingerprint || 'unknown' } : c
+      );
+      get().updateMerchant({ lifetimeProCodes: updatedCodes });
+    }
     
-    // Check against locally stored codes first
-    const storedCodes = m.lifetimeProCodes || [];
-    const codeEntry = storedCodes.find(c => c.code === upperCode);
-    
-    // If code exists locally and was already used, reject
-    if (codeEntry?.usedBy) return false;
-    
-    // For lifetime pro codes, we trust valid format (no local copy needed for cross-user redemption)
-    // This allows the creator to generate codes in Treasury and share them with others
-    
-    // Mark code as used
-    const updatedCodes = storedCodes.map(c => 
-      c.code === upperCode ? { ...c, usedBy: m.referralWalletFingerprint || 'unknown' } : c
-    );
-    
-    // Activate lifetime pro
+    // Activate lifetime pro locally
     get().updateMerchant({
       plan: 'pro',
       proStatus: 'pro',
       proActivatedAt: new Date().toISOString(),
-      proExpiresAt: '', // never expires — lifetime
+      proExpiresAt: '',
       proTxid: `LIFETIME-CODE-${upperCode}`,
-      lifetimeProCodes: updatedCodes,
     });
-
-    // Sync used code to hardcoded creator server
-    fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint }),
-    }).catch(() => {}); // best-effort sync
 
     return true;
   },
