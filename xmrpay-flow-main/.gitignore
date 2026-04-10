@@ -1,0 +1,24 @@
+# OpenClaw / Lovable specific
+.clawhub/
+.openclaw/
+.lovable/
+.env
+
+# Common ignores
+node_modules/
+dist/
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Your other project stuff (add more if needed)
+../Backups_projects/
+../backups/
+../bots/
+../venv/
+../workspace/
+../moneroflow*/
+../test_bot_*/
