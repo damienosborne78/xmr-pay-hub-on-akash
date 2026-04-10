@@ -130,10 +130,6 @@ export default function ReferralsPage() {
 
     // Validate & redeem via server API (falls back to local state)
     const success = await activateProWithCode(code);
-      } catch {
-        // Server unreachable — fall through
-      }
-    }
 
     if (success) {
       setProCodeInput('');
