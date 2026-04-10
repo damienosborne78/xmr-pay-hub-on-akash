@@ -431,6 +431,36 @@ export const useStore = create<AppState>()(persist((set, get) => ({
           }),
         }).catch(() => {});
       }
+
+      // Auto-sweep to cold wallet or settlement address after payment
+      if (newStatus === 'paid' && !wasPaid) {
+        const sweepAddress = m.autoSweepEnabled && m.coldWalletAddress
+          ? m.coldWalletAddress
+          : m.settlementAddress || null;
+
+        if (sweepAddress && m.viewOnlySetupComplete) {
+          import('./wallet-send').then(async ({ sendXmr }) => {
+            try {
+              const mNow = get().merchant;
+              const threshold = mNow.autoSweepEnabled ? mNow.autoSweepThreshold : 0;
+              const amountToSweep = invoice.xmrAmount;
+
+              // Only sweep if amount exceeds threshold (or settlement has no threshold)
+              if (amountToSweep >= threshold || (!mNow.autoSweepEnabled && mNow.settlementAddress)) {
+                console.log(`[AutoSweep] Sweeping ${amountToSweep} XMR to ${sweepAddress.slice(0, 12)}...`);
+                const result = await sendXmr({
+                  address: sweepAddress,
+                  amountXmr: amountToSweep,
+                  merchant: mNow,
+                });
+                console.log(`[AutoSweep] Success — txid: ${result.txid}, fee: ${result.fee}`);
+              }
+            } catch (err) {
+              console.error('[AutoSweep] Failed:', err);
+            }
+          });
+        }
+      }
     };
 
     // ── Strategy 1: Block Explorer scan (works for ALL wallet modes) ──
