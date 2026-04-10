@@ -37,25 +37,17 @@ jobs:
       - name: Deploy new build
         run: |
           set -euo pipefail
-
           rm -rf "$TARGET_DIR/dist"
           cp -r "$WORK_DIR/dist" "$TARGET_DIR/"
+          echo "✅ New build deployed"
 
-          echo "✅ New build copied"
+      - name: Restart service
+        run: |
+          set -euo pipefail
+          systemctl --user restart xmrpay-flow || true
+          sleep 5
+          systemctl --user status xmrpay-flow --no-pager
 
-          echo "🔄 Restarting service (no sudo)..."
-          
-          # Kill old process
-          pkill -f "npx serve -s dist -l 3001" || true
-          sleep 2
-          
-          # Start new process
-          cd "$TARGET_DIR"
-          nohup /usr/bin/env npx serve -s dist -l 3001 --no-port-switching > serve.log 2>&1 &
-          sleep 3
-
-          echo "=== Service status ==="
-          ps aux | grep "npx serve" | grep -v grep || true
-
-          echo "=== Port check ==="
-          ss -tlnp | grep 3001 || true
+      - name: Health check
+        run: |
+          curl -f http://localhost:3001 || echo "Health check failed"
