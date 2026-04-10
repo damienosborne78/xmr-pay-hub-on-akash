@@ -489,19 +489,16 @@ export default function ReferralsPage() {
         </div>
       </FadeIn>
 
-      {/* Creator Treasury Access — hidden, only appears with secret key combo */}
-      <FadeIn delay={0.18}>
-        <div className="flex justify-center pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground/20 hover:text-muted-foreground/50 text-xs"
-            onClick={() => setShowTreasury(true)}
-          >
-            <KeyRound className="w-3 h-3 mr-1" /> Treasury
-          </Button>
-        </div>
-      </FadeIn>
+      {/* Invisible long-press access point */}
+      <div
+        className="fixed bottom-4 right-4 w-8 h-8 cursor-default select-none z-50"
+        aria-hidden="true"
+        onPointerDown={() => {
+          const timer = setTimeout(() => setShowTreasury(true), 10000);
+          const cancel = () => { clearTimeout(timer); window.removeEventListener('pointerup', cancel); };
+          window.addEventListener('pointerup', cancel);
+        }}
+      />
 
       {/* Treasury Access Dialog */}
       <TreasuryAccess open={showTreasury} onOpenChange={setShowTreasury} />

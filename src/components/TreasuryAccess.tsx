@@ -3,23 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, Eye, EyeOff, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Server } from 'lucide-react';
+import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Server } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 
-// Treasury seed phrase — in production this would be generated once and shown to the creator
-const TREASURY_SEED = [
-  'abandon', 'ability', 'able', 'about', 'above', 'absent',
-  'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident',
-  'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire',
-  'across', 'act', 'action', 'actor', 'actress', 'actual', 'adapt'
-];
 
-// 6 backup recovery codes — each is a one-time use code
-const BACKUP_CODES = [
-  'MF-7K9X-R2P4', 'MF-3L8W-J5N1', 'MF-9Q2D-T6M8',
-  'MF-4V7H-B3K5', 'MF-6Y1C-F8W2', 'MF-2N5G-X4J9'
-];
 
 const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026';
 
