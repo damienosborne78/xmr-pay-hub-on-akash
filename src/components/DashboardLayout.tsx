@@ -4,7 +4,6 @@ import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { PrivacyBanner } from '@/components/PrivacyBanner';
 import { SeedBackupWarning } from '@/components/SeedBackupWarning';
-import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { useStore } from '@/lib/store';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,7 +11,37 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+// --- Simple Dark/Light toggle ---
+function ThemeToggle() {
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem('mf-theme') !== 'light'; } catch { return true; }
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (dark) {
+      root.classList.remove('theme-light');
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+      root.classList.add('theme-light');
+    }
+    try { localStorage.setItem('mf-theme', dark ? 'dark' : 'light'); } catch {}
+  }, [dark]);
+
+  return (
+    <button
+      onClick={() => setDark(d => !d)}
+      className="fixed bottom-5 right-5 z-50 w-9 h-9 rounded-full bg-popover border border-border shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-muted-foreground hover:text-foreground"
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+    </button>
+  );
+}
 
 const mainNav = [
   { title: 'Overview', url: '/dashboard', icon: LayoutDashboard },
@@ -137,7 +166,7 @@ export default function DashboardLayout() {
           <main className="flex-1 p-6 overflow-auto">
             <Outlet />
           </main>
-          <ThemeSwitcher />
+          <ThemeToggle />
         </div>
       </div>
     </SidebarProvider>
