@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStore } from '@/lib/store';
 import { formatUSD, formatXMR, formatFiat, XMR_USD_RATE } from '@/lib/mock-data';
-import { Landmark, FileSpreadsheet, Download, Calendar, Check, Lock } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, Check, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
