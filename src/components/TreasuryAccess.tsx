@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
-import { CREATOR_SERVER_FQDN } from '@/lib/mock-data';
+
 
 const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026';
 
