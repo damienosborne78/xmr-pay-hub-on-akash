@@ -86,12 +86,13 @@ export default function PayoutsPage() {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 40;
+    const margin = 48;
     const orange: [number, number, number] = [255, 102, 0];
     const ink: [number, number, number] = [24, 24, 27];
     const muted: [number, number, number] = [113, 113, 122];
-    const line: [number, number, number] = [228, 228, 231];
-    let y = 130;
+    const line: [number, number, number] = [215, 215, 220];
+    const rowHeight = 32;
+    let y = 0;
 
     const truncate = (text: string, maxWidth: number) => {
       if (doc.getTextWidth(text) <= maxWidth) return text;
@@ -104,83 +105,100 @@ export default function PayoutsPage() {
 
     const drawHeader = () => {
       doc.setFillColor(...orange);
-      doc.rect(0, 0, pageWidth, 88, 'F');
+      doc.rect(0, 0, pageWidth, 90, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(22);
-      doc.text('MoneroFlow Payout Statement', margin, 36);
+      doc.setFontSize(20);
+      doc.text('MoneroFlow Payout Statement', margin, 38);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.text(`Export range: ${range}`, margin, 58);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 73);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 74);
       doc.text(merchant.name || 'MoneroFlow Merchant', pageWidth - margin, 58, { align: 'right' });
     };
 
-    const drawSummaryCard = (x: number, title: string, value: string, subtitle: string) => {
+    const cardHeight = 70;
+    const cardGap = 14;
+    const cardTop = 104;
+
+    const drawSummaryCard = (x: number, w: number, title: string, value: string, subtitle: string) => {
       doc.setDrawColor(...line);
       doc.setFillColor(250, 250, 250);
-      doc.roundedRect(x, 98, (pageWidth - margin * 2 - 24) / 3, 62, 12, 12, 'FD');
+      doc.roundedRect(x, cardTop, w, cardHeight, 10, 10, 'FD');
       doc.setTextColor(...muted);
       doc.setFontSize(9);
-      doc.text(title, x + 14, 118);
+      doc.setFont('helvetica', 'normal');
+      doc.text(title, x + 14, cardTop + 20);
       doc.setTextColor(...ink);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(15);
-      doc.text(value, x + 14, 138);
+      doc.setFontSize(16);
+      doc.text(value, x + 14, cardTop + 42);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(...muted);
-      doc.text(subtitle, x + 14, 152);
+      doc.text(subtitle, x + 14, cardTop + 58);
     };
 
+    const colDate = margin + 12;
+    const colInvoice = margin + 90;
+    const colDesc = margin + 170;
+    const colFiat = pageWidth - margin - 100;
+    const colXmr = pageWidth - margin - 12;
+
     const drawTableHeader = () => {
-      doc.setFillColor(245, 245, 245);
-      doc.roundedRect(margin, y, pageWidth - margin * 2, 24, 8, 8, 'F');
+      doc.setFillColor(240, 240, 242);
+      doc.roundedRect(margin, y, pageWidth - margin * 2, 28, 6, 6, 'F');
       doc.setTextColor(...muted);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.text('Date', margin + 10, y + 16);
-      doc.text('Invoice', margin + 74, y + 16);
-      doc.text('Description', margin + 146, y + 16);
-      doc.text(cur, pageWidth - margin - 130, y + 16, { align: 'right' });
-      doc.text('XMR', pageWidth - margin - 56, y + 16, { align: 'right' });
-      y += 34;
+      doc.setFontSize(8.5);
+      doc.text('Date', colDate, y + 18);
+      doc.text('Invoice', colInvoice, y + 18);
+      doc.text('Description', colDesc, y + 18);
+      doc.text(cur, colFiat, y + 18, { align: 'right' });
+      doc.text('XMR', colXmr, y + 18, { align: 'right' });
+      y += 40;
     };
 
     const ensureSpace = (needed: number) => {
-      if (y + needed <= pageHeight - margin) return;
+      if (y + needed <= pageHeight - 50) return;
       doc.addPage();
       drawHeader();
-      y = 110;
+      y = cardTop + cardHeight + 30;
       drawTableHeader();
     };
 
     drawHeader();
-    const cardWidth = (pageWidth - margin * 2 - 24) / 3;
-    drawSummaryCard(margin, 'Total revenue', formatFiat(totalFiat, sym, cur), `${invoiceList.length} transaction(s)`);
-    drawSummaryCard(margin + cardWidth + 12, 'Total XMR', formatXMR(totalXmr), 'Confirmed incoming only');
-    drawSummaryCard(margin + (cardWidth + 12) * 2, 'Reference rate', `$${XMR_USD_RATE.toFixed(2)}`, 'XMR / USD snapshot');
+    const contentWidth = pageWidth - margin * 2;
+    const cardW = (contentWidth - cardGap * 2) / 3;
+    drawSummaryCard(margin, cardW, 'Total revenue', formatFiat(totalFiat, sym, cur), `${invoiceList.length} transaction(s)`);
+    drawSummaryCard(margin + cardW + cardGap, cardW, 'Total XMR', formatXMR(totalXmr), 'Confirmed incoming only');
+    drawSummaryCard(margin + (cardW + cardGap) * 2, cardW, 'Reference rate', `$${XMR_USD_RATE.toFixed(2)}`, 'XMR / USD snapshot');
 
+    y = cardTop + cardHeight + 24;
     drawTableHeader();
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     invoiceList.forEach((inv) => {
-      ensureSpace(24);
-      doc.setDrawColor(...line);
-      doc.line(margin, y + 14, pageWidth - margin, y + 14);
+      ensureSpace(rowHeight);
       doc.setTextColor(...ink);
-      doc.text(new Date(inv.paidAt || inv.createdAt).toLocaleDateString(), margin + 10, y);
-      doc.text(inv.id, margin + 74, y);
-      doc.text(truncate(inv.description, pageWidth - 360), margin + 146, y);
-      doc.text(formatFiat(inv.fiatAmount, sym, cur), pageWidth - margin - 130, y, { align: 'right' });
-      doc.text(formatXMR(inv.xmrAmount), pageWidth - margin - 56, y, { align: 'right' });
-      y += 24;
+      doc.text(new Date(inv.paidAt || inv.createdAt).toLocaleDateString(), colDate, y + 4);
+      doc.setFontSize(8);
+      doc.text(inv.id, colInvoice, y + 4);
+      doc.setFontSize(9);
+      doc.text(truncate(inv.description, colFiat - colDesc - 20), colDesc, y + 4);
+      doc.text(formatFiat(inv.fiatAmount, sym, cur), colFiat, y + 4, { align: 'right' });
+      doc.setFontSize(8);
+      doc.text(formatXMR(inv.xmrAmount), colXmr, y + 4, { align: 'right' });
+      doc.setFontSize(9);
+      doc.setDrawColor(...line);
+      doc.line(margin + 8, y + 18, pageWidth - margin - 8, y + 18);
+      y += rowHeight;
     });
 
     doc.setFontSize(8);
     doc.setTextColor(...muted);
-    doc.text('Generated by MoneroFlow for accounting and reconciliation purposes.', margin, pageHeight - 24);
+    doc.text('Generated by MoneroFlow for accounting and reconciliation purposes.', margin, pageHeight - 28);
     doc.save(filename);
   };
 
