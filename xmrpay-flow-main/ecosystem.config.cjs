@@ -1,10 +1,9 @@
 module.exports = {
   apps: [{
     name: "xmrpay-flow",
-    script: "bun",
-    args: "x serve -s dist -l 3001",
+    script: "serve.js",
     cwd: "/home/node/.openclaw/workspace/xmrpay-flow-main",
-    interpreter: "none",
+    interpreter: "bun",
     env: {
       NODE_ENV: "production"
     },

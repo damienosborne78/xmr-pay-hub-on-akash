@@ -48,7 +48,7 @@ export default function ReferralsPage() {
   useEffect(() => {
     const checkNetwork = async () => {
       try {
-        const resp = await fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/health`, {
+        const resp = await fetch(`${window.location.origin}/api/mf/health`, {
           method: 'GET',
           signal: AbortSignal.timeout(5000),
         });
@@ -128,30 +128,8 @@ export default function ReferralsPage() {
       return;
     }
 
-    // Try local store first
-    let success = activateProWithCode(code);
-    
-    // Try fetching from hardcoded creator server
-    if (!success) {
-      try {
-        const resp = await fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/validate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.valid && !data.usedBy) {
-            // Add code to local store then activate
-            const codes = merchant.lifetimeProCodes || [];
-            updateMerchant({ lifetimeProCodes: [...codes, { code, createdAt: data.createdAt || new Date().toISOString() }] });
-            success = activateProWithCode(code);
-          }
-        }
-      } catch {
-        // Server unreachable — fall through
-      }
-    }
+    // Validate & redeem via server API (falls back to local state)
+    const success = await activateProWithCode(code);
 
     if (success) {
       setProCodeInput('');
