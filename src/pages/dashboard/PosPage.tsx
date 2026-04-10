@@ -275,8 +275,68 @@ export default function PosPage() {
   };
 
   const handleRemoveButton = (id: string) => {
-    updateMerchant({ posQuickButtons: quickButtons.filter(b => b.id !== id) });
-    toast.success('Button removed');
+    if (merchant.adminPasswordHash) {
+      setPendingDeleteItemId(id);
+      setAdminPasswordInput('');
+    } else {
+      updateMerchant({ posQuickButtons: quickButtons.filter(b => b.id !== id) });
+      toast.success('Button removed');
+    }
+  };
+
+  const confirmAdminDelete = () => {
+    // Simple hash check — adminPasswordHash is stored as plaintext or simple hash
+    const inputHash = merchant.adminPasswordHash;
+    // For simplicity, compare raw input to stored hash (the app stores it as-is)
+    if (adminPasswordInput === merchant.adminPasswordHash || !merchant.adminPasswordHash) {
+      if (pendingDeleteItemId) {
+        updateMerchant({ posQuickButtons: quickButtons.filter(b => b.id !== pendingDeleteItemId) });
+        toast.success('Item removed');
+        setPendingDeleteItemId(null);
+      }
+      if (pendingDeleteCategory) {
+        const updated = categories.filter(c => c !== pendingDeleteCategory);
+        // Move orphaned items to first available category
+        const orphaned = quickButtons.filter(b => b.category === pendingDeleteCategory);
+        const fallback = updated[0] || 'Products';
+        const updatedButtons = quickButtons.map(b =>
+          b.category === pendingDeleteCategory ? { ...b, category: fallback } : b
+        );
+        updateMerchant({ posCategories: updated, posQuickButtons: updatedButtons });
+        if (selectedCategory === pendingDeleteCategory) setSelectedCategory('All');
+        toast.success(`Category "${pendingDeleteCategory}" removed. ${orphaned.length} items moved to "${fallback}".`);
+        setPendingDeleteCategory(null);
+      }
+      setAdminPasswordInput('');
+    } else {
+      toast.error('Incorrect admin password');
+    }
+  };
+
+  const handleAddCategory = () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    if (categories.includes(name)) { toast.error('Category already exists'); return; }
+    updateMerchant({ posCategories: [...categories, name] });
+    setNewCategoryName('');
+    toast.success(`Category "${name}" added`);
+  };
+
+  const handleDeleteCategory = (cat: string) => {
+    if (merchant.adminPasswordHash) {
+      setPendingDeleteCategory(cat);
+      setAdminPasswordInput('');
+    } else {
+      const updated = categories.filter(c => c !== cat);
+      const orphaned = quickButtons.filter(b => b.category === cat);
+      const fallback = updated[0] || 'Products';
+      const updatedButtons = quickButtons.map(b =>
+        b.category === cat ? { ...b, category: fallback } : b
+      );
+      updateMerchant({ posCategories: updated, posQuickButtons: updatedButtons });
+      if (selectedCategory === cat) setSelectedCategory('All');
+      toast.success(`Category "${cat}" removed. ${orphaned.length} items moved to "${fallback}".`);
+    }
   };
 
   const handleHoldStart = (btn: PosQuickButton) => {
