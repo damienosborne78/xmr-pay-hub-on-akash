@@ -23,22 +23,22 @@ jobs:
           cd xmrpay-flow-main
           bun install --frozen-lockfile
           bun run build
-          echo "✅ Build completed"
+          echo "✅ Build completed successfully"
 
-      - name: Deploy and restart
+      - name: Deploy new build
         run: |
-          # Copy the new dist folder to the live location
+          # Copy the new dist folder to the location the service is serving
           rm -rf /home/node/.openclaw/workspace/xmrpay-flow-main/dist
           cp -r xmrpay-flow-main/dist /home/node/.openclaw/workspace/xmrpay-flow-main/
 
-          echo "✅ New build copied"
+          echo "✅ New build copied to live folder"
 
           # Restart the systemd service
-          echo "🔄 Restarting service..."
+          echo "🔄 Restarting xmrpay-flow service..."
           sudo systemctl restart xmrpay-flow
 
           echo "=== Service status ==="
           sudo systemctl status xmrpay-flow --no-pager -l
 
-          echo "=== Port 3001 check ==="
-          ss -tlnp | grep 3001 || echo "No process on 3001"
+          echo "=== Port check ==="
+          ss -tlnp | grep 3001
