@@ -43,11 +43,19 @@ jobs:
 
           echo "✅ New build copied"
 
-          echo "🔄 Restarting service..."
-          sudo -n /usr/bin/systemctl restart xmrpay-flow.service
+          echo "🔄 Restarting service (no sudo)..."
+          
+          # Kill old process
+          pkill -f "npx serve -s dist -l 3001" || true
+          sleep 2
+          
+          # Start new process
+          cd "$TARGET_DIR"
+          nohup /usr/bin/env npx serve -s dist -l 3001 --no-port-switching > serve.log 2>&1 &
+          sleep 3
 
           echo "=== Service status ==="
-          sudo -n /usr/bin/systemctl status xmrpay-flow.service --no-pager -l
+          ps aux | grep "npx serve" | grep -v grep || true
 
           echo "=== Port check ==="
           ss -tlnp | grep 3001 || true
