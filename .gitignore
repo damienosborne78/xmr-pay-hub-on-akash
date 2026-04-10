@@ -1,27 +1,16 @@
-# Project-specific ignores
-xmrpay-flow-main-backup-*
-node_modules/
-dist/
-.env
-.lovable/
-.openclaw/
-.clawhub/
+# Ignore everything except the actual project
+*
+!xmrpay-flow-main/
+!xmrpay-flow-main/**/*
+!.github/
+!.github/workflows/
+!.gitignore
+!README.md
 
-# General ignores
-*.log
-*.db
-venv/
-__pycache__/
-data/
-backups/
-backups_old/
-bots/
-test_bot_*/
-moneroflow*/
-*.tar.gz
-.DS_Store
-.vscode/
-.idea/
-
-# Keep these if you want
-!xmrpay-flow-main-backup-*/
+# Inside the project, ignore common junk
+xmrpay-flow-main/node_modules/
+xmrpay-flow-main/dist/
+xmrpay-flow-main/.env
+xmrpay-flow-main/.lovable/
+xmrpay-flow-main/.openclaw/
+xmrpay-flow-main/.clawhub/
