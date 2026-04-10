@@ -19,13 +19,15 @@ export default function WhiteLabelPage() {
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [copiedButton, setCopiedButton] = useState(false);
 
-  const embedCode = `<iframe src="https://pay.moneroflow.com/${merchant.apiKey}/checkout" 
+  const baseUrl = merchant.fqdn ? `https://${merchant.fqdn}` : window.location.origin;
+
+  const embedCode = `<iframe src="${baseUrl}/${merchant.apiKey}/checkout" 
   width="400" height="600" 
   style="border:none;border-radius:16px;" 
   allow="clipboard-write">
 </iframe>`;
 
-  const buttonCode = `<a href="https://pay.moneroflow.com/${merchant.apiKey}/49.99/order" 
+  const buttonCode = `<a href="${baseUrl}/${merchant.apiKey}/49.99/order" 
    style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;
    background:${brandColor};color:#fff;border-radius:8px;font-weight:600;
    text-decoration:none;font-family:sans-serif;">
