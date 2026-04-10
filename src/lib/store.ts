@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { scanRecentOutputs, verifyTxOutputs } from './block-explorer';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
@@ -657,14 +657,12 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       lifetimeProCodes: updatedCodes,
     });
 
-    // If creator server is configured, sync the used code
-    if (m.creatorServerFqdn) {
-      fetch(`https://${m.creatorServerFqdn}/api/mf/codes/redeem`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint }),
-      }).catch(() => {}); // best-effort sync
-    }
+    // Sync used code to hardcoded creator server
+    fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint }),
+    }).catch(() => {}); // best-effort sync
 
     return true;
   },

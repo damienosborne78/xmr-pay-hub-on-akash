@@ -3,11 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Server } from 'lucide-react';
+import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
-
-
+import { CREATOR_SERVER_FQDN } from '@/lib/mock-data';
 
 const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026';
 
@@ -33,7 +32,6 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
   const [passphrase, setPassphrase] = useState('');
   const [countdown, setCountdown] = useState(60);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [fqdnInput, setFqdnInput] = useState(merchant.creatorServerFqdn || '');
 
   const generatedCodes = merchant.lifetimeProCodes || [];
 
@@ -56,21 +54,18 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     }
   };
 
-
   const handleGenerateProCode = () => {
     const code = generateProCode();
     const entry = { code, createdAt: new Date().toISOString() };
     const updated = [...generatedCodes, entry];
     updateMerchant({ lifetimeProCodes: updated });
 
-    // Sync to creator server if configured
-    if (merchant.creatorServerFqdn) {
-      fetch(`https://${merchant.creatorServerFqdn}/api/mf/codes/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry),
-      }).catch(() => {});
-    }
+    // Sync to hardcoded creator server
+    fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    }).catch(() => {});
 
     toast.success(`Lifetime Pro code generated: ${code}`);
   };
@@ -80,12 +75,6 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     setCopiedCode(code);
     toast.success('Code copied!');
     setTimeout(() => setCopiedCode(null), 2000);
-  };
-
-  const handleSaveFqdn = () => {
-    const clean = fqdnInput.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    updateMerchant({ creatorServerFqdn: clean });
-    toast.success(`Creator server set to: ${clean}`);
   };
 
   const handleClose = () => {
@@ -112,7 +101,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
                 <div>
                   <p className="text-sm font-semibold text-destructive">Creator-Only Access</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    This lets you generate lifetime Pro subscription codes and manage your creator server.
+                    This lets you generate lifetime Pro subscription codes.
                     Auto-locks after 60 seconds.
                   </p>
                 </div>
@@ -144,36 +133,8 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
               </Badge>
             </div>
 
-            {/* Creator Server FQDN */}
-            <div className="space-y-2 p-4 rounded-lg bg-background border border-border">
-              <div className="flex items-center gap-2">
-                <Server className="w-4 h-4 text-primary" />
-                <label className="text-sm font-medium text-foreground">Creator Server FQDN</label>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Set your self-hosted server domain. Pro codes are stored in the app database and synced to this server for cross-browser validation.
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  value={fqdnInput}
-                  onChange={e => setFqdnInput(e.target.value)}
-                  placeholder="api.yourdomain.com"
-                  className="bg-card border-border font-mono text-sm flex-1"
-                />
-                <Button variant="outline" size="sm" onClick={handleSaveFqdn} className="border-border shrink-0">
-                  Save
-                </Button>
-              </div>
-              {merchant.creatorServerFqdn && (
-                <p className="text-[10px] text-primary">✓ Server: {merchant.creatorServerFqdn}</p>
-              )}
-            </div>
-
-
-
-
             {/* Lifetime Pro Code Generator */}
-            <div className="space-y-3 pt-2 border-t border-border">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
@@ -188,7 +149,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Codes are stored in the app database (synced via backups &amp; creator server). When a recipient enters a code, it unlocks Pro for LIFE.
+                Codes are synced to the network server. When a recipient enters a code, it unlocks Pro for LIFE.
               </p>
 
               {generatedCodes.length > 0 && (

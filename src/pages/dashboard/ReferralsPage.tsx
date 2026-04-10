@@ -6,7 +6,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { Copy, Check, Users, TrendingUp, Coins, Gift, Zap, Crown, Shield, QrCode, Wallet, AlertTriangle, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { formatXMR, formatUSD, usdToXmr, PRO_MONTHLY_XMR, PRO_REFERRAL_UNLOCK_COUNT, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT } from '@/lib/mock-data';
+import { formatXMR, formatUSD, usdToXmr, PRO_MONTHLY_XMR, PRO_REFERRAL_UNLOCK_COUNT, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from '@/lib/mock-data';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TreasuryAccess } from '@/components/TreasuryAccess';
@@ -112,10 +112,10 @@ export default function ReferralsPage() {
     // Try local store first
     let success = activateProWithCode(code);
     
-    // If not found locally and creator server is configured, try fetching from server
-    if (!success && merchant.creatorServerFqdn) {
+    // Try fetching from hardcoded creator server
+    if (!success) {
       try {
-        const resp = await fetch(`https://${merchant.creatorServerFqdn}/api/mf/codes/validate`, {
+        const resp = await fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code }),
