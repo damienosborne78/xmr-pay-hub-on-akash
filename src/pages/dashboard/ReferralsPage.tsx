@@ -49,9 +49,6 @@ export default function ReferralsPage() {
   useEffect(() => {
     const checkNetwork = async () => {
       try {
-        const resp = await fetch(`${window.location.origin}/api/mf/health`, {
-          method: 'GET',
-        });
         const resp = await fetchCreatorApi('/api/mf/health', { method: 'GET' });
         setNetworkStatus(resp.ok ? 'connected' : 'disconnected');
       } catch {
