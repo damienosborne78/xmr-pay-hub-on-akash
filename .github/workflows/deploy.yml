@@ -20,29 +20,26 @@ jobs:
 
       - name: Build the app
         run: |
-          echo "=== Working directory ==="
-          pwd
           cd xmrpay-flow-main
-          echo "=== Inside project folder ==="
-          pwd
-          ls -la
           bun install --frozen-lockfile
           bun run build
-          echo "=== Build finished successfully ==="
+          echo "Build completed successfully"
 
-      - name: Restart PM2 with full debug
+      - name: Restart PM2 correctly
         run: |
-          cd xmrpay-flow-main
-          echo "=== Current PM2 processes before restart ==="
-          pm2 status
-          echo "=== Killing old process ==="
+          cd /home/node/.openclaw/workspace/xmrpay-flow-main
+          
+          echo "=== Stopping old process ==="
           pm2 delete xmrpay-flow || true
-          echo "=== Starting new process ==="
+          
+          echo "=== Starting new process from correct path ==="
           pm2 start ecosystem.config.cjs --name xmrpay-flow
-          sleep 3
-          echo "=== PM2 status after restart ==="
+          
+          echo "=== Saving PM2 config ==="
+          pm2 save
+          
+          echo "=== Final PM2 status ==="
           pm2 status
-          echo "=== Port 3001 check ==="
-          ss -tlnp | grep 3001 || echo "No process listening on 3001"
-          echo "=== Last 20 lines of PM2 logs ==="
-          pm2 logs xmrpay-flow --lines 20
+          
+          echo "=== Port check ==="
+          ss -tlnp | grep 3001 || echo "No process on 3001"
