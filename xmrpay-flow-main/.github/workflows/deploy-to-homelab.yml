@@ -1,0 +1,29 @@
+name: Deploy to Homelab Server
+
+on:
+  push:
+    branches: [ main ]        # Change to 'master' if your default branch is master
+
+jobs:
+  deploy:
+    runs-on: self-hosted      # This runs the job on your Ubuntu server
+
+    steps:
+      - name: Checkout latest code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the production app
+        run: bun run build
+
+      - name: Restart the app with PM2
+        run: |
+          pm2 restart xmrpay-flow || echo "PM2 process not found yet"
+          pm2 save
