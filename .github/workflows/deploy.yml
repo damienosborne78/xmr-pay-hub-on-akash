@@ -27,21 +27,12 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Show paths
-        run: |
-          set -euo pipefail
-          pwd
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          ls -la
-          ls -la "$WORK_DIR"
-
       - name: Build the app
         working-directory: ${{ github.workspace }}/xmrpay-flow-main
         run: |
           set -euo pipefail
           bun install --frozen-lockfile
           bun run build
-          echo "✅ Build completed"
 
       - name: Deploy new build
         run: |
