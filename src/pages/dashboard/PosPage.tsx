@@ -538,7 +538,7 @@ export default function PosPage() {
         </div>
 
         {/* Category tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1 flex-wrap items-center">
           {['All', ...categories].map(cat => (
             <button
               key={cat}
@@ -552,6 +552,15 @@ export default function PosPage() {
               {cat}
             </button>
           ))}
+          {isPro && (
+            <button
+              onClick={() => setShowCategoryManager(true)}
+              className="text-muted-foreground hover:text-primary transition-colors ml-1"
+              title="Manage categories"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Favorites bar */}
