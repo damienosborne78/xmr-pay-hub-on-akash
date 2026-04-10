@@ -20,25 +20,21 @@ jobs:
 
       - name: Build the app
         run: |
-          echo "=== Current directory ==="
-          pwd
-          ls -la
           cd xmrpay-flow-main
-          echo "=== Building in xmrpay-flow-main ==="
-          pwd
           bun install --frozen-lockfile
           bun run build
           echo "✅ Build completed"
 
-      - name: Copy build and restart service
+      - name: Deploy and restart
         run: |
-          echo "=== Copying dist folder to live location ==="
+          # Copy the new dist folder to the live location
           rm -rf /home/node/.openclaw/workspace/xmrpay-flow-main/dist
           cp -r xmrpay-flow-main/dist /home/node/.openclaw/workspace/xmrpay-flow-main/
 
-          echo "✅ Build copied"
+          echo "✅ New build copied"
 
-          echo "=== Restarting systemd service ==="
+          # Restart the systemd service
+          echo "🔄 Restarting service..."
           sudo systemctl restart xmrpay-flow
 
           echo "=== Service status ==="
