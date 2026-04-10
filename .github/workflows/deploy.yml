@@ -23,14 +23,18 @@ jobs:
           cd xmrpay-flow-main
           bun install --frozen-lockfile
           bun run build
+          echo "✅ Build completed successfully"
 
-      - name: Deploy new build
+      - name: Deploy new version
         run: |
-          # Copy the freshly built files to the production folder
+          # Copy the fresh build to the live location
           rm -rf /home/node/.openclaw/workspace/xmrpay-flow-main/dist
           cp -r xmrpay-flow-main/dist /home/node/.openclaw/workspace/xmrpay-flow-main/
 
-          echo "=== Restarting systemd service ==="
+          echo "✅ Build copied to production folder"
+
+          # Restart the systemd service
+          echo "🔄 Restarting xmrpay-flow service..."
           sudo systemctl restart xmrpay-flow
 
           echo "=== Service status ==="
