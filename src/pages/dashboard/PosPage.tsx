@@ -1106,6 +1106,92 @@ export default function PosPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Category Manager Dialog */}
+      <Dialog open={showCategoryManager} onOpenChange={setShowCategoryManager}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader><DialogTitle className="text-foreground">Manage Categories</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            {/* Add new category */}
+            <div className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={e => setNewCategoryName(e.target.value)}
+                className="bg-background border-border text-sm flex-1"
+                placeholder="New category name..."
+                onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+              />
+              <Button onClick={handleAddCategory} size="sm" className="bg-gradient-orange hover:opacity-90" disabled={!newCategoryName.trim()}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Existing categories */}
+            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+              {categories.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">No categories yet</p>
+              )}
+              {categories.map(cat => {
+                const itemCount = quickButtons.filter(b => b.category === cat).length;
+                return (
+                  <div key={cat} className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-background">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Tag className="w-3 h-3 text-primary shrink-0" />
+                      <span className="text-sm text-foreground truncate">{cat}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">({itemCount} items)</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteCategory(cat)}
+                      className="text-muted-foreground hover:text-destructive transition-colors shrink-0 ml-2"
+                      title="Delete category (requires admin password)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Password Confirmation Dialog */}
+      <Dialog open={!!(pendingDeleteCategory || pendingDeleteItemId)} onOpenChange={(open) => {
+        if (!open) { setPendingDeleteCategory(null); setPendingDeleteItemId(null); setAdminPasswordInput(''); }
+      }}>
+        <DialogContent className="bg-card border-border max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <Lock className="w-4 h-4 text-destructive" />
+              Admin Password Required
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            {pendingDeleteCategory
+              ? `Delete category "${pendingDeleteCategory}"? Items will be moved to another category.`
+              : 'Delete this item? This action cannot be undone.'}
+          </p>
+          <div className="space-y-3">
+            <Input
+              type="password"
+              value={adminPasswordInput}
+              onChange={e => setAdminPasswordInput(e.target.value)}
+              className="bg-background border-border"
+              placeholder="Enter admin password"
+              onKeyDown={e => e.key === 'Enter' && confirmAdminDelete()}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => { setPendingDeleteCategory(null); setPendingDeleteItemId(null); setAdminPasswordInput(''); }} className="flex-1 border-border">
+                Cancel
+              </Button>
+              <Button onClick={confirmAdminDelete} variant="destructive" className="flex-1" disabled={!adminPasswordInput}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
     </div>
   );
