@@ -3,7 +3,7 @@ name: Deploy to Homelab
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # Allows manual "Run workflow" button
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -20,13 +20,27 @@ jobs:
 
       - name: Build the app
         run: |
+          echo "=== Working directory ==="
+          pwd
+          echo "=== Listing root ==="
+          ls -la
+          cd xmrpay-flow-main
+          echo "=== Inside xmrpay-flow-main ==="
+          pwd
+          ls -la
           bun install --frozen-lockfile
           bun run build
+          echo "=== Build completed successfully ==="
 
-      - name: Restart the app
+      - name: Restart PM2
         run: |
-          cd /home/node/.openclaw/workspace/xmrpay-flow-main
+          cd xmrpay-flow-main
+          echo "=== Before PM2 restart ==="
+          pm2 status
           pm2 delete xmrpay-flow || true
           pm2 start ecosystem.config.cjs --name xmrpay-flow
           pm2 save
+          echo "=== After PM2 restart ==="
           pm2 status
+          echo "=== Port 3001 check ==="
+          ss -tlnp | grep 3001 || echo "No process on 3001"
