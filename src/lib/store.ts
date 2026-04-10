@@ -786,7 +786,8 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   checkReferralProUnlock: () => {
     const m = get().merchant;
     const activeRefs = get().referrals.filter(r => r.level === 1).length;
-    if (activeRefs >= PRO_REFERRAL_UNLOCK_COUNT && !m.proUnlockedViaReferrals) {
+    const bypass = m.devBypassReferrals;
+    if ((bypass || activeRefs >= PRO_REFERRAL_UNLOCK_COUNT) && !m.proUnlockedViaReferrals) {
       get().updateMerchant({
         plan: 'pro',
         proStatus: 'pro_referral',

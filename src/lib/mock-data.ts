@@ -340,6 +340,7 @@ export const defaultMerchant: Merchant = {
   preferredFeeTier: 'normal',
   sendMode: 'proxy',
   lifetimeProCodes: [],
+  devBypassReferrals: false,
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
