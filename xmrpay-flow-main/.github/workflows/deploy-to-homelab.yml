@@ -3,6 +3,7 @@ name: Deploy to Homelab
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:     # This allows manual trigger from GitHub UI
 
 jobs:
   deploy:
@@ -20,12 +21,13 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build app
+      - name: Build production app
         run: bun run build
 
-      - name: Restart with PM2
+      - name: Restart app with PM2
         run: |
+          cd /home/node/.openclaw/workspace/xmrpay-flow-main
           pm2 delete xmrpay-flow || true
-          pm2 start ecosystem.config.js --name xmrpay-flow
+          pm2 start ecosystem.config.cjs --name xmrpay-flow || true
           pm2 save
           pm2 status
