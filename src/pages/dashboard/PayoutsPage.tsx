@@ -243,7 +243,7 @@ export default function PayoutsPage() {
     <div className="space-y-8 max-w-3xl">
       <FadeIn>
         <h1 className="text-2xl font-bold text-foreground">Payouts & Accounting</h1>
-        <p className="text-muted-foreground text-sm">Fiat payouts, bank settlements, and accounting exports</p>
+        <p className="text-muted-foreground text-sm">Settlements and accounting exports</p>
       </FadeIn>
 
       {/* Summary Cards */}
