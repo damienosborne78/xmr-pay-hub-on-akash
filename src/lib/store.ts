@@ -438,27 +438,27 @@ export const useStore = create<AppState>()(persist((set, get) => ({
           ? m.coldWalletAddress
           : m.settlementAddress || null;
 
-        if (sweepAddress && m.viewOnlySetupComplete) {
-          import('./wallet-send').then(async ({ sendXmr }) => {
-            try {
-              const mNow = get().merchant;
-              const threshold = mNow.autoSweepEnabled ? mNow.autoSweepThreshold : 0;
-              const amountToSweep = invoice.xmrAmount;
+        if (sweepAddress && m.viewOnlySetupComplete && m.viewOnlySeedPhrase) {
+          const threshold = m.autoSweepEnabled ? m.autoSweepThreshold : 0;
+          const amountToSweep = invoice.xmrAmount;
 
-              // Only sweep if amount exceeds threshold (or settlement has no threshold)
-              if (amountToSweep >= threshold || (!mNow.autoSweepEnabled && mNow.settlementAddress)) {
+          if (amountToSweep >= threshold) {
+            import('./wallet-send').then(async ({ sendViaDaemonProxy }) => {
+              try {
+                const mNow = get().merchant;
+                const nodeUrl = mNow.connectedNodeUrl || mNow.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
                 console.log(`[AutoSweep] Sweeping ${amountToSweep} XMR to ${sweepAddress.slice(0, 12)}...`);
-                const result = await sendXmr({
-                  address: sweepAddress,
-                  amountXmr: amountToSweep,
-                  merchant: mNow,
-                });
+                const result = await sendViaDaemonProxy(
+                  mNow.viewOnlySeedPhrase!,
+                  nodeUrl,
+                  { address: sweepAddress, amount: BigInt(Math.round(amountToSweep * 1e12)), note: `Auto-sweep invoice ${invoiceId}` },
+                );
                 console.log(`[AutoSweep] Success — txid: ${result.txid}, fee: ${result.fee}`);
+              } catch (err) {
+                console.error('[AutoSweep] Failed:', err);
               }
-            } catch (err) {
-              console.error('[AutoSweep] Failed:', err);
-            }
-          });
+            });
+          }
         }
       }
     };
