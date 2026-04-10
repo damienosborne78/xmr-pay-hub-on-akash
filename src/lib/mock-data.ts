@@ -154,8 +154,7 @@ export interface Merchant {
   preferredFeeTier: 'normal' | 'fast' | 'urgent'; // default fee tier to display
   // Send mode
   sendMode: 'proxy' | 'wasm'; // Daemon Proxy (default) or Full WASM
-  // Treasury / Creator server
-  creatorServerFqdn: string; // FQDN of the self-hosted API for pro code validation
+  // Treasury / Creator server (creatorServerFqdn removed — hardcoded as CREATOR_SERVER_FQDN)
   lifetimeProCodes: { code: string; createdAt: string; usedBy?: string }[];
 }
 
@@ -164,6 +163,7 @@ export const PRO_MONTHLY_XMR = 0.05;
 export const PRO_REFERRAL_UNLOCK_COUNT = 10;
 export const CREATOR_TREASURY_ADDRESS = '47sghzufGhJJDQEbScMCwVBimTn42jXtXqfNWYGbbbB2cPmHjV9VFRxDAaBZRcsFnMoyTyXbFr4ALGSKFQN2MJN76sixoYce';
 export const REFERRAL_ECOSYSTEM_PERCENT = 50; // 50% of pro-sub goes back to referrers
+export const CREATOR_SERVER_FQDN = 'moneroflow.depincloud.net'; // Hardcoded — never changes, even in forks
 
 export interface PosUser {
   id: string;
@@ -338,7 +338,6 @@ export const defaultMerchant: Merchant = {
   webhookPaymentUrl: '',
   preferredFeeTier: 'normal',
   sendMode: 'proxy',
-  creatorServerFqdn: '',
   lifetimeProCodes: [],
 };
 
