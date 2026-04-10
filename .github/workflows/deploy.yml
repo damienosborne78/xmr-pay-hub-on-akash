@@ -24,19 +24,17 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
-      - name: Deploy built files and restart
+      - name: Deploy new build
         run: |
-          # Copy the freshly built dist folder to the permanent location
+          # Copy the freshly built files to the production folder
           rm -rf /home/node/.openclaw/workspace/xmrpay-flow-main/dist
           cp -r xmrpay-flow-main/dist /home/node/.openclaw/workspace/xmrpay-flow-main/
 
-          cd /home/node/.openclaw/workspace/xmrpay-flow-main
-          
-          echo "=== Restarting PM2 ==="
-          pm2 delete xmrpay-flow || true
-          pm2 start ecosystem.config.cjs --name xmrpay-flow
-          pm2 save
-          
-          echo "=== Final status ==="
-          pm2 status
-          ss -tlnp | grep 3001
+          echo "=== Restarting systemd service ==="
+          sudo systemctl restart xmrpay-flow
+
+          echo "=== Service status ==="
+          sudo systemctl status xmrpay-flow --no-pager -l
+
+          echo "=== Port 3001 check ==="
+          ss -tlnp | grep 3001 || echo "No process on 3001"
