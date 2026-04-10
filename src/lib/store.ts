@@ -631,38 +631,48 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return { verified, failed };
   },
 
-  activateProWithCode: (code: string) => {
+  activateProWithCode: async (code: string): Promise<boolean> => {
     const m = get().merchant;
     const upperCode = code.toUpperCase();
     
-    // Check against codes stored in the Zustand state (persisted in IndexedDB, shared via backups/server)
-    const storedCodes = m.lifetimeProCodes || [];
-    const codeEntry = storedCodes.find(c => c.code === upperCode);
+    // First, try validating against the server API (works for ALL clients)
+    try {
+      const baseUrl = window.location.origin;
+      const res = await fetch(`${baseUrl}/api/mf/codes/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: upperCode }),
+      });
+      const data = await res.json();
+      
+      if (!data.valid) return false;
+      
+      // Redeem on server
+      await fetch(`${baseUrl}/api/mf/codes/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint || 'unknown' }),
+      });
+    } catch {
+      // Fallback: check local state if server unreachable
+      const storedCodes = m.lifetimeProCodes || [];
+      const codeEntry = storedCodes.find(c => c.code === upperCode);
+      if (!codeEntry || codeEntry.usedBy) return false;
+      
+      const updatedCodes = storedCodes.map(c => 
+        c.code === upperCode ? { ...c, usedBy: m.referralWalletFingerprint || 'unknown' } : c
+      );
+      get().updateMerchant({ lifetimeProCodes: updatedCodes });
+    }
     
-    if (!codeEntry) return false;
-    if (codeEntry.usedBy) return false; // already redeemed
-    
-    // Mark code as used
-    const updatedCodes = storedCodes.map(c => 
-      c.code === upperCode ? { ...c, usedBy: m.referralWalletFingerprint || 'unknown' } : c
-    );
-    
-    // Activate lifetime pro
+    // Activate lifetime pro locally
     get().updateMerchant({
       plan: 'pro',
       proStatus: 'pro',
       proActivatedAt: new Date().toISOString(),
       proExpiresAt: '', // never expires — lifetime
       proTxid: `LIFETIME-CODE-${upperCode}`,
-      lifetimeProCodes: updatedCodes,
     });
-
-    // Sync used code to hardcoded creator server
-    fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint }),
-    }).catch(() => {}); // best-effort sync
 
     return true;
   },
