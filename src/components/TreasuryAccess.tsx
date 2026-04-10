@@ -61,8 +61,8 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     const updated = [...generatedCodes, entry];
     updateMerchant({ lifetimeProCodes: updated });
 
-    // Sync to hardcoded creator server
-    fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/create`, {
+    // Persist to server-side JSON file via local API
+    fetch(`${window.location.origin}/api/mf/codes/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry),
