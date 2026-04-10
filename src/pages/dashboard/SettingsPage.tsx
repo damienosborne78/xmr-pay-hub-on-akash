@@ -834,9 +834,17 @@ export default function SettingsPage() {
       <FadeIn delay={0.12}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Settlement</h2>
+          <p className="text-xs text-muted-foreground">
+            Incoming payments will be automatically forwarded to this address after confirmation (when set).
+          </p>
           <div className="space-y-2">
             <Label className="text-foreground">Settlement Address</Label>
             <Input value={merchant.settlementAddress} onChange={e => updateMerchant({ settlementAddress: e.target.value })} className="bg-background border-border font-mono text-xs" placeholder="Your XMR wallet address for settlement" />
+            {merchant.settlementAddress && (
+              <div className="p-2 rounded-lg bg-success/10 border border-success/20">
+                <p className="text-[11px] text-success">✓ Payments will auto-forward to this address after confirmation.</p>
+              </div>
+            )}
           </div>
         </div>
       </FadeIn>
