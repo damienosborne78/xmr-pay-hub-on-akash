@@ -2,7 +2,7 @@ name: Deploy to Homelab
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          path: xmrpay-flow-main
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -19,24 +21,28 @@ jobs:
           bun-version: latest
 
       - name: Build the app
+        working-directory: xmrpay-flow-main
         run: |
-          cd xmrpay-flow-main
           bun install --frozen-lockfile
           bun run build
-          echo "✅ Build completed"
 
       - name: Deploy new build
         run: |
-          rm -rf /home/node/.openclaw/workspace/xmrpay-flow-main/dist
-          cp -r xmrpay-flow-main/dist /home/node/.openclaw/workspace/xmrpay-flow-main/
+          set -euo pipefail
+
+          APP_DIR="/home/node/.openclaw/workspace/xmrpay-flow-main"
+          BUILD_DIR="${GITHUB_WORKSPACE}/xmrpay-flow-main/dist"
+
+          rm -rf "${APP_DIR}/dist"
+          cp -r "${BUILD_DIR}" "${APP_DIR}/"
 
           echo "✅ New build copied"
 
           echo "🔄 Restarting service..."
-          sudo systemctl restart xmrpay-flow
+          sudo -n systemctl restart xmrpay-flow
 
           echo "=== Service status ==="
-          sudo systemctl status xmrpay-flow --no-pager -l
+          sudo -n systemctl status xmrpay-flow --no-pager -l
 
           echo "=== Port check ==="
           ss -tlnp | grep 3001
