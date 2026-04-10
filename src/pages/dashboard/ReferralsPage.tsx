@@ -42,6 +42,25 @@ export default function ReferralsPage() {
   const [proTxid, setProTxid] = useState('');
   const [referralInput, setReferralInput] = useState('');
   const [proCodeInput, setProCodeInput] = useState('');
+  const [networkStatus, setNetworkStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+
+  // Check network connectivity to creator server
+  useEffect(() => {
+    const checkNetwork = async () => {
+      try {
+        const resp = await fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000),
+        });
+        setNetworkStatus(resp.ok ? 'connected' : 'disconnected');
+      } catch {
+        setNetworkStatus('disconnected');
+      }
+    };
+    checkNetwork();
+    const interval = setInterval(checkNetwork, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fingerprint = merchant.referralWalletFingerprint || merchant.referralCode || 'LOADING';
   const directReferrals = referrals.filter(r => r.level === 1).length;
@@ -486,6 +505,20 @@ export default function ReferralsPage() {
               ))}
             </div>
           )}
+        </div>
+      </FadeIn>
+
+      {/* Referrals Network Status */}
+      <FadeIn delay={0.18}>
+        <div className="flex items-center justify-center gap-2 py-4">
+          <div className={`w-2 h-2 rounded-full ${
+            networkStatus === 'connected' ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]' :
+            networkStatus === 'disconnected' ? 'bg-destructive shadow-[0_0_6px_rgba(239,68,68,0.6)]' :
+            'bg-muted-foreground animate-pulse'
+          }`} />
+          <span className="text-xs text-muted-foreground">
+            Referrals Network {networkStatus === 'connected' ? 'Connected' : networkStatus === 'disconnected' ? 'Disconnected' : 'Checking...'}
+          </span>
         </div>
       </FadeIn>
 
