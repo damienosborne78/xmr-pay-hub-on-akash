@@ -23,23 +23,20 @@ jobs:
           cd xmrpay-flow-main
           bun install --frozen-lockfile
           bun run build
-          echo "Build completed successfully"
 
-      - name: Restart PM2 correctly
+      - name: Deploy built files and restart
         run: |
+          # Copy the freshly built dist folder to the permanent location
+          rm -rf /home/node/.openclaw/workspace/xmrpay-flow-main/dist
+          cp -r xmrpay-flow-main/dist /home/node/.openclaw/workspace/xmrpay-flow-main/
+
           cd /home/node/.openclaw/workspace/xmrpay-flow-main
           
-          echo "=== Stopping old process ==="
+          echo "=== Restarting PM2 ==="
           pm2 delete xmrpay-flow || true
-          
-          echo "=== Starting new process from correct path ==="
           pm2 start ecosystem.config.cjs --name xmrpay-flow
-          
-          echo "=== Saving PM2 config ==="
           pm2 save
           
-          echo "=== Final PM2 status ==="
+          echo "=== Final status ==="
           pm2 status
-          
-          echo "=== Port check ==="
-          ss -tlnp | grep 3001 || echo "No process on 3001"
+          ss -tlnp | grep 3001
