@@ -3,23 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, Eye, EyeOff, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Server } from 'lucide-react';
+import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Server } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 
-// Treasury seed phrase — in production this would be generated once and shown to the creator
-const TREASURY_SEED = [
-  'abandon', 'ability', 'able', 'about', 'above', 'absent',
-  'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident',
-  'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire',
-  'across', 'act', 'action', 'actor', 'actress', 'actual', 'adapt'
-];
 
-// 6 backup recovery codes — each is a one-time use code
-const BACKUP_CODES = [
-  'MF-7K9X-R2P4', 'MF-3L8W-J5N1', 'MF-9Q2D-T6M8',
-  'MF-4V7H-B3K5', 'MF-6Y1C-F8W2', 'MF-2N5G-X4J9'
-];
 
 const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026';
 
@@ -43,9 +31,6 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
 
   const [step, setStep] = useState<'auth' | 'reveal' | 'locked'>('auth');
   const [passphrase, setPassphrase] = useState('');
-  const [showSeed, setShowSeed] = useState(false);
-  const [showCodes, setShowCodes] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [fqdnInput, setFqdnInput] = useState(merchant.creatorServerFqdn || '');
@@ -60,8 +45,6 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
           if (prev <= 1) {
             clearInterval(timer);
             setStep('locked');
-            setShowSeed(false);
-            setShowCodes(false);
             return 0;
           }
           return prev - 1;
@@ -73,12 +56,6 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     }
   };
 
-  const copySeed = () => {
-    navigator.clipboard.writeText(TREASURY_SEED.join(' '));
-    setCopied(true);
-    toast.success('Seed copied — store it OFFLINE immediately');
-    setTimeout(() => setCopied(false), 3000);
-  };
 
   const handleGenerateProCode = () => {
     const code = generateProCode();
@@ -114,9 +91,6 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
   const handleClose = () => {
     setStep('auth');
     setPassphrase('');
-    setShowSeed(false);
-    setShowCodes(false);
-    setCopied(false);
     setCountdown(60);
     onOpenChange(false);
   };
@@ -126,7 +100,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
       <DialogContent className="max-w-lg bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
-            <Shield className="w-5 h-5 text-primary" /> Treasury Master Access
+            <Shield className="w-5 h-5 text-primary" /> Master Access
           </DialogTitle>
         </DialogHeader>
 
@@ -138,7 +112,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
                 <div>
                   <p className="text-sm font-semibold text-destructive">Creator-Only Access</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    This reveals the treasury wallet seed phrase, backup recovery codes, and lets you generate lifetime Pro subscription codes.
+                    This lets you generate lifetime Pro subscription codes and manage your creator server.
                     Auto-locks after 60 seconds.
                   </p>
                 </div>
@@ -195,52 +169,8 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
               )}
             </div>
 
-            {/* Seed Phrase */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Treasury Seed Phrase (25 words)</label>
-                <Button variant="ghost" size="sm" onClick={() => setShowSeed(!showSeed)}>
-                  {showSeed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </Button>
-              </div>
-              <div className="p-4 rounded-lg bg-background border border-border">
-                {showSeed ? (
-                  <div className="space-y-2">
-                    <p className="font-mono text-xs text-foreground leading-relaxed break-all select-all">
-                      {TREASURY_SEED.join(' ')}
-                    </p>
-                    <Button variant="outline" size="sm" onClick={copySeed} className="border-border">
-                      {copied ? <Check className="w-3 h-3 mr-1.5" /> : <Copy className="w-3 h-3 mr-1.5" />}
-                      {copied ? 'Copied!' : 'Copy Seed'}
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Click the eye icon to reveal</p>
-                )}
-              </div>
-            </div>
 
-            {/* Backup Recovery Codes */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Backup Recovery Codes</label>
-                <Button variant="ghost" size="sm" onClick={() => setShowCodes(!showCodes)}>
-                  {showCodes ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </Button>
-              </div>
-              {showCodes && (
-                <div className="grid grid-cols-2 gap-2">
-                  {BACKUP_CODES.map((code, i) => (
-                    <div key={i} className="p-2 rounded bg-background border border-border text-center">
-                      <span className="font-mono text-xs text-primary">{code}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Each code can restore access if you lose your passphrase. Store them separately and offline.
-              </p>
-            </div>
+
 
             {/* Lifetime Pro Code Generator */}
             <div className="space-y-3 pt-2 border-t border-border">
@@ -301,7 +231,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
         {step === 'locked' && (
           <div className="text-center py-6 space-y-3">
             <Lock className="w-12 h-12 text-muted-foreground/30 mx-auto" />
-            <p className="text-sm text-muted-foreground">Session timed out. Re-authenticate to access treasury.</p>
+            <p className="text-sm text-muted-foreground">Session timed out. Re-authenticate to continue.</p>
             <Button variant="outline" onClick={() => { setStep('auth'); setCountdown(60); }}>
               Re-authenticate
             </Button>
