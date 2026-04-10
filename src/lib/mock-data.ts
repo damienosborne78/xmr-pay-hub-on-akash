@@ -156,6 +156,7 @@ export interface Merchant {
   sendMode: 'proxy' | 'wasm'; // Daemon Proxy (default) or Full WASM
   // Treasury / Creator server (creatorServerFqdn removed — hardcoded as CREATOR_SERVER_FQDN)
   lifetimeProCodes: { code: string; createdAt: string; usedBy?: string }[];
+  devBypassReferrals: boolean;
 }
 
 // Pro subscription constants
