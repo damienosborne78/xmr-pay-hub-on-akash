@@ -1,0 +1,32 @@
+name: Deploy to Homelab
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # Allows manual "Run workflow" button
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build the app
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Restart the app
+        run: |
+          cd /home/node/.openclaw/workspace/xmrpay-flow-main
+          pm2 delete xmrpay-flow || true
+          pm2 start ecosystem.config.cjs --name xmrpay-flow
+          pm2 save
+          pm2 status
