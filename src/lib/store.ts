@@ -7,7 +7,7 @@ import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } 
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
 import { normalizeMerchantSubscription } from './subscription';
-import { fetchCreatorApi } from './creator-server';
+
 
 // ─── IndexedDB storage adapter for Zustand persist ───
 function createIDBStorage() {
@@ -638,7 +638,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     
     // First, try validating against the server API (works for ALL clients)
     try {
-      const res = await fetchCreatorApi('/api/mf/codes/validate', {
+      const res = await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: upperCode }),
@@ -648,7 +648,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       if (!res.ok || !data.valid) return false;
       
       // Redeem on server
-      const redeemRes = await fetchCreatorApi('/api/mf/codes/redeem', {
+      const redeemRes = await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint || 'unknown' }),
