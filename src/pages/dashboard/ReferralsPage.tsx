@@ -48,7 +48,7 @@ export default function ReferralsPage() {
   useEffect(() => {
     const checkNetwork = async () => {
       try {
-        const resp = await fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/health`, {
+        const resp = await fetch(`${window.location.origin}/api/mf/health`, {
           method: 'GET',
           signal: AbortSignal.timeout(5000),
         });
