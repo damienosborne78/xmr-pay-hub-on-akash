@@ -79,6 +79,13 @@ export default function PosPage() {
   const [discountValue, setDiscountValue] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<{ type: 'percent' | 'fixed'; value: number } | null>(null);
 
+  // Category management state
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [pendingDeleteCategory, setPendingDeleteCategory] = useState<string | null>(null);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [pendingDeleteItemId, setPendingDeleteItemId] = useState<string | null>(null);
+
   const quickButtons = merchant.posQuickButtons || [];
   const categories = merchant.posCategories || ['Food', 'Drinks', 'Services', 'Products'];
   const modifiers = merchant.posModifiers || [];
