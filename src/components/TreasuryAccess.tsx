@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
-import { fetchCreatorApi } from '@/lib/creator-server';
+import { CREATOR_SERVER_FQDN } from '@/lib/mock-data';
 
 
 const CREATOR_PASSPHRASE = 'moneroflow-treasury-2026';
@@ -61,7 +61,7 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
     const entry = { code, createdAt: new Date().toISOString() };
 
     try {
-      const response = await fetchCreatorApi('/api/mf/codes/create', {
+      const response = await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
