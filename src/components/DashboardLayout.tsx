@@ -4,7 +4,7 @@ import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { PrivacyBanner } from '@/components/PrivacyBanner';
 import { SeedBackupWarning } from '@/components/SeedBackupWarning';
-import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher.tsx';
 import { useStore } from '@/lib/store';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
