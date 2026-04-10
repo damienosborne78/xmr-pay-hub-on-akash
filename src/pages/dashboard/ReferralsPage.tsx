@@ -11,6 +11,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TreasuryAccess } from '@/components/TreasuryAccess';
 import { isMerchantPro } from '@/lib/subscription';
+import { fetchCreatorApi } from '@/lib/creator-server';
 
 const COMMISSION_TIERS = [
   { level: 1, label: 'Direct Referral', percent: 25 },
@@ -50,8 +51,8 @@ export default function ReferralsPage() {
       try {
         const resp = await fetch(`${window.location.origin}/api/mf/health`, {
           method: 'GET',
-          signal: AbortSignal.timeout(5000),
         });
+        const resp = await fetchCreatorApi('/api/mf/health', { method: 'GET' });
         setNetworkStatus(resp.ok ? 'connected' : 'disconnected');
       } catch {
         setNetworkStatus('disconnected');

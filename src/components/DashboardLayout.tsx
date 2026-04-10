@@ -14,32 +14,73 @@ import {
 import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-// --- Simple Dark/Light toggle ---
+const THEMES = [
+  { id: 'dark', label: 'Dark', swatch: '24 100% 50%' },
+  { id: 'theme-light', label: 'Light', swatch: '0 0% 92%' },
+  { id: 'theme-rose', label: 'Rose', swatch: '350 70% 55%' },
+  { id: 'theme-lavender', label: 'Lavender', swatch: '260 60% 55%' },
+  { id: 'theme-mint', label: 'Mint', swatch: '170 60% 40%' },
+  { id: 'theme-peach', label: 'Peach', swatch: '25 85% 55%' },
+] as const;
+
 function ThemeToggle() {
-  const [dark, setDark] = useState(() => {
-    try { return localStorage.getItem('mf-theme') !== 'light'; } catch { return true; }
+  const [theme, setTheme] = useState<string>(() => {
+    try { return localStorage.getItem('mf-theme') || 'dark'; } catch { return 'dark'; }
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    if (dark) {
-      root.classList.remove('theme-light');
+    root.classList.remove('dark', 'theme-light', 'theme-rose', 'theme-lavender', 'theme-mint', 'theme-peach');
+
+    if (theme === 'dark') {
       root.classList.add('dark');
     } else {
-      root.classList.remove('dark');
-      root.classList.add('theme-light');
+      root.classList.add(theme);
     }
-    try { localStorage.setItem('mf-theme', dark ? 'dark' : 'light'); } catch {}
-  }, [dark]);
+
+    try { localStorage.setItem('mf-theme', theme); } catch {}
+  }, [theme]);
+
+  const activeTheme = THEMES.find(item => item.id === theme) || THEMES[0];
+
+  const cycleTheme = () => {
+    setTheme(current => {
+      const index = THEMES.findIndex(item => item.id === current);
+      return THEMES[(index + 1) % THEMES.length].id;
+    });
+  };
 
   return (
-    <button
-      onClick={() => setDark(d => !d)}
-      className="fixed bottom-5 right-5 z-50 w-9 h-9 rounded-full bg-popover border border-border shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-muted-foreground hover:text-foreground"
-      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-    </button>
+    <div className="fixed bottom-5 right-5 z-50">
+      <div className="relative flex h-12 w-12 items-center justify-center">
+        {THEMES.map((themeOption, index) => {
+          const angle = (Math.PI * 2 * index) / THEMES.length - Math.PI / 2;
+          const x = Math.cos(angle) * 22;
+          const y = Math.sin(angle) * 22;
+          const isActive = themeOption.id === theme;
+
+          return (
+            <span
+              key={themeOption.id}
+              className="absolute h-2.5 w-2.5 rounded-full border border-background transition-transform duration-200"
+              style={{
+                backgroundColor: `hsl(${themeOption.swatch})`,
+                transform: `translate(${x}px, ${y}px) scale(${isActive ? 1.25 : 1})`,
+                boxShadow: isActive ? '0 0 0 2px hsl(var(--card))' : 'none',
+              }}
+            />
+          );
+        })}
+
+        <button
+          onClick={cycleTheme}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-popover text-foreground shadow-lg transition-all hover:shadow-xl"
+          title={`Theme: ${activeTheme.label}`}
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
   );
 }
 

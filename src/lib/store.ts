@@ -7,6 +7,7 @@ import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } 
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
 import { normalizeMerchantSubscription } from './subscription';
+import { fetchCreatorApi } from './creator-server';
 
 // ─── IndexedDB storage adapter for Zustand persist ───
 function createIDBStorage() {
@@ -84,7 +85,7 @@ interface AppState {
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
   toggleSubscription: (id: string) => void;
   cancelSubscription: (id: string) => void;
-  createPaymentLink: (slug: string, fiatAmount: number, label: string) => PaymentLink;
+  createPaymentLink: (slug: string, fiatAmount: number, label: string, fiatCurrency?: string) => PaymentLink;
   deletePaymentLink: (id: string) => void;
   getRpcConfig: () => RpcConfig;
   autoConnectNode: () => Promise<NodeStatus | null>;
@@ -637,22 +638,22 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     
     // First, try validating against the server API (works for ALL clients)
     try {
-      const baseUrl = window.location.origin;
-      const res = await fetch(`${baseUrl}/api/mf/codes/validate`, {
+      const res = await fetchCreatorApi('/api/mf/codes/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: upperCode }),
       });
       const data = await res.json();
       
-      if (!data.valid) return false;
+      if (!res.ok || !data.valid) return false;
       
       // Redeem on server
-      await fetch(`${baseUrl}/api/mf/codes/redeem`, {
+      const redeemRes = await fetchCreatorApi('/api/mf/codes/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint || 'unknown' }),
       });
+      if (!redeemRes.ok) return false;
     } catch {
       // Fallback: check local state if server unreachable
       const storedCodes = m.lifetimeProCodes || [];
@@ -717,12 +718,13 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     }));
   },
 
-  createPaymentLink: (slug: string, fiatAmount: number, label: string) => {
+  createPaymentLink: (slug: string, fiatAmount: number, label: string, fiatCurrency?: string) => {
+    const merchant = get().merchant;
     const link: PaymentLink = {
       id: 'pl_' + Math.random().toString(36).slice(2, 8),
       slug,
       fiatAmount,
-      fiatCurrency: 'USD',
+      fiatCurrency: fiatCurrency || merchant.fiatCurrency || 'USD',
       label,
       createdAt: new Date().toISOString(),
       uses: 0,
