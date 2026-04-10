@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles } from 'lucide-react';
+import { Shield, Copy, Check, AlertTriangle, Lock, Gift, Sparkles, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 import { CREATOR_SERVER_FQDN } from '@/lib/mock-data';
@@ -179,6 +180,26 @@ export function TreasuryAccess({ open, onOpenChange }: TreasuryAccessProps) {
                   No codes generated yet. Click "Generate Code" to create one.
                 </div>
               )}
+            </div>
+
+            {/* Dev Bypass Referral Checks */}
+            <div className="p-3 rounded-lg bg-background border border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bug className="w-4 h-4 text-yellow-500" />
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Bypass Referral Checks</label>
+                    <p className="text-[10px] text-muted-foreground">Skip referral count requirement for Pro unlock (dev/testing)</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={merchant.devBypassReferrals}
+                  onCheckedChange={(checked) => {
+                    updateMerchant({ devBypassReferrals: checked });
+                    toast.success(checked ? 'Referral bypass ENABLED' : 'Referral bypass disabled');
+                  }}
+                />
+              </div>
             </div>
 
             <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">

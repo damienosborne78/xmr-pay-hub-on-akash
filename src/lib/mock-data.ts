@@ -156,6 +156,7 @@ export interface Merchant {
   sendMode: 'proxy' | 'wasm'; // Daemon Proxy (default) or Full WASM
   // Treasury / Creator server (creatorServerFqdn removed — hardcoded as CREATOR_SERVER_FQDN)
   lifetimeProCodes: { code: string; createdAt: string; usedBy?: string }[];
+  devBypassReferrals: boolean;
 }
 
 // Pro subscription constants
@@ -339,6 +340,7 @@ export const defaultMerchant: Merchant = {
   preferredFeeTier: 'normal',
   sendMode: 'proxy',
   lifetimeProCodes: [],
+  devBypassReferrals: false,
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';
