@@ -22,25 +22,27 @@ jobs:
         run: |
           echo "=== Working directory ==="
           pwd
-          echo "=== Listing root ==="
-          ls -la
           cd xmrpay-flow-main
-          echo "=== Inside xmrpay-flow-main ==="
+          echo "=== Inside project folder ==="
           pwd
           ls -la
           bun install --frozen-lockfile
           bun run build
-          echo "=== Build completed successfully ==="
+          echo "=== Build finished successfully ==="
 
-      - name: Restart PM2
+      - name: Restart PM2 with full debug
         run: |
           cd xmrpay-flow-main
-          echo "=== Before PM2 restart ==="
+          echo "=== Current PM2 processes before restart ==="
           pm2 status
+          echo "=== Killing old process ==="
           pm2 delete xmrpay-flow || true
+          echo "=== Starting new process ==="
           pm2 start ecosystem.config.cjs --name xmrpay-flow
-          pm2 save
-          echo "=== After PM2 restart ==="
+          sleep 3
+          echo "=== PM2 status after restart ==="
           pm2 status
           echo "=== Port 3001 check ==="
-          ss -tlnp | grep 3001 || echo "No process on 3001"
+          ss -tlnp | grep 3001 || echo "No process listening on 3001"
+          echo "=== Last 20 lines of PM2 logs ==="
+          pm2 logs xmrpay-flow --lines 20
