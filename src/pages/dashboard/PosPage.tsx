@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import {
   Delete, Check, Loader2, Lock, Plus, X, Tag, ShoppingBag,
   Search, Star, Clock, ParkingCircle, Percent, StickyNote,
-  Receipt, ChevronRight, Minus, Package, Sparkles, Zap
+  Receipt, ChevronRight, Minus, Package, Sparkles, Zap, Settings, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
