@@ -5,9 +5,17 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: self-hosted
+
+    env:
+      APP_NAME: xmrpay-flow
+      WORK_DIR: ${{ github.workspace }}/xmrpay-flow-main
+      TARGET_DIR: /home/node/.openclaw/workspace/xmrpay-flow-main
 
     steps:
       - name: Checkout code
@@ -20,29 +28,34 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Show paths
+        run: |
+          pwd
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          ls -la
+          ls -la "$WORK_DIR"
+
       - name: Build the app
-        working-directory: xmrpay-flow-main
+        working-directory: ${{ github.workspace }}/xmrpay-flow-main
         run: |
           bun install --frozen-lockfile
           bun run build
+          echo "✅ Build completed"
 
       - name: Deploy new build
         run: |
           set -euo pipefail
 
-          APP_DIR="/home/node/.openclaw/workspace/xmrpay-flow-main"
-          BUILD_DIR="${GITHUB_WORKSPACE}/xmrpay-flow-main/dist"
-
-          rm -rf "${APP_DIR}/dist"
-          cp -r "${BUILD_DIR}" "${APP_DIR}/"
+          rm -rf "$TARGET_DIR/dist"
+          cp -r "$WORK_DIR/dist" "$TARGET_DIR/"
 
           echo "✅ New build copied"
 
           echo "🔄 Restarting service..."
-          sudo -n systemctl restart xmrpay-flow
+          sudo -n /usr/bin/systemctl restart xmrpay-flow.service
 
           echo "=== Service status ==="
-          sudo -n systemctl status xmrpay-flow --no-pager -l
+          sudo -n /usr/bin/systemctl status xmrpay-flow.service --no-pager -l
 
           echo "=== Port check ==="
-          ss -tlnp | grep 3001
+          ss -tlnp | grep 3001 || true
