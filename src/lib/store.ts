@@ -451,9 +451,9 @@ export const useStore = create<AppState>()(persist((set, get) => ({
                 const result = await sendViaDaemonProxy(
                   mNow.viewOnlySeedPhrase!,
                   nodeUrl,
-                  { address: sweepAddress, amount: BigInt(Math.round(amountToSweep * 1e12)), note: `Auto-sweep invoice ${invoiceId}` },
+                  { recipientAddress: sweepAddress, amountXmr: amountToSweep, priority: 1, note: `Auto-sweep invoice ${invoiceId}` },
                 );
-                console.log(`[AutoSweep] Success — txid: ${result.txid}, fee: ${result.fee}`);
+                console.log(`[AutoSweep] Success — txHash: ${result.txHash}, fee: ${result.fee}`);
               } catch (err) {
                 console.error('[AutoSweep] Failed:', err);
               }
