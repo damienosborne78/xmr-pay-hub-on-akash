@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStore } from '@/lib/store';
 import { formatUSD, formatXMR, formatFiat, XMR_USD_RATE } from '@/lib/mock-data';
@@ -35,11 +34,6 @@ export default function PayoutsPage() {
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
 
-  const [autoPayoutEnabled, setAutoPayoutEnabled] = useState(false);
-  const [payoutMethod, setPayoutMethod] = useState('bank');
-  const [payoutThreshold, setPayoutThreshold] = useState(1.0);
-  const [bankAccount, setBankAccount] = useState('');
-  const [payoutCurrency, setPayoutCurrency] = useState(cur);
   const [exportRange, setExportRange] = useState('month');
 
   const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent');
