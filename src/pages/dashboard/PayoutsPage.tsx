@@ -5,11 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStore } from '@/lib/store';
 import { formatUSD, formatXMR, formatFiat, XMR_USD_RATE } from '@/lib/mock-data';
-import { Landmark, FileSpreadsheet, Download, Calendar, Check, Lock } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, Check, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
@@ -35,11 +34,6 @@ export default function PayoutsPage() {
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
 
-  const [autoPayoutEnabled, setAutoPayoutEnabled] = useState(false);
-  const [payoutMethod, setPayoutMethod] = useState('bank');
-  const [payoutThreshold, setPayoutThreshold] = useState(1.0);
-  const [bankAccount, setBankAccount] = useState('');
-  const [payoutCurrency, setPayoutCurrency] = useState(cur);
   const [exportRange, setExportRange] = useState('month');
 
   const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent');
@@ -249,7 +243,7 @@ export default function PayoutsPage() {
     <div className="space-y-8 max-w-3xl">
       <FadeIn>
         <h1 className="text-2xl font-bold text-foreground">Payouts & Accounting</h1>
-        <p className="text-muted-foreground text-sm">Fiat payouts, bank settlements, and accounting exports</p>
+        <p className="text-muted-foreground text-sm">Settlements and accounting exports</p>
       </FadeIn>
 
       {/* Summary Cards */}
@@ -273,71 +267,6 @@ export default function PayoutsPage() {
         </div>
       </FadeIn>
 
-      {/* Auto Payout */}
-      <FadeIn delay={0.08}>
-        <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-          <div className="flex items-center gap-2">
-            <Landmark className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Automatic Fiat Payouts</h2>
-            {!isPro && <ProLock />}
-          </div>
-          <p className="text-xs text-muted-foreground">Auto-convert XMR to fiat and settle to your bank account or stablecoin wallet.</p>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Enable Auto Payouts</p>
-              <p className="text-xs text-muted-foreground">Automatically convert and settle when balance exceeds threshold</p>
-            </div>
-            <Switch checked={autoPayoutEnabled} onCheckedChange={v => handleProAction(() => setAutoPayoutEnabled(v))} />
-          </div>
-
-          {autoPayoutEnabled && isPro && (
-            <div className="space-y-4 pt-3 border-t border-border">
-              <div className="space-y-2">
-                <Label className="text-foreground">Payout Method</Label>
-                <Select value={payoutMethod} onValueChange={setPayoutMethod}>
-                  <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bank">Bank Transfer (ACH/SEPA/Wire)</SelectItem>
-                    <SelectItem value="usdt">Stablecoin (USDT/USDC)</SelectItem>
-                    <SelectItem value="usdc_polygon">USDC on Polygon</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="text-foreground">Payout Currency</Label>
-                  <Select value={payoutCurrency} onValueChange={setPayoutCurrency}>
-                    <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD — US Dollar</SelectItem>
-                      <SelectItem value="EUR">EUR — Euro</SelectItem>
-                      <SelectItem value="GBP">GBP — British Pound</SelectItem>
-                      <SelectItem value="BRL">BRL — Brazilian Real</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-foreground">Payout Threshold</Label>
-                    <span className="text-sm font-mono text-primary">{payoutThreshold} XMR</span>
-                  </div>
-                  <Slider value={[payoutThreshold]} onValueChange={v => setPayoutThreshold(v[0])} min={0.1} max={10} step={0.1} className="py-2" />
-                </div>
-              </div>
-              {payoutMethod === 'bank' && (
-                <div className="space-y-2">
-                  <Label className="text-foreground">Bank Account / IBAN</Label>
-                  <Input value={bankAccount} onChange={e => setBankAccount(e.target.value)} className="bg-background border-border font-mono text-sm" placeholder="DE89 3704 0044 0532 0130 00" />
-                </div>
-              )}
-              <Button className="bg-gradient-orange hover:opacity-90" onClick={() => toast.success('Payout settings saved!')}>
-                Save Payout Settings
-              </Button>
-            </div>
-          )}
-        </div>
-      </FadeIn>
 
       {/* Accounting Export */}
       <FadeIn delay={0.1}>

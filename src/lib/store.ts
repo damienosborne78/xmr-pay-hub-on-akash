@@ -431,6 +431,36 @@ export const useStore = create<AppState>()(persist((set, get) => ({
           }),
         }).catch(() => {});
       }
+
+      // Auto-sweep to cold wallet or settlement address after payment
+      if (newStatus === 'paid' && !wasPaid) {
+        const sweepAddress = m.autoSweepEnabled && m.coldWalletAddress
+          ? m.coldWalletAddress
+          : m.settlementAddress || null;
+
+        if (sweepAddress && m.viewOnlySetupComplete && m.viewOnlySeedPhrase) {
+          const threshold = m.autoSweepEnabled ? m.autoSweepThreshold : 0;
+          const amountToSweep = invoice.xmrAmount;
+
+          if (amountToSweep >= threshold) {
+            import('./wallet-send').then(async ({ sendViaDaemonProxy }) => {
+              try {
+                const mNow = get().merchant;
+                const nodeUrl = mNow.connectedNodeUrl || mNow.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
+                console.log(`[AutoSweep] Sweeping ${amountToSweep} XMR to ${sweepAddress.slice(0, 12)}...`);
+                const result = await sendViaDaemonProxy(
+                  mNow.viewOnlySeedPhrase!,
+                  nodeUrl,
+                  { recipientAddress: sweepAddress, amountXmr: amountToSweep, priority: 1, note: `Auto-sweep invoice ${invoiceId}` },
+                );
+                console.log(`[AutoSweep] Success — txHash: ${result.txHash}, fee: ${result.fee}`);
+              } catch (err) {
+                console.error('[AutoSweep] Failed:', err);
+              }
+            });
+          }
+        }
+      }
     };
 
     // ── Strategy 1: Block Explorer scan (works for ALL wallet modes) ──

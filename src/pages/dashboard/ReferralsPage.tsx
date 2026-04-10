@@ -491,14 +491,22 @@ export default function ReferralsPage() {
 
       {/* Invisible long-press access point */}
       <div
-        className="fixed bottom-4 right-4 w-8 h-8 cursor-default select-none z-50"
+        className="fixed bottom-4 right-4 w-8 h-8 cursor-default select-none z-50 flex items-center justify-center"
         aria-hidden="true"
         onPointerDown={() => {
           const timer = setTimeout(() => setShowTreasury(true), 10000);
           const cancel = () => { clearTimeout(timer); window.removeEventListener('pointerup', cancel); };
           window.addEventListener('pointerup', cancel);
         }}
-      />
+      >
+        {/* Subtle pixel cluster — just enough to locate visually */}
+        <div className="grid grid-cols-2 gap-px opacity-30">
+          <div className="w-[2px] h-[2px] rounded-full bg-primary/80" />
+          <div className="w-[2px] h-[2px] rounded-full bg-primary/60" />
+          <div className="w-[2px] h-[2px] rounded-full bg-primary/60" />
+          <div className="w-[2px] h-[2px] rounded-full bg-primary/40" />
+        </div>
+      </div>
 
       {/* Treasury Access Dialog */}
       <TreasuryAccess open={showTreasury} onOpenChange={setShowTreasury} />

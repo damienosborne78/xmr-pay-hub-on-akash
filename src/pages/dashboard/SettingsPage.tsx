@@ -770,23 +770,6 @@ export default function SettingsPage() {
         </div>
       </FadeIn>
 
-      <FadeIn delay={0.08}>
-        <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Fiat Hedging</h2>
-          </div>
-          <p className="text-xs text-muted-foreground">Auto-convert a percentage of incoming XMR to stablecoins to protect against price drops.</p>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-foreground">Hedge Percentage</Label>
-              <span className="text-sm font-mono text-primary">{merchant.fiatHedgePercent}%</span>
-            </div>
-            <Slider value={[merchant.fiatHedgePercent]} onValueChange={v => updateMerchant({ fiatHedgePercent: v[0] })} min={0} max={100} step={5} className="py-2" />
-            <p className="text-xs text-muted-foreground">{merchant.fiatHedgePercent === 0 ? 'No hedging — 100% held in XMR' : `${merchant.fiatHedgePercent}% auto-converted to USDT, ${100 - merchant.fiatHedgePercent}% held in XMR`}</p>
-          </div>
-        </div>
-      </FadeIn>
 
       {/* Referral Settings */}
       <FadeIn delay={0.09}>
@@ -851,20 +834,18 @@ export default function SettingsPage() {
       <FadeIn delay={0.12}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Settlement</h2>
+          <p className="text-xs text-muted-foreground">
+            Incoming payments will be automatically forwarded to this address after confirmation (when set).
+          </p>
           <div className="space-y-2">
             <Label className="text-foreground">Settlement Address</Label>
             <Input value={merchant.settlementAddress} onChange={e => updateMerchant({ settlementAddress: e.target.value })} className="bg-background border-border font-mono text-xs" placeholder="Your XMR wallet address for settlement" />
+            {merchant.settlementAddress && (
+              <div className="p-2 rounded-lg bg-success/10 border border-success/20">
+                <p className="text-[11px] text-success">✓ Payments will auto-forward to this address after confirmation.</p>
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-between pt-2">
-            <div>
-              <p className="text-sm font-medium text-foreground">Hybrid Custody Mode</p>
-              <p className="text-xs text-muted-foreground">Enable self-sovereign mode — your keys, your coins</p>
-            </div>
-            <Switch checked={merchant.custodyMode === 'self-sovereign'} onCheckedChange={(v) => updateMerchant({ custodyMode: v ? 'self-sovereign' : 'managed' })} />
-          </div>
-          <Badge variant="outline" className={merchant.custodyMode === 'self-sovereign' ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted-foreground'}>
-            {merchant.custodyMode === 'self-sovereign' ? '🔐 Self-Sovereign' : '☁️ Managed'}
-          </Badge>
         </div>
       </FadeIn>
 
