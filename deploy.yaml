@@ -3,7 +3,7 @@ version: "2.0"
 
 services:
   xmr-pay-hub:
-    image: ghcr.io/YOUR-GITHUB-USERNAME/xmr-pay-hub-on-akash:latest
+    image: ghcr.io/damienosborne78/xmr-pay-hub-on-akash:latest
     expose:
       - port: 80
         as: 80
