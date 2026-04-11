@@ -1,0 +1,40 @@
+---
+version: "2.0"
+
+services:
+  xmr-pay-hub:
+    image: ghcr.io/YOUR-GITHUB-USERNAME/xmr-pay-hub-on-akash:latest
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      # Add any VITE_ environment variables your app needs (e.g. Monero RPC, API keys)
+      # Example (uncomment and customize if needed):
+      # - VITE_MONERO_RPC_URL=http://your-private-monero-node:18081
+      # - VITE_APP_NAME=XMR Pay Hub
+
+profiles:
+  compute:
+    xmr-pay-hub:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 1Gi
+        storage:
+          size: 512Mi
+
+  placement:
+    global:
+      pricing:
+        xmr-pay-hub:
+          denom: uakt
+          amount: 2000   # ~0.002 AKT/hour → very cheap (~$1-3/month per instance)
+
+deployment:
+  xmr-pay-hub:
+    xmr-pay-hub:
+      profile: xmr-pay-hub
+      count: 1
