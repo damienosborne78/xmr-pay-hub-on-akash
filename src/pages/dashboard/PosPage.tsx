@@ -284,11 +284,18 @@ export default function PosPage() {
     }
   };
 
+  const hashPassword = (pw: string) => {
+    let hash = 0;
+    for (let i = 0; i < pw.length; i++) {
+      const chr = pw.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0;
+    }
+    return 'h_' + Math.abs(hash).toString(36);
+  };
+
   const confirmAdminDelete = () => {
-    // Simple hash check — adminPasswordHash is stored as plaintext or simple hash
-    const inputHash = merchant.adminPasswordHash;
-    // For simplicity, compare raw input to stored hash (the app stores it as-is)
-    if (adminPasswordInput === merchant.adminPasswordHash || !merchant.adminPasswordHash) {
+    if (!merchant.adminPasswordHash || hashPassword(adminPasswordInput) === merchant.adminPasswordHash) {
       if (pendingDeleteItemId) {
         updateMerchant({ posQuickButtons: quickButtons.filter(b => b.id !== pendingDeleteItemId) });
         toast.success('Item removed');
@@ -296,7 +303,6 @@ export default function PosPage() {
       }
       if (pendingDeleteCategory) {
         const updated = categories.filter(c => c !== pendingDeleteCategory);
-        // Move orphaned items to first available category
         const orphaned = quickButtons.filter(b => b.category === pendingDeleteCategory);
         const fallback = updated[0] || 'Products';
         const updatedButtons = quickButtons.map(b =>
