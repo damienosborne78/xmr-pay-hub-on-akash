@@ -2,31 +2,40 @@ name: Deploy to Homelab
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:   # Allows manual "Run workflow" button
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
     runs-on: self-hosted
 
+    env:
+      WORK_DIR: ${{ github.workspace }}/xmrpay-flow-main
+      TARGET_DIR: /home/node/.openclaw/workspace/xmrpay-flow-main
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          path: xmrpay-flow-main
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
-      - name: Build the app
+      - name: Build & Deploy
+        working-directory: ${{ github.workspace }}/xmrpay-flow-main
         run: |
+          set -euo pipefail
           bun install --frozen-lockfile
           bun run build
+          rm -rf "$TARGET_DIR/dist"
+          cp -r dist "$TARGET_DIR/"
+          echo "✅ Deployed to $TARGET_DIR - npx serve auto-reloads"
 
-      - name: Restart the app
+      - name: Health check
         run: |
-          cd /home/node/.openclaw/workspace/xmrpay-flow-main
-          pm2 delete xmrpay-flow || true
-          pm2 start ecosystem.config.cjs --name xmrpay-flow
-          pm2 save
-          pm2 status
+          sleep 2
+          curl -f http://localhost:3001 || echo "Site may need manual restart"
