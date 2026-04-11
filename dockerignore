@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+.lovable
+.env
+.env.*
+*.log
+.DS_Store
+.vscode
+.idea
+xmrpay-flow-main
