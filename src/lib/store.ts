@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, CREATOR_TREASURY_VIEW_KEY, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { scanRecentOutputs, verifyTxOutputs, getTxInfo } from './block-explorer';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
@@ -900,6 +900,33 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     const twentyFourHours = 24 * 60 * 60;
     if (txInfo.timestamp > 0 && txAge > twentyFourHours) {
       return { success: false, error: 'TX is older than 24 hours. Please send a new payment.' };
+    }
+
+    // Verify TX outputs go to the treasury address using view key
+    let destinationVerified = false;
+    try {
+      const outputCheck = await verifyTxOutputs(cleanTxid, CREATOR_TREASURY_ADDRESS, CREATOR_TREASURY_VIEW_KEY);
+      if (outputCheck) {
+        if (!outputCheck.matched || outputCheck.totalAmount <= 0) {
+          return { success: false, error: 'Payment not sent to the treasury address. Please send to the correct address.' };
+        }
+        // Amount is in piconero (1 XMR = 1e12 piconero)
+        const requiredPiconero = PRO_MONTHLY_XMR * 1e12;
+        if (outputCheck.totalAmount < requiredPiconero) {
+          const receivedXmr = (outputCheck.totalAmount / 1e12).toFixed(6);
+          return { success: false, error: `Payment amount too low: ${receivedXmr} XMR received, ${PRO_MONTHLY_XMR} XMR required.` };
+        }
+        destinationVerified = true;
+        console.log(`[Pro] TX verified: ${(outputCheck.totalAmount / 1e12).toFixed(6)} XMR to treasury, ${outputCheck.confirmations} confirmations`);
+      } else {
+        console.warn('[Pro] Could not verify TX outputs via explorer — falling back to basic check');
+      }
+    } catch (e) {
+      console.warn('[Pro] Output verification failed, falling back to basic check:', e);
+    }
+
+    if (!destinationVerified) {
+      console.warn('[Pro] Destination not verified (view key may be public, not private). Accepting TX based on existence + confirmation.');
     }
 
     // All checks passed — activate Pro

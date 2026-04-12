@@ -162,7 +162,8 @@ export interface Merchant {
 // Pro subscription constants
 export const PRO_MONTHLY_XMR = 0.05;
 export const PRO_REFERRAL_UNLOCK_COUNT = 10;
-export const CREATOR_TREASURY_ADDRESS = '47sghzufGhJJDQEbScMCwVBimTn42jXtXqfNWYGbbbB2cPmHjV9VFRxDAaBZRcsFnMoyTyXbFr4ALGSKFQN2MJN76sixoYce';
+export const CREATOR_TREASURY_ADDRESS = '49C9ZpMch9s3jsjobTuPK7RRy7s5rbqjz6MfCWDCQEXpAkDUvKwrktAdc7apj39jNZY2ewvk7NmMLQPszgvMo6U9VpKf1R7';
+export const CREATOR_TREASURY_VIEW_KEY = '4317ee72671dabdad9737fd314a8aab981e5a929cf59938bddcbf1a5244eaaff';
 export const REFERRAL_ECOSYSTEM_PERCENT = 50; // 50% of pro-sub goes back to referrers
 export const CREATOR_SERVER_FQDN = 'moneroflow.depincloud.net'; // Hardcoded — never changes, even in forks
 
