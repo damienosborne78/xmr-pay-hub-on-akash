@@ -13,8 +13,8 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     expose:
-      - port: 8080
-        as: 8080
+      - port: 80
+        as: 80
         to:
           - global: true
     command:
