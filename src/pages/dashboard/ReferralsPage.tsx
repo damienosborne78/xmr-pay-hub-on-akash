@@ -582,9 +582,13 @@ export default function ReferralsPage() {
             <Button
               className="w-full bg-gradient-orange hover:opacity-90"
               onClick={handleProActivation}
-              disabled={!proTxid}
+              disabled={!proTxid || verifyingTx}
             >
-              <Zap className="w-4 h-4 mr-2" /> Activate Pro
+              {verifyingTx ? (
+                <><span className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> Verifying on-chain…</>
+              ) : (
+                <><Zap className="w-4 h-4 mr-2" /> Activate Pro</>
+              )}
             </Button>
 
             <p className="text-xs text-muted-foreground text-center">
