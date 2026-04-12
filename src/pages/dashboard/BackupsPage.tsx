@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
-import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink, AlertTriangle } from 'lucide-react';
+import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -14,11 +14,9 @@ import { Label } from '@/components/ui/label';
 import { isMerchantPro } from '@/lib/subscription';
 import {
   CLOUD_PROVIDER_CONFIGS,
-  CloudProvider,
   initiateOAuth,
   isProviderConfigured,
   isProviderConnected,
-  getCloudToken,
   clearCloudToken,
   uploadBackupToCloud,
   detectAndHandleOAuthCallback,
@@ -102,7 +100,7 @@ export default function BackupsPage() {
           setUploadingToCloud(true);
           for (const providerId of connectedList) {
             try {
-              await uploadBackupToCloud(providerId as CloudProvider, `${filename}.json.aes`, blob);
+              await uploadBackupToCloud(providerId, `${filename}.json.aes`, blob);
               toast.success(`Backup uploaded to ${CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name}`);
             } catch (err: any) {
               toast.error(`Upload to ${providerId} failed: ${err.message}`);
@@ -127,7 +125,7 @@ export default function BackupsPage() {
           setUploadingToCloud(true);
           for (const providerId of connectedList) {
             try {
-              await uploadBackupToCloud(providerId as CloudProvider, `${filename}.json`, blob);
+              await uploadBackupToCloud(providerId, `${filename}.json`, blob);
               toast.success(`Backup uploaded to ${CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name}`);
             } catch (err: any) {
               toast.error(`Upload to ${providerId} failed: ${err.message}`);
@@ -202,23 +200,15 @@ export default function BackupsPage() {
   const currentProvider = CLOUD_PROVIDER_CONFIGS.find(p => p.id === showCloudWizard);
 
   const handleCloudConnect = (providerId: string) => {
-    const configured = isProviderConfigured(providerId as CloudProvider);
-    if (!configured) {
-      const config = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId);
-      toast.error(`${config?.name} not configured. Add ${config?.clientIdEnvVar} to your environment variables.`);
-      setShowCloudWizard(providerId);
-      return;
-    }
     setShowCloudWizard(providerId);
   };
 
   const handleCloudAuthorize = async () => {
     if (!showCloudWizard) return;
-    const providerId = showCloudWizard as CloudProvider;
-    setConnectingProvider(providerId);
+    setConnectingProvider(showCloudWizard);
 
     try {
-      const authUrl = await initiateOAuth(providerId);
+      const authUrl = await initiateOAuth(showCloudWizard);
       // Redirect to OAuth provider
       window.location.href = authUrl;
     } catch (err: any) {
@@ -228,7 +218,7 @@ export default function BackupsPage() {
   };
 
   const handleDisconnectCloud = (providerId: string) => {
-    clearCloudToken(providerId as CloudProvider);
+    clearCloudToken(providerId);
     setConnectedProviders(prev => {
       const next = new Set(prev);
       next.delete(providerId);
@@ -335,7 +325,6 @@ export default function BackupsPage() {
           <div className="grid gap-3">
             {CLOUD_PROVIDER_CONFIGS.map(provider => {
               const isConnected = connectedProviders.has(provider.id);
-              const isConfigured = isProviderConfigured(provider.id);
               return (
                 <div key={provider.id} className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${isConnected ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
                   <div className="flex items-center gap-3">
@@ -343,12 +332,6 @@ export default function BackupsPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground">{provider.name}</p>
                       <p className="text-xs text-muted-foreground">{provider.desc}</p>
-                      {!isConfigured && (
-                        <p className="text-[10px] text-amber-400 flex items-center gap-1 mt-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          Needs {provider.clientIdEnvVar}
-                        </p>
-                      )}
                     </div>
                   </div>
                   {isConnected ? (
