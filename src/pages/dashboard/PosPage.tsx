@@ -517,6 +517,7 @@ export default function PosPage() {
       )}
       <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center min-h-[70vh] gap-4 lg:gap-6">
       {/* ═══ LEFT: Product Grid (Pro) ═══ */}
+      {(quickButtons.length > 0 || isPro) && (
       <div className="hidden lg:flex flex-col w-72 space-y-3 pt-2 max-h-[80vh] overflow-hidden">
         {/* Search bar */}
         <div className="relative">
@@ -679,9 +680,11 @@ export default function PosPage() {
           <p className="text-[10px] text-muted-foreground text-center">Hold a button to update its price</p>
         )}
       </div>
+      )}
 
       {/* ═══ CENTER: Keypad ═══ */}
-      <div className="w-full max-w-xs mx-auto space-y-4">
+      <div className="flex-1 flex justify-center">
+      <div className="w-full max-w-xs space-y-4">
         <div className="text-center">
           <Badge variant="outline" className="mb-3 text-primary border-primary/20">PoS Terminal</Badge>
           <div className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight tabular-nums">
@@ -829,6 +832,7 @@ export default function PosPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {/* ═══ RIGHT: Cart (Pro) ═══ */}
