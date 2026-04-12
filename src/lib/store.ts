@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
+import { isValidProCode } from './pro-codes';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { scanRecentOutputs, verifyTxOutputs } from './block-explorer';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
@@ -633,45 +634,26 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   },
 
   activateProWithCode: async (code: string): Promise<boolean> => {
-    const m = get().merchant;
-    const upperCode = code.toUpperCase();
-    
-    // First, try validating against the server API (works for ALL clients)
-    try {
-      const res = await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: upperCode }),
-      });
-      const data = await res.json();
-      
-      if (!res.ok || !data.valid) return false;
-      
-      // Redeem on server
-      const redeemRes = await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: upperCode, redeemedBy: m.referralWalletFingerprint || 'unknown' }),
-      });
-      if (!redeemRes.ok) return false;
-    } catch {
-      // Fallback: check local state if server unreachable
-      const storedCodes = m.lifetimeProCodes || [];
-      const codeEntry = storedCodes.find(c => c.code === upperCode);
-      if (!codeEntry || codeEntry.usedBy) return false;
-      
-      const updatedCodes = storedCodes.map(c => 
-        c.code === upperCode ? { ...c, usedBy: m.referralWalletFingerprint || 'unknown' } : c
-      );
-      get().updateMerchant({ lifetimeProCodes: updatedCodes });
-    }
-    
-    // Activate lifetime pro locally
+    const upperCode = code.toUpperCase().trim();
+
+    // Check if this code was already redeemed on this instance
+    const redeemedCodes: string[] = JSON.parse(localStorage.getItem('mf_redeemed_codes') || '[]');
+    if (redeemedCodes.includes(upperCode)) return false;
+
+    // Validate against hardcoded SHA-256 hashes (works fully offline)
+    const valid = await isValidProCode(upperCode);
+    if (!valid) return false;
+
+    // Mark as redeemed locally so it can't be re-used on this instance
+    redeemedCodes.push(upperCode);
+    localStorage.setItem('mf_redeemed_codes', JSON.stringify(redeemedCodes));
+
+    // Activate lifetime pro
     get().updateMerchant({
       plan: 'pro',
       proStatus: 'pro',
       proActivatedAt: new Date().toISOString(),
-      proExpiresAt: '', // never expires — lifetime
+      proExpiresAt: '',
       proTxid: `LIFETIME-CODE-${upperCode}`,
     });
 
