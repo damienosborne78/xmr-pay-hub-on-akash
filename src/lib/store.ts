@@ -8,130 +8,113 @@ import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type Node
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
 import { normalizeMerchantSubscription } from './subscription';
 
-/**
- * Hardcoded SHA-256 hashes of valid Lifetime Pro codes.
- * Codes are never stored in plaintext — only their hashes.
- * To validate: hash the user input and check if it exists in this set.
- */
-
-const PRO_CODE_HASHES: ReadonlySet<string> = new Set([
-  "77411bb6db9da29b18c938943b03bfc232411e9e15d44772fd0f0c4766175b83",
-  "df96b11d9a813a44d179232686238907c065319eb16d45eed7fce1512d70462e",
-  "261eda00388eeeba8750eb46a533aaedef20ad359646f9671df800a6ce8a16a4",
-  "9786d674eff39b5d8e3b6e9fd431187fb3b5d701e952461b10119904aea2a1b3",
-  "bdab3a76c79e9b4551fc89404bd9a69b35b10b79d01fc695a04f41f7b722176a",
-  "a3895261c60095841d1040cff0eb8ba736341e3c7e46a2449f8f91edae007932",
-  "93c7e4d03f29b481271e8a9e7907b7018f476462f47269e680aa558740462972",
-  "c72f51caca494adcd3ad3c04d5527d79f262a4b13136301c869ddd5fbe7127dc",
-  "e92592fa4c0bb22693f452323d4ae2dcecf8c6243d9d95b53b76b9ad06ac8c59",
-  "f96b2d53b316ecede406770766d16ca0e25ccd61db8c5ea35cd8f8f0f282c0a7",
-  "89031db43a6c5f11f30db6de729da71692284a48df3b41ad06e86d009e3c525e",
-  "30615f06d4c3abc4c0143dab75c11b273525fc2e4877adeeeeda1a100b6ed278",
-  "90de3dd8d7fbb514da37f321e311b6e3067e3d9e7456a11d22e6780cdf65d27f",
-  "0c56d9c4ec840c5fd2ad08e9b702608a9fd185b56ba278a7e29750a4655e9609",
-  "653db0cfa15e27911df6a0926d8d02ac557069460c71db21981c7ad5e83d17a2",
-  "7531e235adef1230ec4014233bb1de0bd32a202ab649f28efc7e6e526496b8d8",
-  "6e5e4d6bdab090df2ff0e2120c6841fbe47ad29a8801e0f9328254e387de7529",
-  "399aec25a27d4b14964b3161c6d01fc610dfcba7dbe942cf8882514742f5c157",
-  "207a5edce38e2fe249bb42b1bbb5c64ae4b874b75912cb9c36c4322571d318bb",
-  "4b31c5b20e3d2afc44ce8ea2d04995667436c42073f32aec6ff2ff87dee75e0c",
-  "880ec3b50fefb1f7c171ad6ea76260e363be5ca1dc2b043810a71fc51f0567c5",
-  "5c35376c9288780a81c91a9da0e4c08708afce823b05203cd30eeec37762bd62",
-  "f27e6464704ed4f93e914044d8f9a0e232374d1ca205c1f8abc8af273e113ec3",
-  "b75d82f70c69999eded50de2a051b41e32d0a4a27ffae85c14a6c36beffedc39",
-  "7078cd94368b6b480d78daba6cb87b71659725c11510b9cb799adb0dead161d0",
-  "5c343b3f424b3af2095ea79561bb09efc9d1a842dac0a8b062ef4aa3ff79a0b0",
-  "1298e53fc6e3172f6d94f6fdda2c4ba893b7965adddf99dedcbf8ccc8aaf0a29",
-  "a1e7c21083aca0dd7f6edb950e7982b544937efa6664cd4a8fbde36de36d4fa5",
-  "2cf4349f5db5254d69781b2014feac41b1c5708359074980aaec85063b1b9347",
-  "0d0a595302fbd7f840b12bfefbeba3242e91fa0ed7a072732eda0cb6bededf30",
-  "470ee48ea1cfa0c9a9b505f5529646a2be107f7bf3cd301ddd736c6331fc664f",
-  "c55afee06ad97a1d4cf97e052cf9f1788b822efd8472f8a9091df00d2d76299b",
-  "efa2ac2d7a8f3495d87e69258789c1b10bde5150cb81d0eae3fd72433404422d",
-  "7858f86b9c786e9e087fe10e4d2695dfa6cffbc11516165d8c32a6e95251ef4b",
-  "efa1117a7b298c502c90a6a008e71279c70a292b7b30f0ee298818de86a33db9",
-  "90cf7a4c5ceb011f34dce1b9f03aa68370d2d23b5b14cb2bb40c4dc541d776fb",
-  "e40fd08c5dd5db2e433f7bb8f5f0c05b5bbb9380134beac6bba433ca39d1ee5d",
-  "ca8901210d7b705b4c61d2410d604e6b56d6bf7fa511bd2ee9f441bd3bff5a5a",
-  "b94751fbc8398f33ceb4cf8b8d24b5d54711c268ac6ae699a29a1f844f0c9299",
-  "c5bfa8b44e2526af643ce2cef9543f21a16fb59347e3f61084dc2d8cf87cd4b9",
-  "7ab93b8ba301db9c6ac141e79a7cd0111c229522b95c3ebe946e54a1f8ea0fe0",
-  "d27124cf8c2371fe9ff6153b13b50773e066b8ba796e23a6ff3ca48baed866af",
-  "452864bb4041d18aa3494783fa989e5e91b48c23d449e9a5fb27ddbb7ef733d9",
-  "c43812f3d9187dc9cd7f04dc5d34aaf2536d211e38510bce29d765354f517272",
-  "5a928bee7342cc9468811a73be7e1bcd18812f84fbcd7dba5262e69ab18aaf29",
-  "43439c24f949062d7b5bef16681abbbd25c9d245522bcb34658b3e817ab08b19",
-  "701fc628c75327822e57ffa45e7a5fc0c34575700eca864a57de5fca6063fc45",
-  "093476ffc0ba3e178e8eaaa1122d1c23f5edc87887151a209cdc290b302740ec",
-  "25e17481675404a3d92577d95a6bd4e05b7c8f10f0b52f7fe91222c6ada7647b",
-  "607aa7bbccadd02a1fb4fe6cb659616759e251c7afc2675e85c3ff8db5c1dba2",
-  "c58606e87c5cecbabce912f40a8a28e11a8ecf1ad45a5bfc553b14ddedb5df1e",
-  "0f23e32b70daffaa0d896dbe83c35ce280c3b3116ec6c085a06f063c7f06bafb",
-  "dd17d8393fe89c125116ac68b8240726653f4d367e2739cc6ef101c966b60937",
-  "ca630cee7cca4ac38296c8f4d5e27dd1a6519116d5d40e5d6bd04258085c70c9",
-  "a02800eed8621e32af9d34292e9ffdb84477095151d9619c9e409cf01155e797",
-  "563b59ddd6b82ce33d8718385e7418843691fb580b5a17f20de2a324ddf2c148",
-  "2f84d6dad90b5a48bc1d92f5c811d8fc2cbe61cb6a660167bceec69894aea7b2",
-  "e455811f097f424020c4101b1e85ff7a197c82e12f865c333b0cfca4270c8637",
-  "0daf19086a8d2d6394a59122598206bd6437ef6189a248a2eb907759d6051558",
-  "60e1534cacffc68c793740734581126942841c72cb5b11698cf9836bec9b1719",
-  "50a6a0aa45f0b9470f30f5a1e44b90c6d990a68ac198d430d292ebeb511d16d5",
-  "bf6a90f5e7cf1a09d662483fb01b8604a4bd4bd0169dfb3ce114a50b6cab8f4e",
-  "59a6121930991296aa104b6523865e9bcf0d3037b56cafa684ad079607910a74",
-  "ee394d1ac06cf1c4daefae376732975d3bd49ceff1416bd42fa249f193923768",
-  "db72f1356202647c65054a5a31a258c436d96c7c659e3f89fbbf0454cfc191f1",
-  "043c786f13576b2e9f9b51dc92b5243d4084d492cff3aff2f2bb034ebd67118e",
-  "5b9eb41337ec6012a8822ca0b224392c69c64e804cf30b2a5499df7a9faa9b7c",
-  "243d05332002d0c1b58dbc6d4b21fff2cc89dceb69a4a4b9d43d1b43b4610bba",
-  "b93562c233ace60489152549b7c8ddcd5ab17c6ac856339474e835baaecf0754",
-  "eee1643025d7bb311f4128b4bfd0e2d6ff85d954e04a5e3b5a023bbfaf3ecfbd",
-  "67406e26db0d1be701ff5898820096cecc57f2328679dd8d65ec758d2f47912f",
-  "a455fa2ff5ea9a8dc79a1f67cf9f017256b9403cb7d83b9fbe8d1a9dd35413d3",
-  "6abdd45dc263258c5e9c22cbe475c47f9b28228ba15e5d48186ccbbf8aef8d42",
-  "065c8f97b861191ab359082b9bcd267621af69ec4f2643a1e57eacc98babd316",
-  "e5b534df5b6181a6bfcca8773066040a9566ccb4da6e9b86a9e85d1c07d4d3a6",
-  "91bfb14682c55663354cd8dcfb35ba98f63017871eddbe01d98f1857faec9031",
-  "608865e6aeb3089012570da6ceb626f57a3b480382bca1d15474862fd74842c9",
-  "59dd5e91614ed4b45d50f7ddeaec6fda96794888f5a9608c52ed6847391bf571",
-  "8eaf41e9b2143c78eebb7e1dc9d751ceffcc7bd875bd0a010b79151b8ceb92db",
-  "b87bbbaab1c907ca690b7d18794b48d2b08105be22a9f2ff1aa60d5569753475",
-  "999c0a3722787dd9ebe5ca70c20c6dcae6d3b93d4bba34d58626e3d9b0e17684",
-  "6b1bfc0d90d48f6996a8cd4099ea430cf3295bd1bba0bf91809612b08c0906cb",
-  "69b5ba5721e3e93aa9e7a5d03d8e5eb6dba3ed4504b4e961a476d131aa471791",
-  "7276e021e9d1602630a2c5feb4e49535ecdc88fa86cfef9443aaff8832f895b1",
-  "f08dbf734ba524a9d59274fc3ba8d24fa09dc196bb3fb18361798ccd8f0852ab",
-  "eaaf306c7092e537db45955accc4fdaf1182a3309ffec75f7110123feb0e753e",
-  "7fa1a0bf2f1d1bd3453f9b5ceb46abba7921fdcfd4496e18f7a74c70b2892e7c",
-  "6c1c024f0980f81fbfd133f47c15e2ec37950272063c2ac543e64b21c62a533c",
-  "437e68b2556225e5cc52425596393ed4255f752034a5e8c5203c04c2402160c6",
-  "e284395d3c9a87ded89a0daab523c46f5eaaaa2a1442757ab4a074b02356aab5",
-  "89a6fd3c3e423d334f7ac92bb4bfbf8f5bcc324f96339ca36ace9deb67c85be1",
-  "52b31ec0319269335d9177c723ddaa1da1b0d3c844a3313cb4b401c071566fb3",
-  "7cb96e467df52377373c489fb3d859fdb5ab32b3736a6fe0b2ac55f167c9f849",
-  "4e92dc6fc914bad0b7922588e329796f3510f91e2325707f166d8c4df5307c3e",
-  "56c4ef938f11ca3ff57fc2dca70eb009255c5539cd4d1a957eaa2b93c74f08a4",
-  "1dc1b5f7a5e769226c1c97a5a9b63b9627eb12f981662fb08146edf0948bf88d",
-  "7380b9d3cc350c7e3aa6123d6b7e04d6c99129f4dfdbfaf60feb74f0306294d9",
-  "49f46db438c642bbae8ab2a7792fedff3c6411fd8f9db3e1c5ac17ccb20e1f72",
-  "bce25ab402add09abc34ab4bb443e34732ece8f9ccdeffdb91ea76a7ecd17e79",
-  "a76dbc2e1ba58f7b60c961ab548df42e85d2d4674fd334b1d6ddbdb29e28faf6",
+/** Valid Lifetime Pro codes — direct Set lookup. */
+const VALID_PRO_CODES: ReadonlySet<string> = new Set([
+  "MF-PRO-EBPVLATR",
+  "MF-PRO-9FMMSYK9",
+  "MF-PRO-ZE3DNC6P",
+  "MF-PRO-UZHQJR7Y",
+  "MF-PRO-T3724C43",
+  "MF-PRO-TZAN4PVY",
+  "MF-PRO-ZQ8KU86C",
+  "MF-PRO-QM4T2PH2",
+  "MF-PRO-DRHYR3AE",
+  "MF-PRO-VPL8Y4LG",
+  "MF-PRO-LEUELXN8",
+  "MF-PRO-5EE6CMBM",
+  "MF-PRO-Q47HTG4Y",
+  "MF-PRO-D2TVKDBK",
+  "MF-PRO-UA9TTM7H",
+  "MF-PRO-67J57B7M",
+  "MF-PRO-ARXUHEV3",
+  "MF-PRO-J6B4VDEG",
+  "MF-PRO-EGHJ9V3G",
+  "MF-PRO-X8T8ZV87",
+  "MF-PRO-FYF7D8Z4",
+  "MF-PRO-6CDHKPTQ",
+  "MF-PRO-JKK5BTSQ",
+  "MF-PRO-EYYNSL8K",
+  "MF-PRO-QGXGLTV7",
+  "MF-PRO-T7RF8DPW",
+  "MF-PRO-R8MHY5UC",
+  "MF-PRO-49MGNLW7",
+  "MF-PRO-ASBUNUPX",
+  "MF-PRO-6D7EG6K4",
+  "MF-PRO-CE8RTTGY",
+  "MF-PRO-E9L5A833",
+  "MF-PRO-FN9HYK29",
+  "MF-PRO-8BZXMNMG",
+  "MF-PRO-NEPD8V68",
+  "MF-PRO-27WYZTFF",
+  "MF-PRO-7SWDYJQQ",
+  "MF-PRO-5FK2NYEB",
+  "MF-PRO-LQ44UDWN",
+  "MF-PRO-3RJF23YL",
+  "MF-PRO-6VU462Q4",
+  "MF-PRO-MYXUSTY7",
+  "MF-PRO-24K3N5KM",
+  "MF-PRO-5DJ9MQGH",
+  "MF-PRO-3G7BEQH2",
+  "MF-PRO-DWREWZW4",
+  "MF-PRO-96Q8VAFM",
+  "MF-PRO-XZX83APN",
+  "MF-PRO-AXSJ2X2N",
+  "MF-PRO-BRSSDQ9M",
+  "MF-PRO-4DHZST79",
+  "MF-PRO-D67GYF4T",
+  "MF-PRO-NRFMTAJG",
+  "MF-PRO-QRTF8FJD",
+  "MF-PRO-PFX3W9EK",
+  "MF-PRO-D6XGEURU",
+  "MF-PRO-7FJRHH86",
+  "MF-PRO-PA7HKUX3",
+  "MF-PRO-LN9MZE8M",
+  "MF-PRO-NTUK3A4R",
+  "MF-PRO-5R226W68",
+  "MF-PRO-G3FUFYXK",
+  "MF-PRO-Q6JQZA3U",
+  "MF-PRO-XKJBTK2C",
+  "MF-PRO-ABYSHUUF",
+  "MF-PRO-XHTGPBQ5",
+  "MF-PRO-AFKQXUKY",
+  "MF-PRO-M9TGTW3W",
+  "MF-PRO-KBM2Z27Z",
+  "MF-PRO-Z27Y9CPF",
+  "MF-PRO-AY89U4XL",
+  "MF-PRO-UA55MSNP",
+  "MF-PRO-T5KBLPKN",
+  "MF-PRO-RJEV7NEA",
+  "MF-PRO-VQNLAXN8",
+  "MF-PRO-9MHAC58C",
+  "MF-PRO-X68KF92J",
+  "MF-PRO-G2C2AAVV",
+  "MF-PRO-9XHXJF7G",
+  "MF-PRO-3VVWPCLE",
+  "MF-PRO-BU5R3D4J",
+  "MF-PRO-YPWGUR8Z",
+  "MF-PRO-QWQT524T",
+  "MF-PRO-7NR8UESW",
+  "MF-PRO-8QFA4W8R",
+  "MF-PRO-TBNG6YLX",
+  "MF-PRO-P2KEYB9K",
+  "MF-PRO-F7CRVPW7",
+  "MF-PRO-BYJLLC6N",
+  "MF-PRO-SLFKLD95",
+  "MF-PRO-2LDWEQVV",
+  "MF-PRO-UYR3WGJB",
+  "MF-PRO-WLG8P6XA",
+  "MF-PRO-PNC8BTZ5",
+  "MF-PRO-U9MW3EXS",
+  "MF-PRO-FESHWDDY",
+  "MF-PRO-VAYDLTEG",
+  "MF-PRO-S2S75UPU",
+  "MF-PRO-LAKSFUX3",
+  "MF-PRO-CC444TT8",
 ]);
 
-/**
- * Validate a pro code by hashing it and checking against the hardcoded set.
- * Uses Web Crypto API (available in all modern browsers).
- */
-async function isValidProCode(code: string): Promise<boolean> {
-  const normalized = code.toUpperCase().trim();
-  const encoder = new TextEncoder();
-  const data = encoder.encode(normalized);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return PRO_CODE_HASHES.has(hashHex);
+function isValidProCode(code: string): boolean {
+  return VALID_PRO_CODES.has(code.toUpperCase().trim());
 }
-
-
 
 // ─── IndexedDB storage adapter for Zustand persist ───
 function createIDBStorage() {
@@ -204,7 +187,7 @@ interface AppState {
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
   verifyInvoiceTxHash: (invoiceId: string, txHash: string) => Promise<{ success: boolean; error?: string }>;
   verifyAllPendingInvoices: () => Promise<{ verified: number; failed: number }>;
-  activateProWithCode: (code: string) => Promise<boolean>;
+  activateProWithCode: (code: string) => boolean;
   updateMerchant: (updates: Partial<Merchant>) => void;
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
   toggleSubscription: (id: string) => void;
@@ -756,7 +739,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return { verified, failed };
   },
 
-  activateProWithCode: async (code: string): Promise<boolean> => {
+  activateProWithCode: (code: string): boolean => {
     const upperCode = code.toUpperCase().trim();
 
     // Check if this code was already redeemed on this instance
@@ -764,7 +747,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     if (redeemedCodes.includes(upperCode)) return false;
 
     // Validate against hardcoded SHA-256 hashes (works fully offline)
-    const valid = await isValidProCode(upperCode);
+    const valid = isValidProCode(upperCode);
     if (!valid) return false;
 
     // Mark as redeemed locally so it can't be re-used on this instance
@@ -889,12 +872,17 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   },
 
   activateProSubscription: (txid: string) => {
+    // Validate TX hash: must be exactly 64 hex characters
+    const cleanTxid = txid.trim();
+    if (!/^[a-fA-F0-9]{64}$/.test(cleanTxid)) {
+      return; // silently reject invalid hashes
+    }
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + 1);
     get().updateMerchant({
       plan: 'pro',
       proStatus: 'pro',
-      proTxid: txid,
+      proTxid: cleanTxid,
       proActivatedAt: new Date().toISOString(),
       proExpiresAt: expiresAt.toISOString(),
     });

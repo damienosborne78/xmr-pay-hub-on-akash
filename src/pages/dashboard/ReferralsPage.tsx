@@ -119,15 +119,14 @@ export default function ReferralsPage() {
     toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
-  const handleRedeemProCode = async () => {
+  const handleRedeemProCode = () => {
     const code = proCodeInput.trim().toUpperCase();
     if (!code || code.length < 6) {
       toast.error('Please enter a valid Pro code');
       return;
     }
 
-    // Validate & redeem via server API (falls back to local state)
-    const success = await activateProWithCode(code);
+    const success = activateProWithCode(code);
 
     if (success) {
       setProCodeInput('');
@@ -138,11 +137,12 @@ export default function ReferralsPage() {
   };
 
   const handleProActivation = () => {
-    if (!proTxid || proTxid.length < 10) {
-      toast.error('Please enter a valid transaction hash');
+    const cleanTx = proTxid.trim();
+    if (!/^[a-fA-F0-9]{64}$/.test(cleanTx)) {
+      toast.error('Invalid TX hash. Must be exactly 64 hex characters (a-f, 0-9).');
       return;
     }
-    activateProSubscription(proTxid);
+    activateProSubscription(cleanTx);
     setShowProActivation(false);
     setProTxid('');
     toast.success('🎉 Pro activated! Welcome to the elite.');
