@@ -119,15 +119,14 @@ export default function ReferralsPage() {
     toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
-  const handleRedeemProCode = async () => {
+  const handleRedeemProCode = () => {
     const code = proCodeInput.trim().toUpperCase();
     if (!code || code.length < 6) {
       toast.error('Please enter a valid Pro code');
       return;
     }
 
-    // Validate & redeem via server API (falls back to local state)
-    const success = await activateProWithCode(code);
+    const success = activateProWithCode(code);
 
     if (success) {
       setProCodeInput('');
