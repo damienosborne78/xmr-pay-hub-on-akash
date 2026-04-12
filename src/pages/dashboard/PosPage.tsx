@@ -630,7 +630,7 @@ export default function PosPage() {
                   <Tag className="w-3 h-3 text-primary shrink-0" />
                   <div className="min-w-0">
                     <span className="text-xs font-medium text-foreground truncate block">{btn.label}</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">≈ {formatXMR(usdToXmr(btn.price)).slice(0, 8)}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">≈ {formatXMR(toXmr(btn.price)).slice(0, 8)}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -698,7 +698,7 @@ export default function PosPage() {
             {isPro && cart.length > 0 ? `${sym}${cartTotal.toFixed(2)}` : `${sym}${input}`}
           </div>
           <p className="text-muted-foreground text-sm mt-1.5 font-mono">
-            ≈ {formatXMR(usdToXmr(isPro && cart.length > 0 ? cartTotal : (parseFloat(input) || 0)))}
+            ≈ {formatXMR(toXmr(isPro && cart.length > 0 ? cartTotal : (parseFloat(input) || 0)))}
           </p>
           {appliedDiscount && (
             <div className="flex items-center justify-center gap-2 mt-1">
@@ -915,7 +915,7 @@ export default function PosPage() {
                 <span>Total</span>
                 <span className="font-mono text-primary">{sym}{cartTotal.toFixed(2)}</span>
               </div>
-              <p className="text-[10px] text-muted-foreground font-mono text-right">≈ {formatXMR(usdToXmr(cartTotal))}</p>
+              <p className="text-[10px] text-muted-foreground font-mono text-right">≈ {formatXMR(toXmr(cartTotal))}</p>
             </div>
           )}
         </div>
