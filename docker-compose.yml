@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    container_name: xmr-pay-hub
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    container_name: cloudflare-tunnel
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TOKEN
+    depends_on:
+      - app   
