@@ -12,15 +12,193 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { isMerchantPro } from '@/lib/subscription';
-import {
-  CLOUD_PROVIDER_CONFIGS,
-  initiateOAuth,
-  isProviderConfigured,
-  isProviderConnected,
-  clearCloudToken,
-  uploadBackupToCloud,
-  detectAndHandleOAuthCallback,
-} from '@/lib/cloud-oauth';
+// ── Inline cloud OAuth types & config (avoids module resolution issues) ──
+
+interface CloudProviderConfig {
+  id: string;
+  name: string;
+  icon: string;
+  desc: string;
+  instructions: string;
+  authEndpoint: string;
+  tokenEndpoint: string;
+  scope: string;
+  clientId: string;
+  uploadEndpoint: string;
+}
+
+const CLOUD_PROVIDER_CONFIGS: CloudProviderConfig[] = [
+  {
+    id: 'google-drive',
+    name: 'Google Drive',
+    icon: '🟢',
+    desc: 'Back up encrypted wallet data to your Google Drive',
+    instructions: 'Click Authorize to securely connect your Google account. MoneroFlow will only access a private app folder.',
+    authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenEndpoint: 'https://oauth2.googleapis.com/token',
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    clientId: 'YOUR_GOOGLE_CLIENT_ID',
+    uploadEndpoint: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+  },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    icon: '🔵',
+    desc: 'Sync encrypted backups to your Dropbox',
+    instructions: 'Click Authorize to securely connect your Dropbox account. Backups are stored in a dedicated MoneroFlow folder.',
+    authEndpoint: 'https://www.dropbox.com/oauth2/authorize',
+    tokenEndpoint: 'https://api.dropboxapi.com/oauth2/token',
+    scope: 'files.content.write',
+    clientId: 'YOUR_DROPBOX_CLIENT_ID',
+    uploadEndpoint: 'https://content.dropboxapi.com/2/files/upload',
+  },
+  {
+    id: 'onedrive',
+    name: 'OneDrive',
+    icon: '🔷',
+    desc: 'Store encrypted backups in your OneDrive',
+    instructions: 'Click Authorize to securely connect your Microsoft account. MoneroFlow uses a private app folder for all backup data.',
+    authEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+    tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    scope: 'Files.ReadWrite.AppFolder',
+    clientId: 'YOUR_ONEDRIVE_CLIENT_ID',
+    uploadEndpoint: 'https://graph.microsoft.com/v1.0/me/drive/special/approot:/',
+  },
+];
+
+const TOKEN_PREFIX = 'moneroflow_cloud_token_';
+const VERIFIER_KEY = 'moneroflow_oauth_verifier';
+const STATE_KEY = 'moneroflow_oauth_state';
+
+function generateRandomString(length: number): string {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('').slice(0, length);
+}
+
+async function sha256(plain: string): Promise<ArrayBuffer> {
+  const encoder = new TextEncoder();
+  return crypto.subtle.digest('SHA-256', encoder.encode(plain));
+}
+
+function base64UrlEncode(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  bytes.forEach(b => (binary += String.fromCharCode(b)));
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function isProviderConfigured(providerId: string): boolean {
+  const config = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId);
+  if (!config) return false;
+  return !config.clientId.startsWith('YOUR_');
+}
+
+function isProviderConnected(providerId: string): boolean {
+  try {
+    const raw = localStorage.getItem(TOKEN_PREFIX + providerId);
+    if (!raw) return false;
+    const token = JSON.parse(raw);
+    return !!token.access_token;
+  } catch {
+    return false;
+  }
+}
+
+function getStoredToken(providerId: string): { access_token: string; refresh_token?: string; expires_at?: number } | null {
+  try {
+    const raw = localStorage.getItem(TOKEN_PREFIX + providerId);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearCloudToken(providerId: string): void {
+  localStorage.removeItem(TOKEN_PREFIX + providerId);
+}
+
+async function initiateOAuth(providerId: string): Promise<string> {
+  const config = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId);
+  if (!config) throw new Error(`Unknown provider: ${providerId}`);
+  const verifier = generateRandomString(64);
+  const challenge = base64UrlEncode(await sha256(verifier));
+  const state = generateRandomString(32);
+  localStorage.setItem(VERIFIER_KEY, JSON.stringify({ verifier, providerId }));
+  localStorage.setItem(STATE_KEY, state);
+  const redirectUri = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams({
+    client_id: config.clientId, redirect_uri: redirectUri, response_type: 'code',
+    scope: config.scope, state, code_challenge: challenge, code_challenge_method: 'S256',
+    access_type: 'offline', prompt: 'consent',
+  });
+  return `${config.authEndpoint}?${params.toString()}`;
+}
+
+async function detectAndHandleOAuthCallback(): Promise<string | null> {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  if (!code || !state) return null;
+  const savedState = localStorage.getItem(STATE_KEY);
+  if (state !== savedState) return null;
+  const verifierData = localStorage.getItem(VERIFIER_KEY);
+  if (!verifierData) return null;
+  const { verifier, providerId } = JSON.parse(verifierData);
+  const config = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId);
+  if (!config) return null;
+  const cleanUrl = window.location.origin + window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code', code, redirect_uri: cleanUrl,
+      client_id: config.clientId, code_verifier: verifier,
+    });
+    const resp = await fetch(config.tokenEndpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
+    });
+    if (!resp.ok) throw new Error(`Token exchange failed: ${resp.status}`);
+    const tokenData = await resp.json();
+    localStorage.setItem(TOKEN_PREFIX + providerId, JSON.stringify({
+      access_token: tokenData.access_token, refresh_token: tokenData.refresh_token,
+      expires_at: Date.now() + (tokenData.expires_in || 3600) * 1000,
+    }));
+    localStorage.removeItem(VERIFIER_KEY);
+    localStorage.removeItem(STATE_KEY);
+    return providerId;
+  } catch (err) {
+    console.error('OAuth token exchange failed:', err);
+    localStorage.removeItem(VERIFIER_KEY);
+    localStorage.removeItem(STATE_KEY);
+    return null;
+  }
+}
+
+async function uploadBackupToCloud(providerId: string, filename: string, data: Blob): Promise<void> {
+  const token = getStoredToken(providerId);
+  if (!token?.access_token) throw new Error('Not connected to ' + providerId);
+  const config = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId);
+  if (!config) throw new Error('Unknown provider');
+  if (providerId === 'google-drive') {
+    const metadata = { name: filename, mimeType: 'application/octet-stream' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', data);
+    const resp = await fetch(config.uploadEndpoint, { method: 'POST', headers: { Authorization: `Bearer ${token.access_token}` }, body: form });
+    if (!resp.ok) throw new Error(`Google Drive upload failed: ${resp.status}`);
+  } else if (providerId === 'dropbox') {
+    const resp = await fetch(config.uploadEndpoint, {
+      method: 'POST', headers: { Authorization: `Bearer ${token.access_token}`, 'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({ path: `/MoneroFlow/${filename}`, mode: 'overwrite' }) }, body: data,
+    });
+    if (!resp.ok) throw new Error(`Dropbox upload failed: ${resp.status}`);
+  } else if (providerId === 'onedrive') {
+    const resp = await fetch(`${config.uploadEndpoint}${filename}:/content`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${token.access_token}`, 'Content-Type': 'application/octet-stream' }, body: data,
+    });
+    if (!resp.ok) throw new Error(`OneDrive upload failed: ${resp.status}`);
+  }
+}
 
 const FREQUENCY_OPTIONS = [
   { value: '1h', label: 'Every 1 hour' },

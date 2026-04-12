@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { formatUSD, formatXMR, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS } from '@/lib/mock-data';
+import { formatUSD, formatXMR, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, PRO_REFERRAL_UNLOCK_COUNT } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FadeIn } from '@/components/FadeIn';
 import { isMerchantPro } from '@/lib/subscription';
-import { Plus, RefreshCw, Pause, Play, X, Crown, Zap, Shield, Check } from 'lucide-react';
+import { Plus, RefreshCw, Pause, Play, X, Crown, Zap, Shield, Check, Copy, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function SubscriptionsPage() {
   const merchant = useStore(s => s.merchant);
@@ -26,8 +27,13 @@ export default function SubscriptionsPage() {
   const [interval, setInterval] = useState<'weekly' | 'monthly'>('monthly');
   const [showProSignup, setShowProSignup] = useState(false);
   const [proTxid, setProTxid] = useState('');
+  const [copiedTreasury, setCopiedTreasury] = useState(false);
+  const [verifyingTx, setVerifyingTx] = useState(false);
 
   const isPro = isMerchantPro(merchant);
+  const fingerprint = merchant.referralWalletFingerprint || merchant.referralCode || 'LOADING';
+  const proPaymentId = fingerprint.padEnd(16, '0').slice(0, 16);
+  const proPaymentUri = `monero:${CREATOR_TREASURY_ADDRESS}?tx_amount=${PRO_MONTHLY_XMR.toFixed(6)}&tx_payment_id=${proPaymentId}&tx_description=MoneroFlow%20Pro%20Subscription`;
 
   const handleCreate = () => {
     if (!email || !desc || !amount || isNaN(Number(amount))) return;
@@ -37,15 +43,34 @@ export default function SubscriptionsPage() {
     setEmail(''); setDesc(''); setAmount('');
   };
 
-  const handleProActivate = () => {
-    if (!proTxid || proTxid.length < 10) {
-      toast.error('Enter a valid transaction hash');
+  const copyTreasury = () => {
+    navigator.clipboard.writeText(CREATOR_TREASURY_ADDRESS);
+    setCopiedTreasury(true);
+    toast.success('Treasury address copied!');
+    setTimeout(() => setCopiedTreasury(false), 2000);
+  };
+
+  const handleProActivation = async () => {
+    const cleanTx = proTxid.trim();
+    if (!/^[a-fA-F0-9]{64}$/.test(cleanTx)) {
+      toast.error('Invalid TX hash. Must be exactly 64 hex characters (a-f, 0-9).');
       return;
     }
-    activateProSubscription(proTxid);
-    setShowProSignup(false);
-    setProTxid('');
-    toast.success('Pro subscription activated!');
+    setVerifyingTx(true);
+    try {
+      const result = await activateProSubscription(cleanTx);
+      if (result.success) {
+        setShowProSignup(false);
+        setProTxid('');
+        toast.success('🎉 Pro activated! Your payment has been verified on-chain.');
+      } else {
+        toast.error(result.error || 'Verification failed. Please try again.');
+      }
+    } catch (e) {
+      toast.error('Could not reach the block explorer. Please try again later.');
+    } finally {
+      setVerifyingTx(false);
+    }
   };
 
   const statusColors: Record<string, string> = {
@@ -94,51 +119,9 @@ export default function SubscriptionsPage() {
               </div>
             </div>
             {!isPro && (
-              <Dialog open={showProSignup} onOpenChange={setShowProSignup}>
-                <DialogTrigger asChild>
-                  <Button className="bg-gradient-orange hover:opacity-90">
-                    <Zap className="w-4 h-4 mr-2" /> Upgrade to Pro
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-card border-border max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="text-foreground flex items-center gap-2">
-                      <Crown className="w-5 h-5 text-primary" /> Upgrade to Pro
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-2">
-                    <div className="space-y-2">
-                      {proFeatures.map(f => (
-                        <div key={f} className="flex items-center gap-2 text-sm text-foreground">
-                          <Check className="w-4 h-4 text-success shrink-0" />
-                          {f}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
-                      <p className="text-xs text-muted-foreground">Send <strong className="text-primary">{formatXMR(PRO_MONTHLY_XMR)}</strong>/month to:</p>
-                      <p className="font-mono text-[9px] text-foreground break-all select-all bg-background rounded p-2 border border-border">
-                        {CREATOR_TREASURY_ADDRESS}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Transaction Hash (after sending)</Label>
-                      <Input
-                        value={proTxid}
-                        onChange={e => setProTxid(e.target.value)}
-                        placeholder="Paste your TX hash here..."
-                        className="bg-background border-border font-mono text-xs"
-                      />
-                    </div>
-
-                    <Button onClick={handleProActivate} className="w-full bg-gradient-orange hover:opacity-90">
-                      <Shield className="w-4 h-4 mr-2" /> Activate Pro
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button className="bg-gradient-orange hover:opacity-90" onClick={() => setShowProSignup(true)}>
+                <Zap className="w-4 h-4 mr-2" /> Upgrade to Pro
+              </Button>
             )}
           </div>
 
@@ -154,6 +137,76 @@ export default function SubscriptionsPage() {
           )}
         </div>
       </FadeIn>
+
+      {/* ── Pro Activation Dialog (full QR code style from Referrals) ── */}
+      <Dialog open={showProSignup} onOpenChange={setShowProSignup}>
+        <DialogContent className="max-w-lg bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <Crown className="w-5 h-5 text-primary" /> Activate Pro Subscription
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 rounded-lg bg-background border border-border text-center">
+              <p className="text-2xl font-bold text-primary mb-1">{PRO_MONTHLY_XMR} XMR<span className="text-sm text-muted-foreground font-normal">/month</span></p>
+              <p className="text-xs text-muted-foreground">Or refer {PRO_REFERRAL_UNLOCK_COUNT} merchants for free Pro forever</p>
+            </div>
+
+            <div className="space-y-2">
+              {proFeatures.map(f => (
+                <div key={f} className="flex items-center gap-2 text-sm text-foreground">
+                  <Check className="w-4 h-4 text-success shrink-0" />
+                  {f}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">1. Send XMR to this address:</p>
+              <div className="p-3 rounded-lg bg-background border border-border">
+                <p className="font-mono text-xs text-muted-foreground break-all leading-relaxed">{CREATOR_TREASURY_ADDRESS}</p>
+                <Button variant="outline" size="sm" onClick={copyTreasury} className="mt-2 border-border hover:border-primary/50">
+                  {copiedTreasury ? <Check className="w-3 h-3 mr-1.5" /> : <Copy className="w-3 h-3 mr-1.5" />}
+                  {copiedTreasury ? 'Copied' : 'Copy Address'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">2. Include this Payment ID:</p>
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <p className="font-mono text-sm text-primary text-center tracking-wider">{proPaymentId}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-center p-4 bg-white rounded-lg w-fit mx-auto">
+              <QRCodeSVG value={proPaymentUri} size={180} />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">3. Paste your TX hash to activate:</p>
+              <Input
+                value={proTxid}
+                onChange={e => setProTxid(e.target.value)}
+                placeholder="Transaction hash (64 hex characters)"
+                className="bg-background border-border font-mono text-sm"
+              />
+            </div>
+
+            <Button
+              className="w-full bg-gradient-orange hover:opacity-90"
+              onClick={handleProActivation}
+              disabled={!proTxid || verifyingTx}
+            >
+              {verifyingTx ? (
+                <><span className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> Verifying on-chain…</>
+              ) : (
+                <><Zap className="w-4 h-4 mr-2" /> Activate Pro</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Recurring Subscriptions ── */}
       <FadeIn delay={0.05}>
