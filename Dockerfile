@@ -1,18 +1,15 @@
-# Stage 1: Build React app
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --frozen-lockfile
-COPY . .
-RUN npm run build
+# Install cloudflared and a process manager
+RUN apk add --no-cache curl dumb-init
 
-# Stage 2: nginx:alpine (CLEAN)
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
+# Download and install cloudflared
+RUN curl -s -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && \
+    chmod +x /usr/local/bin/cloudflared
 
-# CRITICAL: Copy nginx.conf for SPA
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Create a startup script
+RUN echo '#!/bin/sh
+nginx -g "daemon off;" &
+exec dumb-init -- cloudflared tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}' > /start.sh
+RUN chmod +x /start.sh
 
-EXPOSE 80
-USER root
-CMD ["nginx", "-g", "daemon off;"]
+# Use the startup script as the command
+CMD ["/start.sh"]   
