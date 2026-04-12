@@ -136,16 +136,29 @@ export default function ReferralsPage() {
     }
   };
 
-  const handleProActivation = () => {
+  const [verifyingTx, setVerifyingTx] = useState(false);
+
+  const handleProActivation = async () => {
     const cleanTx = proTxid.trim();
     if (!/^[a-fA-F0-9]{64}$/.test(cleanTx)) {
       toast.error('Invalid TX hash. Must be exactly 64 hex characters (a-f, 0-9).');
       return;
     }
-    activateProSubscription(cleanTx);
-    setShowProActivation(false);
-    setProTxid('');
-    toast.success('🎉 Pro activated! Welcome to the elite.');
+    setVerifyingTx(true);
+    try {
+      const result = await activateProSubscription(cleanTx);
+      if (result.success) {
+        setShowProActivation(false);
+        setProTxid('');
+        toast.success('🎉 Pro activated! Your payment has been verified on-chain.');
+      } else {
+        toast.error(result.error || 'Verification failed. Please try again.');
+      }
+    } catch (e) {
+      toast.error('Could not reach the block explorer. Please try again later.');
+    } finally {
+      setVerifyingTx(false);
+    }
   };
 
   const proPaymentUri = `monero:${CREATOR_TREASURY_ADDRESS}?tx_amount=${PRO_MONTHLY_XMR.toFixed(6)}&tx_payment_id=${proPaymentId}&tx_description=MoneroFlow%20Pro%20Subscription`;
