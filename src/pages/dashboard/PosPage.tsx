@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { formatFiat, formatXMR, usdToXmr, PosQuickButton, CartItem, ParkedOrder } from '@/lib/mock-data';
+import { useRates } from '@/hooks/use-rates';
+import { fiatToXmr } from '@/lib/currency-service';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,9 +42,14 @@ export default function PosPage() {
   const invoices = useStore(s => s.invoices);
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const { rates } = useRates();
   const isPro = merchant.plan === 'pro';
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
+
+  const toXmr = useCallback((amount: number) =>
+    rates ? fiatToXmr(amount, cur, rates) : usdToXmr(amount),
+  [rates, cur]);
   const users = merchant.posUsers || [];
   const activeUserId = merchant.activePosUser || 'admin';
   const activeUserName = activeUserId === 'admin' ? 'Admin' : (users.find(u => u.id === activeUserId)?.name || 'Unknown');
@@ -623,7 +630,7 @@ export default function PosPage() {
                   <Tag className="w-3 h-3 text-primary shrink-0" />
                   <div className="min-w-0">
                     <span className="text-xs font-medium text-foreground truncate block">{btn.label}</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">≈ {formatXMR(usdToXmr(btn.price)).slice(0, 8)}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">≈ {formatXMR(toXmr(btn.price)).slice(0, 8)}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -691,7 +698,7 @@ export default function PosPage() {
             {isPro && cart.length > 0 ? `${sym}${cartTotal.toFixed(2)}` : `${sym}${input}`}
           </div>
           <p className="text-muted-foreground text-sm mt-1.5 font-mono">
-            ≈ {formatXMR(usdToXmr(isPro && cart.length > 0 ? cartTotal : (parseFloat(input) || 0)))}
+            ≈ {formatXMR(toXmr(isPro && cart.length > 0 ? cartTotal : (parseFloat(input) || 0)))}
           </p>
           {appliedDiscount && (
             <div className="flex items-center justify-center gap-2 mt-1">
@@ -908,7 +915,7 @@ export default function PosPage() {
                 <span>Total</span>
                 <span className="font-mono text-primary">{sym}{cartTotal.toFixed(2)}</span>
               </div>
-              <p className="text-[10px] text-muted-foreground font-mono text-right">≈ {formatXMR(usdToXmr(cartTotal))}</p>
+              <p className="text-[10px] text-muted-foreground font-mono text-right">≈ {formatXMR(toXmr(cartTotal))}</p>
             </div>
           )}
         </div>
