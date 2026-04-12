@@ -21,7 +21,4 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-# Run as the existing 'nginx' user (already created in nginx:alpine)
-USER nginx
-
 CMD ["nginx", "-g", "daemon off;"]
