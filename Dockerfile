@@ -11,6 +11,7 @@ RUN npm run build
 
 # Stage 2: Production - Serve with nginx:alpine
 FROM nginx:alpine
+RUN echo "nameserver 1.1.1.1\nnameserver 1.0.0.1" > /etc/resolv.conf
 
 # Install curl and dumb-init
 RUN apk add --no-cache curl dumb-init
