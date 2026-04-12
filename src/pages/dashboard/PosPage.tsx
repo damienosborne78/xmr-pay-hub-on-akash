@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { formatFiat, formatXMR, usdToXmr, PosQuickButton, CartItem, ParkedOrder } from '@/lib/mock-data';
+import { useRates } from '@/hooks/use-rates';
+import { fiatToXmr } from '@/lib/currency-service';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
