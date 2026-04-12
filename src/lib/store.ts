@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
-import { scanRecentOutputs, verifyTxOutputs } from './block-explorer';
+import { scanRecentOutputs, verifyTxOutputs, getTxInfo } from './block-explorer';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
@@ -199,7 +199,7 @@ interface AppState {
   refreshNodeStatus: () => Promise<void>;
   restoreFromBackup: (data: any) => void;
   deleteAccount: () => void;
-  activateProSubscription: (txid: string) => void;
+  activateProSubscription: (txid: string) => Promise<{ success: boolean; error?: string }>;
   checkReferralProUnlock: () => boolean;
   generateReferralFingerprint: () => string;
 }
@@ -871,12 +871,41 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return fingerprint;
   },
 
-  activateProSubscription: (txid: string) => {
-    // Validate TX hash: must be exactly 64 hex characters
-    const cleanTxid = txid.trim();
-    if (!/^[a-fA-F0-9]{64}$/.test(cleanTxid)) {
-      return; // silently reject invalid hashes
+  activateProSubscription: async (txid: string) => {
+    const cleanTxid = txid.trim().toLowerCase();
+    if (!/^[a-fA-F0-9]{64}$/i.test(cleanTxid)) {
+      return { success: false, error: 'Invalid TX hash. Must be exactly 64 hex characters.' };
     }
+
+    // Check if TX hash was already used
+    const usedKey = 'mf_used_pro_txids';
+    const usedRaw = localStorage.getItem(usedKey);
+    const usedHashes: string[] = usedRaw ? JSON.parse(usedRaw) : [];
+    if (usedHashes.includes(cleanTxid)) {
+      return { success: false, error: 'This TX hash has already been used for a Pro activation.' };
+    }
+
+    // Verify TX on blockchain via block explorer
+    const txInfo = await getTxInfo(cleanTxid);
+    if (!txInfo) {
+      return { success: false, error: 'TX not found on the blockchain. Please check the hash and try again.' };
+    }
+    if (txInfo.confirmations < 1) {
+      return { success: false, error: 'TX needs at least 1 block confirmation. Please wait a few minutes and try again.' };
+    }
+
+    // Check TX is recent (within 24 hours)
+    const now = Math.floor(Date.now() / 1000);
+    const txAge = now - txInfo.timestamp;
+    const twentyFourHours = 24 * 60 * 60;
+    if (txInfo.timestamp > 0 && txAge > twentyFourHours) {
+      return { success: false, error: 'TX is older than 24 hours. Please send a new payment.' };
+    }
+
+    // All checks passed — activate Pro
+    usedHashes.push(cleanTxid);
+    localStorage.setItem(usedKey, JSON.stringify(usedHashes));
+
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + 1);
     get().updateMerchant({
@@ -886,6 +915,8 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       proActivatedAt: new Date().toISOString(),
       proExpiresAt: expiresAt.toISOString(),
     });
+
+    return { success: true };
   },
 
   checkReferralProUnlock: () => {
