@@ -2,39 +2,52 @@
 version: "2.0"
 
 services:
-  xmr-pay-hub:
-    image: ghcr.io/damienosborne78/xmr-pay-hub-on-akash:latest
+  nginx:
+    image: docker.io/damienosborne78/xmr-pay-hub-on-akash:v1.9
     expose:
-      - port: 80
-        as: 80
+      - port: 8080
+        as: 8080
         to:
           - global: true
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    expose:
+      - port: 8080
+        as: 8080
+        to:
+          - global: true
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - ${TUNNEL_TOKEN}  # Set in Akash Console env vars
     env:
-      # Add any VITE_ environment variables your app needs (e.g. Monero RPC, API keys)
-      # Example (uncomment and customize if needed):
-      # - VITE_MONERO_RPC_URL=http://your-private-monero-node:18081
-      # - VITE_APP_NAME=XMR Pay Hub
+      - TUNNEL_TOKEN
 
 profiles:
   compute:
-    xmr-pay-hub:
+    nginx:
       resources:
         cpu:
-          units: 0.5
+          units: 0.25
         memory:
-          size: 1Gi
+          size: 512Mi
         storage:
           size: 512Mi
-
   placement:
     global:
       pricing:
-        xmr-pay-hub:
+        nginx:
           denom: uakt
-          amount: 2000   # ~0.002 AKT/hour → very cheap (~$1-3/month per instance)
+          amount: 2000
 
 deployment:
-  xmr-pay-hub:
-    xmr-pay-hub:
-      profile: xmr-pay-hub
+  nginx:
+    nginx:
+      profile: nginx
+      count: 1
+    cloudflared:
+      profile: nginx
       count: 1
