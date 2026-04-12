@@ -380,65 +380,32 @@ export default function BackupsPage() {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{currentProvider?.instructions}</p>
 
-            {currentProvider && !isProviderConfigured(currentProvider.id) && (
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
-                <p className="text-xs text-amber-400 font-medium flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  OAuth App Not Configured
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  To connect {currentProvider.name}, you need to:
-                </p>
-                <ol className="text-[11px] text-muted-foreground list-decimal list-inside space-y-1">
-                  {currentProvider.id === 'google-drive' && (
-                    <>
-                      <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-primary underline">Google Cloud Console</a></li>
-                      <li>Create an OAuth 2.0 Client ID (Web application)</li>
-                      <li>Add <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code> as an authorized redirect URI</li>
-                      <li>Copy the Client ID and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_GOOGLE_DRIVE_CLIENT_ID</code></li>
-                    </>
-                  )}
-                  {currentProvider.id === 'dropbox' && (
-                    <>
-                      <li>Go to <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener" className="text-primary underline">Dropbox App Console</a></li>
-                      <li>Create app → Scoped Access → Full Dropbox</li>
-                      <li>Add <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code> as a redirect URI</li>
-                      <li>Enable PKCE in the app settings</li>
-                      <li>Copy the App Key and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_DROPBOX_CLIENT_ID</code></li>
-                    </>
-                  )}
-                  {currentProvider.id === 'onedrive' && (
-                    <>
-                      <li>Go to <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps" target="_blank" rel="noopener" className="text-primary underline">Azure App Registrations</a></li>
-                      <li>Register a new app → Set "Personal Microsoft accounts" as supported account type</li>
-                      <li>Add a "Single-page application" redirect URI: <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code></li>
-                      <li>Copy the Application (client) ID and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_ONEDRIVE_CLIENT_ID</code></li>
-                    </>
-                  )}
-                </ol>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">1</span>
+                </div>
+                <p className="text-xs text-foreground">Click "Authorize" to open {currentProvider?.name}'s secure sign-in page</p>
               </div>
-            )}
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">2</span>
+                </div>
+                <p className="text-xs text-foreground">Sign in and grant MoneroFlow permission to create a backup folder</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">3</span>
+                </div>
+                <p className="text-xs text-foreground">You'll be redirected back here automatically</p>
+              </div>
+            </div>
 
-            {currentProvider && isProviderConfigured(currentProvider.id) && (
-              <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">1</span>
-                  </div>
-                  <p className="text-xs text-foreground">Click "Authorize" to open {currentProvider.name}'s secure sign-in page</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">2</span>
-                  </div>
-                  <p className="text-xs text-foreground">Sign in and grant MoneroFlow permission to create a backup folder</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">3</span>
-                  </div>
-                  <p className="text-xs text-foreground">You'll be redirected back here automatically</p>
-                </div>
+            {currentProvider && !isProviderConfigured(currentProvider.id) && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-[11px] text-amber-400">
+                  ⚠ This provider is not yet enabled. Contact your administrator to configure cloud backups.
+                </p>
               </div>
             )}
 
