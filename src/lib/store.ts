@@ -908,12 +908,17 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   },
 
   activateProSubscription: (txid: string) => {
+    // Validate TX hash: must be exactly 64 hex characters
+    const cleanTxid = txid.trim();
+    if (!/^[a-fA-F0-9]{64}$/.test(cleanTxid)) {
+      return; // silently reject invalid hashes
+    }
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + 1);
     get().updateMerchant({
       plan: 'pro',
       proStatus: 'pro',
-      proTxid: txid,
+      proTxid: cleanTxid,
       proActivatedAt: new Date().toISOString(),
       proExpiresAt: expiresAt.toISOString(),
     });
