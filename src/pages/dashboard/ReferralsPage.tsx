@@ -138,11 +138,12 @@ export default function ReferralsPage() {
   };
 
   const handleProActivation = () => {
-    if (!proTxid || proTxid.length < 10) {
-      toast.error('Please enter a valid transaction hash');
+    const cleanTx = proTxid.trim();
+    if (!/^[a-fA-F0-9]{64}$/.test(cleanTx)) {
+      toast.error('Invalid TX hash. Must be exactly 64 hex characters (a-f, 0-9).');
       return;
     }
-    activateProSubscription(proTxid);
+    activateProSubscription(cleanTx);
     setShowProActivation(false);
     setProTxid('');
     toast.success('🎉 Pro activated! Welcome to the elite.');
