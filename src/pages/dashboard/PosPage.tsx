@@ -42,9 +42,14 @@ export default function PosPage() {
   const invoices = useStore(s => s.invoices);
   const merchant = useStore(s => s.merchant);
   const updateMerchant = useStore(s => s.updateMerchant);
+  const { rates } = useRates();
   const isPro = merchant.plan === 'pro';
   const sym = merchant.fiatSymbol || '$';
   const cur = merchant.fiatCurrency || 'USD';
+
+  const toXmr = useCallback((amount: number) =>
+    rates ? fiatToXmr(amount, cur, rates) : usdToXmr(amount),
+  [rates, cur]);
   const users = merchant.posUsers || [];
   const activeUserId = merchant.activePosUser || 'admin';
   const activeUserName = activeUserId === 'admin' ? 'Admin' : (users.find(u => u.id === activeUserId)?.name || 'Unknown');
