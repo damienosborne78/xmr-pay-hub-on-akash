@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
-import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink, AlertTriangle } from 'lucide-react';
+import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -14,11 +14,9 @@ import { Label } from '@/components/ui/label';
 import { isMerchantPro } from '@/lib/subscription';
 import {
   CLOUD_PROVIDER_CONFIGS,
-  CloudProvider,
   initiateOAuth,
   isProviderConfigured,
   isProviderConnected,
-  getCloudToken,
   clearCloudToken,
   uploadBackupToCloud,
   detectAndHandleOAuthCallback,
@@ -102,7 +100,7 @@ export default function BackupsPage() {
           setUploadingToCloud(true);
           for (const providerId of connectedList) {
             try {
-              await uploadBackupToCloud(providerId as CloudProvider, `${filename}.json.aes`, blob);
+              await uploadBackupToCloud(providerId, `${filename}.json.aes`, blob);
               toast.success(`Backup uploaded to ${CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name}`);
             } catch (err: any) {
               toast.error(`Upload to ${providerId} failed: ${err.message}`);
@@ -127,7 +125,7 @@ export default function BackupsPage() {
           setUploadingToCloud(true);
           for (const providerId of connectedList) {
             try {
-              await uploadBackupToCloud(providerId as CloudProvider, `${filename}.json`, blob);
+              await uploadBackupToCloud(providerId, `${filename}.json`, blob);
               toast.success(`Backup uploaded to ${CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name}`);
             } catch (err: any) {
               toast.error(`Upload to ${providerId} failed: ${err.message}`);
@@ -202,23 +200,15 @@ export default function BackupsPage() {
   const currentProvider = CLOUD_PROVIDER_CONFIGS.find(p => p.id === showCloudWizard);
 
   const handleCloudConnect = (providerId: string) => {
-    const configured = isProviderConfigured(providerId as CloudProvider);
-    if (!configured) {
-      const config = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId);
-      toast.error(`${config?.name} not configured. Add ${config?.clientIdEnvVar} to your environment variables.`);
-      setShowCloudWizard(providerId);
-      return;
-    }
     setShowCloudWizard(providerId);
   };
 
   const handleCloudAuthorize = async () => {
     if (!showCloudWizard) return;
-    const providerId = showCloudWizard as CloudProvider;
-    setConnectingProvider(providerId);
+    setConnectingProvider(showCloudWizard);
 
     try {
-      const authUrl = await initiateOAuth(providerId);
+      const authUrl = await initiateOAuth(showCloudWizard);
       // Redirect to OAuth provider
       window.location.href = authUrl;
     } catch (err: any) {
@@ -228,7 +218,7 @@ export default function BackupsPage() {
   };
 
   const handleDisconnectCloud = (providerId: string) => {
-    clearCloudToken(providerId as CloudProvider);
+    clearCloudToken(providerId);
     setConnectedProviders(prev => {
       const next = new Set(prev);
       next.delete(providerId);
@@ -335,7 +325,6 @@ export default function BackupsPage() {
           <div className="grid gap-3">
             {CLOUD_PROVIDER_CONFIGS.map(provider => {
               const isConnected = connectedProviders.has(provider.id);
-              const isConfigured = isProviderConfigured(provider.id);
               return (
                 <div key={provider.id} className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${isConnected ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
                   <div className="flex items-center gap-3">
@@ -343,12 +332,6 @@ export default function BackupsPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground">{provider.name}</p>
                       <p className="text-xs text-muted-foreground">{provider.desc}</p>
-                      {!isConfigured && (
-                        <p className="text-[10px] text-amber-400 flex items-center gap-1 mt-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          Needs {provider.clientIdEnvVar}
-                        </p>
-                      )}
                     </div>
                   </div>
                   {isConnected ? (
@@ -397,65 +380,32 @@ export default function BackupsPage() {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{currentProvider?.instructions}</p>
 
-            {currentProvider && !isProviderConfigured(currentProvider.id) && (
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
-                <p className="text-xs text-amber-400 font-medium flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  OAuth App Not Configured
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  To connect {currentProvider.name}, you need to:
-                </p>
-                <ol className="text-[11px] text-muted-foreground list-decimal list-inside space-y-1">
-                  {currentProvider.id === 'google-drive' && (
-                    <>
-                      <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-primary underline">Google Cloud Console</a></li>
-                      <li>Create an OAuth 2.0 Client ID (Web application)</li>
-                      <li>Add <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code> as an authorized redirect URI</li>
-                      <li>Copy the Client ID and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_GOOGLE_DRIVE_CLIENT_ID</code></li>
-                    </>
-                  )}
-                  {currentProvider.id === 'dropbox' && (
-                    <>
-                      <li>Go to <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener" className="text-primary underline">Dropbox App Console</a></li>
-                      <li>Create app → Scoped Access → Full Dropbox</li>
-                      <li>Add <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code> as a redirect URI</li>
-                      <li>Enable PKCE in the app settings</li>
-                      <li>Copy the App Key and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_DROPBOX_CLIENT_ID</code></li>
-                    </>
-                  )}
-                  {currentProvider.id === 'onedrive' && (
-                    <>
-                      <li>Go to <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps" target="_blank" rel="noopener" className="text-primary underline">Azure App Registrations</a></li>
-                      <li>Register a new app → Set "Personal Microsoft accounts" as supported account type</li>
-                      <li>Add a "Single-page application" redirect URI: <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code></li>
-                      <li>Copy the Application (client) ID and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_ONEDRIVE_CLIENT_ID</code></li>
-                    </>
-                  )}
-                </ol>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">1</span>
+                </div>
+                <p className="text-xs text-foreground">Click "Authorize" to open {currentProvider?.name}'s secure sign-in page</p>
               </div>
-            )}
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">2</span>
+                </div>
+                <p className="text-xs text-foreground">Sign in and grant MoneroFlow permission to create a backup folder</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary">3</span>
+                </div>
+                <p className="text-xs text-foreground">You'll be redirected back here automatically</p>
+              </div>
+            </div>
 
-            {currentProvider && isProviderConfigured(currentProvider.id) && (
-              <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">1</span>
-                  </div>
-                  <p className="text-xs text-foreground">Click "Authorize" to open {currentProvider.name}'s secure sign-in page</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">2</span>
-                  </div>
-                  <p className="text-xs text-foreground">Sign in and grant MoneroFlow permission to create a backup folder</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">3</span>
-                  </div>
-                  <p className="text-xs text-foreground">You'll be redirected back here automatically</p>
-                </div>
+            {currentProvider && !isProviderConfigured(currentProvider.id) && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-[11px] text-amber-400">
+                  ⚠ This provider is not yet enabled. Contact your administrator to configure cloud backups.
+                </p>
               </div>
             )}
 
