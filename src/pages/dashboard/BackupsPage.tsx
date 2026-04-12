@@ -4,20 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
-import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink, AlertTriangle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { isMerchantPro } from '@/lib/subscription';
-
-const CLOUD_PROVIDERS = [
-  { id: 'google-drive', name: 'Google Drive', icon: '📁', desc: 'Back up to your Google account', authUrl: 'https://accounts.google.com/o/oauth2/auth', instructions: 'Sign in with your Google account to allow MoneroFlow to store encrypted backups in a dedicated folder in your Google Drive.' },
-  { id: 'dropbox', name: 'Dropbox', icon: '📦', desc: 'Sync backups to Dropbox', authUrl: 'https://www.dropbox.com/oauth2/authorize', instructions: 'Connect your Dropbox account. MoneroFlow will create a "MoneroFlow Backups" folder to store your encrypted backup files.' },
-  { id: 'icloud', name: 'iCloud', icon: '☁️', desc: 'Apple iCloud Drive backup', authUrl: 'https://appleid.apple.com/auth/authorize', instructions: 'Sign in with your Apple ID. Backups will be saved to iCloud Drive in a MoneroFlow folder.' },
-];
+import {
+  CLOUD_PROVIDER_CONFIGS,
+  CloudProvider,
+  initiateOAuth,
+  isProviderConfigured,
+  isProviderConnected,
+  getCloudToken,
+  clearCloudToken,
+  uploadBackupToCloud,
+  detectAndHandleOAuthCallback,
+} from '@/lib/cloud-oauth';
 
 const FREQUENCY_OPTIONS = [
   { value: '1h', label: 'Every 1 hour' },
@@ -36,18 +41,41 @@ export default function BackupsPage() {
 
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [backupFrequency, setBackupFrequency] = useState('1d');
-  const [connectedCloud, setConnectedCloud] = useState<string | null>(null);
   const [encryptedBackups, setEncryptedBackups] = useState(false);
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [restoring, setRestoring] = useState(false);
   const [showCloudWizard, setShowCloudWizard] = useState<string | null>(null);
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [uploadingToCloud, setUploadingToCloud] = useState(false);
+
+  // Track connected providers reactively
+  const [connectedProviders, setConnectedProviders] = useState<Set<string>>(() => {
+    const set = new Set<string>();
+    CLOUD_PROVIDER_CONFIGS.forEach(p => {
+      if (isProviderConnected(p.id)) set.add(p.id);
+    });
+    return set;
+  });
+
+  // Handle OAuth callback on page load
+  useEffect(() => {
+    detectAndHandleOAuthCallback().then(providerId => {
+      if (providerId) {
+        setConnectedProviders(prev => new Set([...prev, providerId]));
+        const name = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name;
+        toast.success(`Connected to ${name}! Backups will sync automatically.`);
+      }
+    }).catch(err => {
+      console.error('OAuth callback error:', err);
+      toast.error(`OAuth failed: ${err.message}`);
+    });
+  }, []);
 
   const handleManualBackup = async () => {
     setExporting(true);
     try {
       const state = useStore.getState();
-      // Include ALL app data — same for both regular and encrypted backups
       const backupData = JSON.stringify({
         merchant: state.merchant,
         invoices: state.invoices,
@@ -56,7 +84,6 @@ export default function BackupsPage() {
         referrals: state.referrals,
         referralPayouts: state.referralPayouts,
         isAuthenticated: state.isAuthenticated,
-        connectedCloud,
         autoBackupEnabled,
         backupFrequency,
         encryptedBackups,
@@ -64,21 +91,55 @@ export default function BackupsPage() {
         version: '2.0',
       });
 
+      const filename = `moneroflow-backup-${Date.now()}`;
+
       if (encryptedBackups && isPro && merchant.privacyPassphrase) {
         const blob = await exportEncryptedBackup(backupData, merchant.privacyPassphrase);
+
+        // Upload to connected cloud providers
+        const connectedList = Array.from(connectedProviders);
+        if (connectedList.length > 0) {
+          setUploadingToCloud(true);
+          for (const providerId of connectedList) {
+            try {
+              await uploadBackupToCloud(providerId as CloudProvider, `${filename}.json.aes`, blob);
+              toast.success(`Backup uploaded to ${CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name}`);
+            } catch (err: any) {
+              toast.error(`Upload to ${providerId} failed: ${err.message}`);
+            }
+          }
+          setUploadingToCloud(false);
+        }
+
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `moneroflow-backup-${Date.now()}.json.aes`;
+        a.download = `${filename}.json.aes`;
         a.click();
         URL.revokeObjectURL(url);
         toast.success('Encrypted backup downloaded!');
       } else {
         const blob = new Blob([backupData], { type: 'application/json' });
+
+        // Upload to connected cloud providers
+        const connectedList = Array.from(connectedProviders);
+        if (connectedList.length > 0) {
+          setUploadingToCloud(true);
+          for (const providerId of connectedList) {
+            try {
+              await uploadBackupToCloud(providerId as CloudProvider, `${filename}.json`, blob);
+              toast.success(`Backup uploaded to ${CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name}`);
+            } catch (err: any) {
+              toast.error(`Upload to ${providerId} failed: ${err.message}`);
+            }
+          }
+          setUploadingToCloud(false);
+        }
+
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `moneroflow-backup-${Date.now()}.json`;
+        a.download = `${filename}.json`;
         a.click();
         URL.revokeObjectURL(url);
         toast.success('Backup downloaded!');
@@ -104,11 +165,9 @@ export default function BackupsPage() {
       }
       const parsed = JSON.parse(json);
       restoreFromBackup(parsed);
-      // Restore UI-local settings
-       if ('connectedCloud' in parsed) setConnectedCloud(parsed.connectedCloud || null);
-       if (typeof parsed.autoBackupEnabled === 'boolean') setAutoBackupEnabled(parsed.autoBackupEnabled);
+      if (typeof parsed.autoBackupEnabled === 'boolean') setAutoBackupEnabled(parsed.autoBackupEnabled);
       if (parsed.backupFrequency) setBackupFrequency(parsed.backupFrequency);
-       if (typeof parsed.encryptedBackups === 'boolean') setEncryptedBackups(parsed.encryptedBackups);
+      if (typeof parsed.encryptedBackups === 'boolean') setEncryptedBackups(parsed.encryptedBackups);
       const invoiceCount = parsed.invoices?.length || 0;
       const subCount = parsed.subscriptions?.length || 0;
       const userCount = parsed.merchant?.posUsers?.length || 0;
@@ -128,11 +187,9 @@ export default function BackupsPage() {
     if (!file) return;
 
     if (file.name.endsWith('.aes')) {
-      // If we have a passphrase in state, use it. Otherwise prompt.
       if (merchant.privacyPassphrase) {
         await doRestore(file, merchant.privacyPassphrase);
       } else {
-        // Prompt user for passphrase — they may have reset browser
         setPendingRestoreFile(file);
         setShowRestorePassphrasePrompt(true);
       }
@@ -142,28 +199,42 @@ export default function BackupsPage() {
     if (e.target) e.target.value = '';
   };
 
-  const currentProvider = CLOUD_PROVIDERS.find(p => p.id === showCloudWizard);
+  const currentProvider = CLOUD_PROVIDER_CONFIGS.find(p => p.id === showCloudWizard);
 
   const handleCloudConnect = (providerId: string) => {
+    const configured = isProviderConfigured(providerId as CloudProvider);
+    if (!configured) {
+      const config = CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId);
+      toast.error(`${config?.name} not configured. Add ${config?.clientIdEnvVar} to your environment variables.`);
+      setShowCloudWizard(providerId);
+      return;
+    }
     setShowCloudWizard(providerId);
   };
 
-  const handleCloudAuthorize = () => {
-    const provider = CLOUD_PROVIDERS.find(p => p.id === showCloudWizard);
-    if (!provider) return;
-    // In production, this would open an OAuth popup with the actual authUrl
-    // For now we simulate the flow since there's no backend to handle OAuth callbacks
-    toast.info(`Opening ${provider.name} authorization...`);
-    setTimeout(() => {
-      setConnectedCloud(showCloudWizard);
-      setShowCloudWizard(null);
-      toast.success(`Connected to ${provider.name}! Backups will sync automatically.`);
-    }, 1500);
+  const handleCloudAuthorize = async () => {
+    if (!showCloudWizard) return;
+    const providerId = showCloudWizard as CloudProvider;
+    setConnectingProvider(providerId);
+
+    try {
+      const authUrl = await initiateOAuth(providerId);
+      // Redirect to OAuth provider
+      window.location.href = authUrl;
+    } catch (err: any) {
+      toast.error(err.message);
+      setConnectingProvider(null);
+    }
   };
 
-  const handleDisconnectCloud = () => {
-    setConnectedCloud(null);
-    toast.success('Cloud backup disconnected');
+  const handleDisconnectCloud = (providerId: string) => {
+    clearCloudToken(providerId as CloudProvider);
+    setConnectedProviders(prev => {
+      const next = new Set(prev);
+      next.delete(providerId);
+      return next;
+    });
+    toast.success(`Disconnected from ${CLOUD_PROVIDER_CONFIGS.find(p => p.id === providerId)?.name}`);
   };
 
   return (
@@ -188,10 +259,18 @@ export default function BackupsPage() {
             </p>
           </div>
 
+          {connectedProviders.size > 0 && (
+            <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+              <p className="text-[11px] text-success">
+                ☁️ Backups will also upload to: {Array.from(connectedProviders).map(id => CLOUD_PROVIDER_CONFIGS.find(p => p.id === id)?.name).join(', ')}
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={handleManualBackup} disabled={exporting} className="bg-gradient-orange hover:opacity-90">
-              {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-              {exporting ? 'Exporting...' : 'Download Backup'}
+            <Button onClick={handleManualBackup} disabled={exporting || uploadingToCloud} className="bg-gradient-orange hover:opacity-90">
+              {exporting || uploadingToCloud ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+              {uploadingToCloud ? 'Uploading to Cloud...' : exporting ? 'Exporting...' : 'Download Backup'}
             </Button>
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={restoring} className="border-border hover:border-primary/50">
               {restoring ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
@@ -251,11 +330,12 @@ export default function BackupsPage() {
             <Cloud className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Cloud Backups</h2>
           </div>
-          <p className="text-xs text-muted-foreground">Sync backups to a cloud provider for off-device safety. Connects via OAuth — no passwords stored.</p>
+          <p className="text-xs text-muted-foreground">Sync backups to a cloud provider via real OAuth 2.0 PKCE authorization. No passwords stored — only secure tokens.</p>
 
           <div className="grid gap-3">
-            {CLOUD_PROVIDERS.map(provider => {
-              const isConnected = connectedCloud === provider.id;
+            {CLOUD_PROVIDER_CONFIGS.map(provider => {
+              const isConnected = connectedProviders.has(provider.id);
+              const isConfigured = isProviderConfigured(provider.id);
               return (
                 <div key={provider.id} className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${isConnected ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
                   <div className="flex items-center gap-3">
@@ -263,12 +343,18 @@ export default function BackupsPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground">{provider.name}</p>
                       <p className="text-xs text-muted-foreground">{provider.desc}</p>
+                      {!isConfigured && (
+                        <p className="text-[10px] text-amber-400 flex items-center gap-1 mt-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Needs {provider.clientIdEnvVar}
+                        </p>
+                      )}
                     </div>
                   </div>
                   {isConnected ? (
                     <div className="flex items-center gap-2">
                       <Badge className="bg-success/10 text-success border-success/20 text-xs">Connected</Badge>
-                      <Button variant="ghost" size="sm" onClick={handleDisconnectCloud} className="text-xs text-muted-foreground hover:text-destructive">
+                      <Button variant="ghost" size="sm" onClick={() => handleDisconnectCloud(provider.id)} className="text-xs text-muted-foreground hover:text-destructive">
                         Disconnect
                       </Button>
                     </div>
@@ -277,8 +363,10 @@ export default function BackupsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleCloudConnect(provider.id)}
+                      disabled={connectingProvider === provider.id}
                       className="border-border hover:border-primary/50"
                     >
+                      {connectingProvider === provider.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
                       Connect
                     </Button>
                   )}
@@ -287,10 +375,10 @@ export default function BackupsPage() {
             })}
           </div>
 
-          {connectedCloud && autoBackupEnabled && (
+          {connectedProviders.size > 0 && autoBackupEnabled && (
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-xs text-foreground">
-                ✅ Auto backups will sync to {CLOUD_PROVIDERS.find(p => p.id === connectedCloud)?.name} every <strong>{FREQUENCY_OPTIONS.find(f => f.value === backupFrequency)?.label?.toLowerCase()}</strong>.
+                ✅ Auto backups will sync to {Array.from(connectedProviders).map(id => CLOUD_PROVIDER_CONFIGS.find(p => p.id === id)?.name).join(', ')} every <strong>{FREQUENCY_OPTIONS.find(f => f.value === backupFrequency)?.label?.toLowerCase()}</strong>.
               </p>
             </div>
           )}
@@ -309,30 +397,71 @@ export default function BackupsPage() {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{currentProvider?.instructions}</p>
 
-            <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-xs font-bold text-primary">1</span>
-                </div>
-                <p className="text-xs text-foreground">Click "Authorize" below to open a secure sign-in window</p>
+            {currentProvider && !isProviderConfigured(currentProvider.id) && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
+                <p className="text-xs text-amber-400 font-medium flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  OAuth App Not Configured
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  To connect {currentProvider.name}, you need to:
+                </p>
+                <ol className="text-[11px] text-muted-foreground list-decimal list-inside space-y-1">
+                  {currentProvider.id === 'google-drive' && (
+                    <>
+                      <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-primary underline">Google Cloud Console</a></li>
+                      <li>Create an OAuth 2.0 Client ID (Web application)</li>
+                      <li>Add <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code> as an authorized redirect URI</li>
+                      <li>Copy the Client ID and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_GOOGLE_DRIVE_CLIENT_ID</code></li>
+                    </>
+                  )}
+                  {currentProvider.id === 'dropbox' && (
+                    <>
+                      <li>Go to <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener" className="text-primary underline">Dropbox App Console</a></li>
+                      <li>Create app → Scoped Access → Full Dropbox</li>
+                      <li>Add <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code> as a redirect URI</li>
+                      <li>Enable PKCE in the app settings</li>
+                      <li>Copy the App Key and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_DROPBOX_CLIENT_ID</code></li>
+                    </>
+                  )}
+                  {currentProvider.id === 'onedrive' && (
+                    <>
+                      <li>Go to <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps" target="_blank" rel="noopener" className="text-primary underline">Azure App Registrations</a></li>
+                      <li>Register a new app → Set "Personal Microsoft accounts" as supported account type</li>
+                      <li>Add a "Single-page application" redirect URI: <code className="text-primary bg-primary/10 px-1 rounded">{window.location.origin}/dashboard/backups</code></li>
+                      <li>Copy the Application (client) ID and set it as <code className="text-primary bg-primary/10 px-1 rounded">VITE_ONEDRIVE_CLIENT_ID</code></li>
+                    </>
+                  )}
+                </ol>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-xs font-bold text-primary">2</span>
+            )}
+
+            {currentProvider && isProviderConfigured(currentProvider.id) && (
+              <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-xs font-bold text-primary">1</span>
+                  </div>
+                  <p className="text-xs text-foreground">Click "Authorize" to open {currentProvider.name}'s secure sign-in page</p>
                 </div>
-                <p className="text-xs text-foreground">Sign in with your {currentProvider?.name} account</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-xs font-bold text-primary">3</span>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-xs font-bold text-primary">2</span>
+                  </div>
+                  <p className="text-xs text-foreground">Sign in and grant MoneroFlow permission to create a backup folder</p>
                 </div>
-                <p className="text-xs text-foreground">Grant MoneroFlow permission to create a backup folder</p>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-xs font-bold text-primary">3</span>
+                  </div>
+                  <p className="text-xs text-foreground">You'll be redirected back here automatically</p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="p-3 rounded-lg bg-success/5 border border-success/20">
               <p className="text-[11px] text-success">
-                🔐 MoneroFlow only stores encrypted backup files. We never read or access any other data in your cloud account.
+                🔐 MoneroFlow only stores encrypted backup files. We never read or access any other data in your cloud account. OAuth tokens are stored locally in your browser.
               </p>
             </div>
 
@@ -340,8 +469,16 @@ export default function BackupsPage() {
               <Button variant="outline" onClick={() => setShowCloudWizard(null)} className="flex-1 border-border">
                 Cancel
               </Button>
-              <Button onClick={handleCloudAuthorize} className="flex-1 bg-gradient-orange hover:opacity-90">
-                <ExternalLink className="w-4 h-4 mr-2" />
+              <Button
+                onClick={handleCloudAuthorize}
+                disabled={!currentProvider || !isProviderConfigured(currentProvider.id) || !!connectingProvider}
+                className="flex-1 bg-gradient-orange hover:opacity-90"
+              >
+                {connectingProvider ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                )}
                 Authorize
               </Button>
             </div>
