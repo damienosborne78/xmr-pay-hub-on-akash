@@ -1,7 +1,7 @@
 import { useStore } from '@/lib/store';
 import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, DollarSign, Shield, ArrowDownToLine, BarChart3, Users } from 'lucide-react';
+import { TrendingUp, DollarSign, BarChart3, Users } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { FadeIn } from '@/components/FadeIn';
 import { useMemo, useState } from 'react';
@@ -29,13 +29,11 @@ export default function AnalyticsPage() {
   const { rates } = useRates();
   const users = merchant.posUsers || [];
 
-  const [period, setPeriod] = useState<TimePeriod>('month');
+  const [period, setPeriod] = useState<TimePeriod>('day');
 
   const paid = invoices.filter(i => i.status === 'paid');
   const totalFiat = paid.reduce((s, i) => s + i.fiatAmount, 0);
   const totalXMR = paid.reduce((s, i) => s + i.xmrAmount, 0);
-  const hedgedFiat = totalFiat * (merchant.fiatHedgePercent / 100);
-  const exposedFiat = totalFiat - hedgedFiat;
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
 
   // All unique user IDs from invoices
@@ -99,9 +97,9 @@ export default function AnalyticsPage() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <BarChart3 className="w-7 h-7 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">Analytics & Hedging</h1>
+              <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
             </div>
-            <p className="text-muted-foreground text-sm">Revenue tracking, XMR price monitoring, and fiat hedging overview</p>
+            <p className="text-muted-foreground text-sm">Revenue tracking, XMR price monitoring, and sales overview</p>
           </div>
           <Select value={period} onValueChange={v => setPeriod(v as TimePeriod)}>
             <SelectTrigger className="w-[120px] h-9 bg-background border-border text-sm">
@@ -116,12 +114,10 @@ export default function AnalyticsPage() {
         </div>
       </FadeIn>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
           { label: 'Total Revenue', value: formatFiat(totalFiat, sym, cur), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
           { label: 'XMR Price', value: xmrPrice ? formatFiat(xmrPrice, sym, cur) : 'Loading...', sub: `live rate in ${cur}`, icon: TrendingUp, color: 'text-success' },
-          { label: 'Hedged', value: formatFiat(hedgedFiat, sym, cur), sub: `${merchant.fiatHedgePercent}% auto-converted`, icon: Shield, color: 'text-primary' },
-          { label: `${cur} Exposure`, value: formatFiat(exposedFiat, sym, cur), sub: 'held in XMR', icon: ArrowDownToLine, color: 'text-warning' },
         ].map((s, i) => (
           <FadeIn key={s.label} delay={i * 0.05}>
             <div className="p-5 rounded-xl bg-card border border-border hover:border-primary/20 transition-colors">
