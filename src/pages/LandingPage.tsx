@@ -13,7 +13,7 @@ import {
 const features = [
   { icon: Zap, title: 'Instant Setup', desc: 'Click one button — your Monero wallet is auto-generated. Start accepting payments in seconds.' },
   { icon: Shield, title: 'Self-Custody by Default', desc: 'Your keys, your coins. Browser wallet with seed phrase backup — no third parties ever touch your funds.' },
-  { icon: Globe, title: 'Multi-Currency Invoicing', desc: 'Invoice in any fiat currency, customer pays in XMR. Live rate conversion at time of order.' },
+  { icon: Globe, title: 'Multi-Currency Invoicing', desc: 'Invoice in any currency, customer pays in XMR. Live rate conversion at time of order.' },
   { icon: MonitorSmartphone, title: 'Elite PoS Terminal', desc: 'Full-featured point-of-sale with kiosk inventory, quick links, cart parking, multi-user support, and parked orders.' },
   { icon: BarChart3, title: 'Analytics & Reporting', desc: 'Real-time dashboard with revenue tracking, user performance, and exportable accounting reports.' },
   { icon: Gift, title: 'Earn XMR Referrals', desc: 'Refer merchants, earn multi-level XMR commissions forever. Refer enough and unlock Pro for free.' },

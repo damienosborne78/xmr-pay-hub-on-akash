@@ -119,7 +119,7 @@ export default function LocalizationPage() {
           <p className="text-xs text-muted-foreground">Show prices in the customer's local currency alongside XMR amount.</p>
 
           <div className="space-y-2">
-            <Label className="text-foreground">Default Fiat Currency</Label>
+            <Label className="text-foreground">Default Currency</Label>
             <Select value={defaultCurrency} onValueChange={setDefaultCurrency}>
               <SelectTrigger className="bg-background border-border">
                 <SelectValue />

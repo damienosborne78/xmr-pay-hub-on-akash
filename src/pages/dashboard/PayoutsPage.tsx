@@ -46,7 +46,7 @@ export default function PayoutsPage() {
   };
 
   const generateCSV = (invoiceList: typeof paidInvoices): string => {
-    const headers = ['Invoice ID', 'Date', 'Description', `Fiat Amount (${cur})`, 'XMR Amount', 'XMR/USD Rate', 'Status', 'Subaddress', 'TX Hash', 'Paid At'];
+    const headers = ['Invoice ID', 'Date', 'Description', `Amount (${cur})`, 'XMR Amount', 'XMR/USD Rate', 'Status', 'Subaddress', 'TX Hash', 'Paid At'];
     const rows = invoiceList.map(inv => [
       inv.id, inv.createdAt, `"${inv.description.replace(/"/g, '""')}"`,
       inv.fiatAmount.toFixed(2), inv.xmrAmount.toFixed(6), XMR_USD_RATE.toFixed(2),

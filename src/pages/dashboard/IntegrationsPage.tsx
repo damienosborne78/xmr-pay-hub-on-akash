@@ -15,7 +15,7 @@ const plugins = [
     icon: ShoppingBag,
     description: 'Accept XMR on your Shopify store. Auto-syncs products, shows live XMR pricing at checkout, handles order status updates.',
     status: 'available' as const,
-    features: ['One-click install from Shopify App Store', 'Auto product mapping', 'Live XMR conversion at checkout', 'Order status sync (Paid → Fulfilled)', 'VAT/tax handling on fiat side'],
+    features: ['One-click install from Shopify App Store', 'Auto product mapping', 'Live XMR conversion at checkout', 'Order status sync (Paid → Fulfilled)', 'VAT/tax handling on local currency side'],
   },
   {
     id: 'woocommerce',
