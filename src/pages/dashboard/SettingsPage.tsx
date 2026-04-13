@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio, Settings2 } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio, Settings2, KeyRound } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -20,6 +20,7 @@ import RestoreWalletFromSeed from '@/components/RestoreWalletFromSeed';
 import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 import { isMerchantPro } from '@/lib/subscription';
 import AdvancedWalletSetup from '@/components/AdvancedWalletSetup';
+import { hashPassword } from '@/lib/hash-password';
 
 
 
@@ -41,6 +42,50 @@ export default function SettingsPage() {
   const [showDangerConfirm, setShowDangerConfirm] = useState(false);
   const [showAdvancedSetup, setShowAdvancedSetup] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Admin password gate state
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [showSetAdmin, setShowSetAdmin] = useState(false);
+  const [showUnlockAdmin, setShowUnlockAdmin] = useState(false);
+  const [adminPass, setAdminPass] = useState('');
+  const [adminPassConfirm, setAdminPassConfirm] = useState('');
+  const [unlockPass, setUnlockPass] = useState('');
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  const requireAdmin = (action: () => void) => {
+    if (adminUnlocked) { action(); return; }
+    setPendingAction(() => action);
+    if (!merchant.adminPasswordHash) {
+      setShowSetAdmin(true);
+    } else {
+      setShowUnlockAdmin(true);
+    }
+  };
+
+  const handleSetAdminAndProceed = () => {
+    if (adminPass.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    if (adminPass !== adminPassConfirm) { toast.error('Passwords do not match'); return; }
+    updateMerchant({ adminPasswordHash: hashPassword(adminPass) });
+    setShowSetAdmin(false);
+    setAdminPass('');
+    setAdminPassConfirm('');
+    setAdminUnlocked(true);
+    toast.success('Admin password set! 🔒');
+    if (pendingAction) { pendingAction(); setPendingAction(null); }
+  };
+
+  const handleUnlockAndProceed = () => {
+    if (hashPassword(unlockPass) === merchant.adminPasswordHash) {
+      setAdminUnlocked(true);
+      setShowUnlockAdmin(false);
+      setUnlockPass('');
+      toast.success('Admin unlocked');
+      if (pendingAction) { pendingAction(); setPendingAction(null); }
+    } else {
+      toast.error('Wrong admin password');
+    }
+  };
 
   const copyKey = () => {
     navigator.clipboard.writeText(merchant.apiKey);
@@ -417,6 +462,7 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={!!merchant.viewOnlySeedBackedUp}
                   onClick={() => {
                     updateMerchant({
                       viewOnlyAddress: '',
@@ -430,14 +476,14 @@ export default function SettingsPage() {
                     });
                     setShowBrowserWalletSetup(true);
                   }}
-                  className="border-border hover:border-primary/50 text-xs"
+                  className={`border-border hover:border-primary/50 text-xs ${merchant.viewOnlySeedBackedUp ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <RefreshCw className="w-3 h-3 mr-1.5" /> Create New Wallet
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={() => requireAdmin(() => {
                     updateMerchant({
                       viewOnlyAddress: '',
                       viewOnlyViewKey: '',
@@ -449,15 +495,15 @@ export default function SettingsPage() {
                       rpcConnected: false,
                     });
                     setShowRestoreFromSeed(true);
-                  }}
+                  })}
                   className="border-border hover:border-primary/50 text-xs"
                 >
-                  <Download className="w-3 h-3 mr-1.5" /> Restore from Seed
+                  <Lock className="w-3 h-3 mr-1.5" /> Restore from Seed
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={() => requireAdmin(() => {
                     updateMerchant({
                       viewOnlyAddress: '',
                       viewOnlyViewKey: '',
@@ -470,10 +516,10 @@ export default function SettingsPage() {
                       rpcConnected: false,
                     });
                     toast.success('Browser wallet removed');
-                  }}
+                  })}
                   className="border-destructive/30 hover:border-destructive/50 text-destructive text-xs"
                 >
-                  Remove Wallet
+                  <Lock className="w-3 h-3 mr-1.5" /> Remove Wallet
                 </Button>
               </div>
 
@@ -497,6 +543,42 @@ export default function SettingsPage() {
 
           {/* Advanced Wallet Setup Dialog */}
           <AdvancedWalletSetup open={showAdvancedSetup} onOpenChange={setShowAdvancedSetup} />
+
+          {/* Set Admin Password Dialog */}
+          <Dialog open={showSetAdmin} onOpenChange={(open) => { setShowSetAdmin(open); if (!open) { setAdminPass(''); setAdminPassConfirm(''); setPendingAction(null); } }}>
+            <DialogContent className="bg-card border-border max-w-md">
+              <DialogHeader><DialogTitle className="text-foreground flex items-center gap-2"><KeyRound className="w-5 h-5 text-primary" /> Set Admin Password</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">You must set an admin password before performing this action.</p>
+              <div className="space-y-4 mt-2">
+                <div className="space-y-2">
+                  <Label className="text-foreground">Password (min 6 chars)</Label>
+                  <div className="relative">
+                    <Input type={showAdminPass ? 'text' : 'password'} value={adminPass} onChange={e => setAdminPass(e.target.value)} className="bg-background border-border pr-10" />
+                    <button onClick={() => setShowAdminPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Confirm Password</Label>
+                  <Input type="password" value={adminPassConfirm} onChange={e => setAdminPassConfirm(e.target.value)} className="bg-background border-border" onKeyDown={e => e.key === 'Enter' && handleSetAdminAndProceed()} />
+                </div>
+                <Button onClick={handleSetAdminAndProceed} className="w-full bg-gradient-orange hover:opacity-90">Set Password & Continue</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Unlock Admin Dialog */}
+          <Dialog open={showUnlockAdmin} onOpenChange={(open) => { setShowUnlockAdmin(open); if (!open) { setUnlockPass(''); setPendingAction(null); } }}>
+            <DialogContent className="bg-card border-border max-w-md">
+              <DialogHeader><DialogTitle className="text-foreground flex items-center gap-2"><Lock className="w-5 h-5 text-primary" /> Admin Password Required</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">Enter your admin password to continue.</p>
+              <div className="space-y-4 mt-2">
+                <Input type="password" value={unlockPass} onChange={e => setUnlockPass(e.target.value)} placeholder="Enter admin password" className="bg-background border-border" onKeyDown={e => e.key === 'Enter' && handleUnlockAndProceed()} />
+                <Button onClick={handleUnlockAndProceed} className="w-full bg-gradient-orange hover:opacity-90">Unlock & Continue</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
 
 
