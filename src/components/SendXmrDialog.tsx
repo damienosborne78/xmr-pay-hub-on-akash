@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { verifyTxOutputs, getMempoolTxHashes, getTxInfo } from '@/lib/block-explorer';
 import { motion } from 'framer-motion';
-import { sendViaDaemonProxy, sendViaWasmWallet, type SyncProgress, type SendMode } from '@/lib/wallet-send';
+import { sendViaDaemonProxy, sendViaWasmWallet, checkWalletBalance, getCachedBalance, clearBalanceCache, type SyncProgress, type SendMode } from '@/lib/wallet-send';
 
 // Fee tiers for sending
 const SEND_FEE_TIERS = [
@@ -51,6 +51,11 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [sentFee, setSentFee] = useState(0);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [sendError, setSendError] = useState('');
+  const [realBalance, setRealBalance] = useState<number | null>(null);
+  const [realUnlockedBalance, setRealUnlockedBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState(false);
+  const [balanceSyncMsg, setBalanceSyncMsg] = useState('');
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
@@ -60,13 +65,62 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const fiatEquivalent = xmrPrice ? parsedAmount * xmrPrice : null;
   const feeInFiat = xmrPrice ? selectedFee.feeXmr * xmrPrice : null;
 
-  // Wallet balance (simulated — in production would come from RPC)
+  // Fallback invoice-based balance (used only when real balance unavailable)
   const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent' && !i.simulated);
   const sentInvoices = invoices.filter(i => i.type === 'sent');
   const totalReceived = paidInvoices.reduce((s, i) => s + i.xmrAmount, 0);
   const totalSent = sentInvoices.reduce((s, i) => s + i.xmrAmount + (i.feeXmr || 0), 0);
-  const walletBalance = Math.max(0, totalReceived - totalSent);
-  const walletBalanceFiat = xmrPrice ? walletBalance * xmrPrice : null;
+  const fallbackBalance = Math.max(0, totalReceived - totalSent);
+
+  // Display balance: prefer real > cached > fallback
+  const displayBalance = realUnlockedBalance ?? realBalance ?? fallbackBalance;
+  const displayBalanceFiat = xmrPrice ? displayBalance * xmrPrice : null;
+  const hasRealBalance = realUnlockedBalance !== null;
+  const hasCachedBalance = realBalance !== null && realUnlockedBalance === null;
+
+  // Load cached balance instantly + fetch real balance when dialog opens
+  useEffect(() => {
+    if (!open) return;
+
+    // 1. Load cache instantly
+    const cached = getCachedBalance();
+    if (cached) {
+      setRealBalance(cached.unlockedBalance);
+    }
+
+    // 2. Start real balance check if seed available
+    if (merchant.viewOnlySeedPhrase) {
+      setBalanceLoading(true);
+      setBalanceError(false);
+      setBalanceSyncMsg('');
+
+      checkWalletBalance(
+        merchant.viewOnlySeedPhrase,
+        effectiveNodeUrl,
+        (p) => setBalanceSyncMsg(p.message),
+      )
+        .then(({ balance, unlockedBalance }) => {
+          setRealBalance(balance);
+          setRealUnlockedBalance(unlockedBalance);
+          setBalanceLoading(false);
+          setBalanceSyncMsg('');
+        })
+        .catch(() => {
+          setBalanceError(true);
+          setBalanceLoading(false);
+          setBalanceSyncMsg('');
+        });
+    }
+
+    return () => {
+      // Reset on close
+      setRealBalance(null);
+      setRealUnlockedBalance(null);
+      setBalanceLoading(false);
+      setBalanceError(false);
+      setBalanceSyncMsg('');
+    };
+  }, [open, merchant.viewOnlySeedPhrase, effectiveNodeUrl]);
 
   // Determine if admin auth is required: only when multiple users exist
   const needsAuth = hasMultipleUsers && !adminAuthed;
@@ -286,13 +340,34 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
               <div className="rounded-lg bg-muted/20 border border-border p-3 flex items-center gap-3">
                 <Wallet className="w-5 h-5 text-primary shrink-0" />
                 <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Wallet Balance</p>
-                  <p className="text-sm font-bold text-foreground font-mono">{formatXMR(walletBalance)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                      {hasRealBalance ? 'On-Chain Balance' : balanceLoading ? 'Checking Balance' : 'Wallet Balance'}
+                    </p>
+                    {balanceLoading && (
+                      <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                    )}
+                    {hasRealBalance && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 border-primary/30 text-primary">LIVE</Badge>
+                    )}
+                    {balanceError && !hasRealBalance && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 border-warning/30 text-warning">ESTIMATE</Badge>
+                    )}
+                  </div>
+                  {balanceLoading && !realBalance && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{balanceSyncMsg || 'Connecting...'}</p>
+                  )}
+                  {(realBalance !== null || !balanceLoading) && (
+                    <p className="text-sm font-bold text-foreground font-mono">{formatXMR(displayBalance)}</p>
+                  )}
+                  {balanceLoading && realBalance !== null && (
+                    <p className="text-[9px] text-muted-foreground">{balanceSyncMsg || 'Updating...'}</p>
+                  )}
                 </div>
-                {walletBalanceFiat !== null && (
+                {displayBalanceFiat !== null && (realBalance !== null || !balanceLoading) && (
                   <div className="text-right">
                     <p className="text-sm font-medium text-muted-foreground">
-                      {sym}{walletBalanceFiat.toFixed(2)} {cur}
+                      {sym}{displayBalanceFiat.toFixed(2)} {cur}
                     </p>
                   </div>
                 )}

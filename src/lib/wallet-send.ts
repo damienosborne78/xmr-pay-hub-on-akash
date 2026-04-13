@@ -1,5 +1,36 @@
 import { REMOTE_NODES } from './node-manager';
 
+// ── Balance Cache ──────────────────────────────────────────────────────────
+const BALANCE_CACHE_KEY = 'mf_wallet_balance_cache';
+
+export interface BalanceCache {
+  balance: number;
+  unlockedBalance: number;
+  timestamp: number;
+}
+
+export function getCachedBalance(): BalanceCache | null {
+  try {
+    const raw = localStorage.getItem(BALANCE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BalanceCache;
+    // Expire after 30 minutes
+    if (Date.now() - parsed.timestamp > 30 * 60 * 1000) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedBalance(balance: number, unlockedBalance: number): void {
+  const cache: BalanceCache = { balance, unlockedBalance, timestamp: Date.now() };
+  localStorage.setItem(BALANCE_CACHE_KEY, JSON.stringify(cache));
+}
+
+export function clearBalanceCache(): void {
+  localStorage.removeItem(BALANCE_CACHE_KEY);
+}
+
 /**
  * Real Monero Transaction Sending Service
  *
@@ -205,6 +236,9 @@ export async function sendViaDaemonProxy(
     // Close the temporary wallet
     await wallet.close();
 
+    // Invalidate balance cache after successful send
+    clearBalanceCache();
+
     return {
       success: true,
       txHash,
@@ -295,6 +329,9 @@ export async function sendViaWasmWallet(
 
     onProgress?.({ percent: 100, height: 0, targetHeight: 0, message: 'Transaction broadcast!' });
 
+    // Invalidate balance cache after successful send
+    clearBalanceCache();
+
     return { success: true, txHash, fee };
   } catch (e: any) {
     // If persistent wallet errors, clean it up
@@ -336,5 +373,62 @@ export async function getWasmWalletBalance(
     return null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Check real on-chain wallet balance.
+ * Creates a temporary WASM wallet, syncs recent blocks, reads balances, closes.
+ * Automatically updates the localStorage cache on success.
+ */
+export async function checkWalletBalance(
+  seedPhrase: string,
+  nodeUrl: string,
+  onProgress?: (progress: SyncProgress) => void,
+): Promise<{ balance: number; unlockedBalance: number }> {
+  let wallet: any = null;
+
+  try {
+    onProgress?.({ percent: 5, height: 0, targetHeight: 0, message: 'Loading wallet engine...' });
+    const moneroTs = await import('monero-ts');
+
+    onProgress?.({ percent: 15, height: 0, targetHeight: 0, message: 'Connecting to node...' });
+    const { daemonUrl, daemonHeight } = await connectToReachableDaemon(moneroTs, nodeUrl);
+
+    onProgress?.({ percent: 25, height: 0, targetHeight: daemonHeight, message: 'Opening wallet...' });
+    wallet = await moneroTs.createWalletFull({
+      password: '',
+      networkType: moneroTs.MoneroNetworkType.MAINNET,
+      seed: seedPhrase,
+      server: daemonUrl,
+      restoreHeight: Math.max(0, daemonHeight - 5000),
+    });
+
+    onProgress?.({ percent: 35, height: 0, targetHeight: daemonHeight, message: 'Syncing recent blocks...' });
+    await wallet.sync(new class extends moneroTs.MoneroWalletListener {
+      async onSyncProgress(height: number, _startHeight: number, endHeight: number, percentDone: number): Promise<void> {
+        onProgress?.({
+          percent: 35 + Math.floor(percentDone * 55),
+          height,
+          targetHeight: endHeight,
+          message: `Syncing... ${Math.floor(percentDone * 100)}%`,
+        });
+      }
+    });
+
+    const balance = Number(await wallet.getBalance()) / 1e12;
+    const unlockedBalance = Number(await wallet.getUnlockedBalance()) / 1e12;
+
+    await wallet.close();
+
+    // Update cache
+    setCachedBalance(balance, unlockedBalance);
+
+    onProgress?.({ percent: 100, height: daemonHeight, targetHeight: daemonHeight, message: 'Balance updated' });
+
+    return { balance, unlockedBalance };
+  } catch (e: any) {
+    try { if (wallet) await wallet.close(); } catch {}
+    throw e;
   }
 }
