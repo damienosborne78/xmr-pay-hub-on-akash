@@ -941,6 +941,10 @@ export default function SettingsPage() {
         </div>
       </FadeIn>
 
+      <FadeIn delay={0.14}>
+        <CsvInventoryImport />
+      </FadeIn>
+
       <FadeIn delay={0.15}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">API Key</h2>
