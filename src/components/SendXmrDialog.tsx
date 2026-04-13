@@ -340,13 +340,34 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
               <div className="rounded-lg bg-muted/20 border border-border p-3 flex items-center gap-3">
                 <Wallet className="w-5 h-5 text-primary shrink-0" />
                 <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Wallet Balance</p>
-                  <p className="text-sm font-bold text-foreground font-mono">{formatXMR(walletBalance)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                      {hasRealBalance ? 'On-Chain Balance' : balanceLoading ? 'Checking Balance' : 'Wallet Balance'}
+                    </p>
+                    {balanceLoading && (
+                      <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                    )}
+                    {hasRealBalance && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 border-primary/30 text-primary">LIVE</Badge>
+                    )}
+                    {balanceError && !hasRealBalance && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 border-warning/30 text-warning">ESTIMATE</Badge>
+                    )}
+                  </div>
+                  {balanceLoading && !realBalance && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{balanceSyncMsg || 'Connecting...'}</p>
+                  )}
+                  {(realBalance !== null || !balanceLoading) && (
+                    <p className="text-sm font-bold text-foreground font-mono">{formatXMR(displayBalance)}</p>
+                  )}
+                  {balanceLoading && realBalance !== null && (
+                    <p className="text-[9px] text-muted-foreground">{balanceSyncMsg || 'Updating...'}</p>
+                  )}
                 </div>
-                {walletBalanceFiat !== null && (
+                {displayBalanceFiat !== null && (realBalance !== null || !balanceLoading) && (
                   <div className="text-right">
                     <p className="text-sm font-medium text-muted-foreground">
-                      {sym}{walletBalanceFiat.toFixed(2)} {cur}
+                      {sym}{displayBalanceFiat.toFixed(2)} {cur}
                     </p>
                   </div>
                 )}
