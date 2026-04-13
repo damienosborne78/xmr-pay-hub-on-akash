@@ -187,7 +187,7 @@ interface AppState {
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
   verifyInvoiceTxHash: (invoiceId: string, txHash: string) => Promise<{ success: boolean; error?: string }>;
   verifyAllPendingInvoices: () => Promise<{ verified: number; failed: number }>;
-  activateProWithCode: (code: string) => boolean;
+  activateProWithCode: (code: string) => Promise<boolean>;
   updateMerchant: (updates: Partial<Merchant>) => void;
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
   toggleSubscription: (id: string) => void;
@@ -739,18 +739,39 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return { verified, failed };
   },
 
-  activateProWithCode: (code: string): boolean => {
+  activateProWithCode: async (code: string): Promise<boolean> => {
     const upperCode = code.toUpperCase().trim();
 
-    // Check if this code was already redeemed on this instance
+    // Quick local guard — already redeemed on this browser
     const redeemedCodes: string[] = JSON.parse(localStorage.getItem('mf_redeemed_codes') || '[]');
     if (redeemedCodes.includes(upperCode)) return false;
 
-    // Validate against hardcoded SHA-256 hashes (works fully offline)
-    const valid = isValidProCode(upperCode);
-    if (!valid) return false;
+    // Must be in the hardcoded allowlist
+    if (!isValidProCode(upperCode)) return false;
 
-    // Mark as redeemed locally so it can't be re-used on this instance
+    // --- Server-side validation (prevents cross-browser reuse) ---
+    try {
+      const valResp = await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: upperCode }),
+      });
+      if (valResp.ok) {
+        const valData = await valResp.json();
+        if (!valData.valid) return false; // Server says already used or not found
+      }
+      // If server validates, redeem it server-side
+      await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: upperCode, redeemedBy: get().merchant.referralWalletFingerprint || 'unknown' }),
+      });
+    } catch {
+      // Server unreachable — fall through to local-only validation (offline mode)
+      console.warn('[Store] Creator server unreachable, using local-only code validation');
+    }
+
+    // Mark as redeemed locally
     redeemedCodes.push(upperCode);
     localStorage.setItem('mf_redeemed_codes', JSON.stringify(redeemedCodes));
 

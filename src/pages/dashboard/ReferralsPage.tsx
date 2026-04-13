@@ -119,20 +119,29 @@ export default function ReferralsPage() {
     toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
-  const handleRedeemProCode = () => {
+  const [redeemingCode, setRedeemingCode] = useState(false);
+
+  const handleRedeemProCode = async () => {
     const code = proCodeInput.trim().toUpperCase();
     if (!code || code.length < 6) {
       toast.error('Please enter a valid Pro code');
       return;
     }
 
-    const success = activateProWithCode(code);
+    setRedeemingCode(true);
+    try {
+      const success = await activateProWithCode(code);
 
-    if (success) {
-      setProCodeInput('');
-      toast.success('🎉 Lifetime Pro activated! You have permanent access to all Pro features.');
-    } else {
-      toast.error('Invalid or already-used code. Please check and try again.');
+      if (success) {
+        setProCodeInput('');
+        toast.success('🎉 Lifetime Pro activated! You have permanent access to all Pro features.');
+      } else {
+        toast.error('Invalid or already-used code. Please check and try again.');
+      }
+    } catch {
+      toast.error('Could not validate code. Please try again.');
+    } finally {
+      setRedeemingCode(false);
     }
   };
 
@@ -228,8 +237,8 @@ export default function ReferralsPage() {
                 className="bg-background border-border font-mono text-sm uppercase tracking-wider flex-1 max-w-sm"
                 maxLength={20}
               />
-              <Button onClick={handleRedeemProCode} disabled={!proCodeInput.trim()} className="bg-gradient-orange hover:opacity-90">
-                <Gift className="w-4 h-4 mr-1.5" /> Redeem
+              <Button onClick={handleRedeemProCode} disabled={!proCodeInput.trim() || redeemingCode} className="bg-gradient-orange hover:opacity-90">
+                <Gift className="w-4 h-4 mr-1.5" /> {redeemingCode ? 'Validating...' : 'Redeem'}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">One-time-use codes that unlock Pro features permanently. Given by the MoneroFlow team.</p>
