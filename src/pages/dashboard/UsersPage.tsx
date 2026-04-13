@@ -8,7 +8,16 @@ import { FadeIn } from '@/components/FadeIn';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Users, ShieldCheck, Plus, Trash2, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
-import { hashPassword } from '@/lib/hash-password';
+/** Simple hash for local admin password lock */
+function hashPassword(pw: string): string {
+  let hash = 0;
+  for (let i = 0; i < pw.length; i++) {
+    const chr = pw.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return 'h_' + Math.abs(hash).toString(36);
+}
 
 export default function UsersPage() {
   const merchant = useStore(s => s.merchant);
