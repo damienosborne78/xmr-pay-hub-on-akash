@@ -237,8 +237,8 @@ export default function ReferralsPage() {
                 className="bg-background border-border font-mono text-sm uppercase tracking-wider flex-1 max-w-sm"
                 maxLength={20}
               />
-              <Button onClick={handleRedeemProCode} disabled={!proCodeInput.trim()} className="bg-gradient-orange hover:opacity-90">
-                <Gift className="w-4 h-4 mr-1.5" /> Redeem
+              <Button onClick={handleRedeemProCode} disabled={!proCodeInput.trim() || redeemingCode} className="bg-gradient-orange hover:opacity-90">
+                <Gift className="w-4 h-4 mr-1.5" /> {redeemingCode ? 'Validating...' : 'Redeem'}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">One-time-use codes that unlock Pro features permanently. Given by the MoneroFlow team.</p>
