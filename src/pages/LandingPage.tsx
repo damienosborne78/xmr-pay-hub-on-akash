@@ -9,6 +9,7 @@ import {
   Wallet, BarChart3, MonitorSmartphone, Globe, Gift,
   Code2, HardDrive, Smartphone, FileSpreadsheet
 } from 'lucide-react';
+import ArchitectureDiagram from '@/components/ArchitectureDiagram';
 
 const features = [
   { icon: Zap, title: 'Instant Setup', desc: 'Click one button — your Monero wallet is auto-generated. Start accepting payments in seconds.' },
