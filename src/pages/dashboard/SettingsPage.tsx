@@ -544,6 +544,42 @@ export default function SettingsPage() {
           {/* Advanced Wallet Setup Dialog */}
           <AdvancedWalletSetup open={showAdvancedSetup} onOpenChange={setShowAdvancedSetup} />
 
+          {/* Set Admin Password Dialog */}
+          <Dialog open={showSetAdmin} onOpenChange={(open) => { setShowSetAdmin(open); if (!open) { setAdminPass(''); setAdminPassConfirm(''); setPendingAction(null); } }}>
+            <DialogContent className="bg-card border-border max-w-md">
+              <DialogHeader><DialogTitle className="text-foreground flex items-center gap-2"><KeyRound className="w-5 h-5 text-primary" /> Set Admin Password</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">You must set an admin password before performing this action.</p>
+              <div className="space-y-4 mt-2">
+                <div className="space-y-2">
+                  <Label className="text-foreground">Password (min 6 chars)</Label>
+                  <div className="relative">
+                    <Input type={showAdminPass ? 'text' : 'password'} value={adminPass} onChange={e => setAdminPass(e.target.value)} className="bg-background border-border pr-10" />
+                    <button onClick={() => setShowAdminPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Confirm Password</Label>
+                  <Input type="password" value={adminPassConfirm} onChange={e => setAdminPassConfirm(e.target.value)} className="bg-background border-border" onKeyDown={e => e.key === 'Enter' && handleSetAdminAndProceed()} />
+                </div>
+                <Button onClick={handleSetAdminAndProceed} className="w-full bg-gradient-orange hover:opacity-90">Set Password & Continue</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Unlock Admin Dialog */}
+          <Dialog open={showUnlockAdmin} onOpenChange={(open) => { setShowUnlockAdmin(open); if (!open) { setUnlockPass(''); setPendingAction(null); } }}>
+            <DialogContent className="bg-card border-border max-w-md">
+              <DialogHeader><DialogTitle className="text-foreground flex items-center gap-2"><Lock className="w-5 h-5 text-primary" /> Admin Password Required</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">Enter your admin password to continue.</p>
+              <div className="space-y-4 mt-2">
+                <Input type="password" value={unlockPass} onChange={e => setUnlockPass(e.target.value)} placeholder="Enter admin password" className="bg-background border-border" onKeyDown={e => e.key === 'Enter' && handleUnlockAndProceed()} />
+                <Button onClick={handleUnlockAndProceed} className="w-full bg-gradient-orange hover:opacity-90">Unlock & Continue</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
 
 
 
