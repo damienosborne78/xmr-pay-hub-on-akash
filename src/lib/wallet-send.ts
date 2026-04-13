@@ -375,3 +375,60 @@ export async function getWasmWalletBalance(
     return null;
   }
 }
+
+/**
+ * Check real on-chain wallet balance.
+ * Creates a temporary WASM wallet, syncs recent blocks, reads balances, closes.
+ * Automatically updates the localStorage cache on success.
+ */
+export async function checkWalletBalance(
+  seedPhrase: string,
+  nodeUrl: string,
+  onProgress?: (progress: SyncProgress) => void,
+): Promise<{ balance: number; unlockedBalance: number }> {
+  let wallet: any = null;
+
+  try {
+    onProgress?.({ percent: 5, height: 0, targetHeight: 0, message: 'Loading wallet engine...' });
+    const moneroTs = await import('monero-ts');
+
+    onProgress?.({ percent: 15, height: 0, targetHeight: 0, message: 'Connecting to node...' });
+    const { daemonUrl, daemonHeight } = await connectToReachableDaemon(moneroTs, nodeUrl);
+
+    onProgress?.({ percent: 25, height: 0, targetHeight: daemonHeight, message: 'Opening wallet...' });
+    wallet = await moneroTs.createWalletFull({
+      password: '',
+      networkType: moneroTs.MoneroNetworkType.MAINNET,
+      seed: seedPhrase,
+      server: daemonUrl,
+      restoreHeight: Math.max(0, daemonHeight - 5000),
+    });
+
+    onProgress?.({ percent: 35, height: 0, targetHeight: daemonHeight, message: 'Syncing recent blocks...' });
+    await wallet.sync(new class extends moneroTs.MoneroWalletListener {
+      async onSyncProgress(height: number, _startHeight: number, endHeight: number, percentDone: number): Promise<void> {
+        onProgress?.({
+          percent: 35 + Math.floor(percentDone * 55),
+          height,
+          targetHeight: endHeight,
+          message: `Syncing... ${Math.floor(percentDone * 100)}%`,
+        });
+      }
+    });
+
+    const balance = Number(await wallet.getBalance()) / 1e12;
+    const unlockedBalance = Number(await wallet.getUnlockedBalance()) / 1e12;
+
+    await wallet.close();
+
+    // Update cache
+    setCachedBalance(balance, unlockedBalance);
+
+    onProgress?.({ percent: 100, height: daemonHeight, targetHeight: daemonHeight, message: 'Balance updated' });
+
+    return { balance, unlockedBalance };
+  } catch (e: any) {
+    try { if (wallet) await wallet.close(); } catch {}
+    throw e;
+  }
+}
