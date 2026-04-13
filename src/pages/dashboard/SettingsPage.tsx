@@ -462,6 +462,7 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={!!merchant.viewOnlySeedBackedUp}
                   onClick={() => {
                     updateMerchant({
                       viewOnlyAddress: '',
@@ -475,14 +476,14 @@ export default function SettingsPage() {
                     });
                     setShowBrowserWalletSetup(true);
                   }}
-                  className="border-border hover:border-primary/50 text-xs"
+                  className={`border-border hover:border-primary/50 text-xs ${merchant.viewOnlySeedBackedUp ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <RefreshCw className="w-3 h-3 mr-1.5" /> Create New Wallet
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={() => requireAdmin(() => {
                     updateMerchant({
                       viewOnlyAddress: '',
                       viewOnlyViewKey: '',
@@ -494,15 +495,15 @@ export default function SettingsPage() {
                       rpcConnected: false,
                     });
                     setShowRestoreFromSeed(true);
-                  }}
+                  })}
                   className="border-border hover:border-primary/50 text-xs"
                 >
-                  <Download className="w-3 h-3 mr-1.5" /> Restore from Seed
+                  <Lock className="w-3 h-3 mr-1.5" /> Restore from Seed
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={() => requireAdmin(() => {
                     updateMerchant({
                       viewOnlyAddress: '',
                       viewOnlyViewKey: '',
@@ -515,10 +516,10 @@ export default function SettingsPage() {
                       rpcConnected: false,
                     });
                     toast.success('Browser wallet removed');
-                  }}
+                  })}
                   className="border-destructive/30 hover:border-destructive/50 text-destructive text-xs"
                 >
-                  Remove Wallet
+                  <Lock className="w-3 h-3 mr-1.5" /> Remove Wallet
                 </Button>
               </div>
 
