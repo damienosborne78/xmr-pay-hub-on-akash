@@ -109,11 +109,13 @@ const configNav = [
 ];
 
 function DashboardSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile, isMobile } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const navigate = useNavigate();
   const logout = useStore(s => s.logout);
+
+  const closeMobile = () => { if (isMobile) setOpenMobile(false); };
 
   const renderNav = (items: typeof mainNav) => (
     <SidebarMenu>
