@@ -51,6 +51,11 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [sentFee, setSentFee] = useState(0);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [sendError, setSendError] = useState('');
+  const [realBalance, setRealBalance] = useState<number | null>(null);
+  const [realUnlockedBalance, setRealUnlockedBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState(false);
+  const [balanceSyncMsg, setBalanceSyncMsg] = useState('');
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
@@ -60,13 +65,62 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const fiatEquivalent = xmrPrice ? parsedAmount * xmrPrice : null;
   const feeInFiat = xmrPrice ? selectedFee.feeXmr * xmrPrice : null;
 
-  // Wallet balance (simulated — in production would come from RPC)
+  // Fallback invoice-based balance (used only when real balance unavailable)
   const paidInvoices = invoices.filter(i => i.status === 'paid' && i.type !== 'sent' && !i.simulated);
   const sentInvoices = invoices.filter(i => i.type === 'sent');
   const totalReceived = paidInvoices.reduce((s, i) => s + i.xmrAmount, 0);
   const totalSent = sentInvoices.reduce((s, i) => s + i.xmrAmount + (i.feeXmr || 0), 0);
-  const walletBalance = Math.max(0, totalReceived - totalSent);
-  const walletBalanceFiat = xmrPrice ? walletBalance * xmrPrice : null;
+  const fallbackBalance = Math.max(0, totalReceived - totalSent);
+
+  // Display balance: prefer real > cached > fallback
+  const displayBalance = realUnlockedBalance ?? realBalance ?? fallbackBalance;
+  const displayBalanceFiat = xmrPrice ? displayBalance * xmrPrice : null;
+  const hasRealBalance = realUnlockedBalance !== null;
+  const hasCachedBalance = realBalance !== null && realUnlockedBalance === null;
+
+  // Load cached balance instantly + fetch real balance when dialog opens
+  useEffect(() => {
+    if (!open) return;
+
+    // 1. Load cache instantly
+    const cached = getCachedBalance();
+    if (cached) {
+      setRealBalance(cached.unlockedBalance);
+    }
+
+    // 2. Start real balance check if seed available
+    if (merchant.viewOnlySeedPhrase) {
+      setBalanceLoading(true);
+      setBalanceError(false);
+      setBalanceSyncMsg('');
+
+      checkWalletBalance(
+        merchant.viewOnlySeedPhrase,
+        effectiveNodeUrl,
+        (p) => setBalanceSyncMsg(p.message),
+      )
+        .then(({ balance, unlockedBalance }) => {
+          setRealBalance(balance);
+          setRealUnlockedBalance(unlockedBalance);
+          setBalanceLoading(false);
+          setBalanceSyncMsg('');
+        })
+        .catch(() => {
+          setBalanceError(true);
+          setBalanceLoading(false);
+          setBalanceSyncMsg('');
+        });
+    }
+
+    return () => {
+      // Reset on close
+      setRealBalance(null);
+      setRealUnlockedBalance(null);
+      setBalanceLoading(false);
+      setBalanceError(false);
+      setBalanceSyncMsg('');
+    };
+  }, [open, merchant.viewOnlySeedPhrase, effectiveNodeUrl]);
 
   // Determine if admin auth is required: only when multiple users exist
   const needsAuth = hasMultipleUsers && !adminAuthed;
