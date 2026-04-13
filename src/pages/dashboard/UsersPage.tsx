@@ -27,16 +27,6 @@ export default function UsersPage() {
   const adminPasswordSet = !!merchant.adminPasswordHash;
   const users = merchant.posUsers || [];
 
-  const hashPassword = (pw: string) => {
-    // Simple hash for local storage — not cryptographic, but sufficient for local admin lock
-    let hash = 0;
-    for (let i = 0; i < pw.length; i++) {
-      const chr = pw.charCodeAt(i);
-      hash = ((hash << 5) - hash) + chr;
-      hash |= 0;
-    }
-    return 'h_' + Math.abs(hash).toString(36);
-  };
 
   const handleSetAdminPassword = () => {
     if (adminPass.length < 6) { toast.error('Password must be at least 6 characters'); return; }
