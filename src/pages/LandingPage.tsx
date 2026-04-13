@@ -104,6 +104,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Architecture Diagram */}
+      <ArchitectureDiagram />
+
       {/* Features */}
       <section className="py-24 bg-surface-elevated/50">
         <div className="container">
