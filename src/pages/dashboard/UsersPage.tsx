@@ -8,6 +8,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Users, ShieldCheck, Plus, Trash2, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
+import { hashPassword } from '@/lib/hash-password';
 
 export default function UsersPage() {
   const merchant = useStore(s => s.merchant);
