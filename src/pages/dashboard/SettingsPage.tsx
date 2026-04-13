@@ -20,7 +20,16 @@ import RestoreWalletFromSeed from '@/components/RestoreWalletFromSeed';
 import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 import { isMerchantPro } from '@/lib/subscription';
 import AdvancedWalletSetup from '@/components/AdvancedWalletSetup';
-import { hashPassword } from '@/lib/hash-password';
+/** Simple hash for local admin password lock */
+function hashPassword(pw: string): string {
+  let hash = 0;
+  for (let i = 0; i < pw.length; i++) {
+    const chr = pw.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return 'h_' + Math.abs(hash).toString(36);
+}
 
 
 
