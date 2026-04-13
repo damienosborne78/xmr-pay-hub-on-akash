@@ -43,6 +43,16 @@ export default function SettingsPage() {
   const [showAdvancedSetup, setShowAdvancedSetup] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Admin password gate state
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [showSetAdmin, setShowSetAdmin] = useState(false);
+  const [showUnlockAdmin, setShowUnlockAdmin] = useState(false);
+  const [adminPass, setAdminPass] = useState('');
+  const [adminPassConfirm, setAdminPassConfirm] = useState('');
+  const [unlockPass, setUnlockPass] = useState('');
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
   const copyKey = () => {
     navigator.clipboard.writeText(merchant.apiKey);
     setCopied(true);
