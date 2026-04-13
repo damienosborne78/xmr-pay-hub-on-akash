@@ -119,20 +119,29 @@ export default function ReferralsPage() {
     toast.success(`Referral code ${code} applied! Your referrer will earn commissions when you subscribe to Pro.`);
   };
 
-  const handleRedeemProCode = () => {
+  const [redeemingCode, setRedeemingCode] = useState(false);
+
+  const handleRedeemProCode = async () => {
     const code = proCodeInput.trim().toUpperCase();
     if (!code || code.length < 6) {
       toast.error('Please enter a valid Pro code');
       return;
     }
 
-    const success = activateProWithCode(code);
+    setRedeemingCode(true);
+    try {
+      const success = await activateProWithCode(code);
 
-    if (success) {
-      setProCodeInput('');
-      toast.success('🎉 Lifetime Pro activated! You have permanent access to all Pro features.');
-    } else {
-      toast.error('Invalid or already-used code. Please check and try again.');
+      if (success) {
+        setProCodeInput('');
+        toast.success('🎉 Lifetime Pro activated! You have permanent access to all Pro features.');
+      } else {
+        toast.error('Invalid or already-used code. Please check and try again.');
+      }
+    } catch {
+      toast.error('Could not validate code. Please try again.');
+    } finally {
+      setRedeemingCode(false);
     }
   };
 
