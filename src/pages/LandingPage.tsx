@@ -6,16 +6,20 @@ import { Badge } from '@/components/ui/badge';
 import { useStore } from '@/lib/store';
 import {
   Zap, Shield, ArrowRight, Check, Lock,
-  Wallet, BarChart3, MonitorSmartphone, Globe, Gift
+  Wallet, BarChart3, MonitorSmartphone, Globe, Gift,
+  Code2, HardDrive, Smartphone
 } from 'lucide-react';
 
 const features = [
   { icon: Zap, title: 'Instant Setup', desc: 'Click one button — your Monero wallet is auto-generated. Start accepting payments in seconds.' },
   { icon: Shield, title: 'Self-Custody by Default', desc: 'Your keys, your coins. Browser wallet with seed phrase backup — no third parties ever touch your funds.' },
   { icon: Globe, title: 'Multi-Currency Invoicing', desc: 'Invoice in any fiat currency, customer pays in XMR. Live rate conversion at time of order.' },
-  { icon: MonitorSmartphone, title: 'Elite PoS Terminal', desc: 'Full-featured point-of-sale with quick items, modifiers, combos, multi-user support, and parked orders.' },
+  { icon: MonitorSmartphone, title: 'Elite PoS Terminal', desc: 'Full-featured point-of-sale with kiosk inventory, quick links, cart parking, multi-user support, and parked orders.' },
   { icon: BarChart3, title: 'Analytics & Reporting', desc: 'Real-time dashboard with revenue tracking, user performance, and exportable accounting reports.' },
   { icon: Gift, title: 'Earn XMR Referrals', desc: 'Refer merchants, earn multi-level XMR commissions forever. Refer enough and unlock Pro for free.' },
+  { icon: Code2, title: 'Fully Open Source', desc: 'MIT-licensed and community-driven. Inspect every line, self-host anywhere, and contribute to the future of private payments.' },
+  { icon: HardDrive, title: 'AES-Encrypted Backup & Restore', desc: 'Lightning-fast AES-GCM encrypted local backup and restore. Your data never leaves your browser.' },
+  { icon: Smartphone, title: 'Works Everywhere', desc: 'Phone, tablet, desktop — runs smoothly on all of them. Just a web browser and an internet connection.' },
 ];
 
 const comparisons = [
@@ -23,10 +27,16 @@ const comparisons = [
   { feature: 'No server / Docker needed', us: true, nowpay: true, moneropay: false },
   { feature: 'Browser-based wallet', us: true, nowpay: false, moneropay: false },
   { feature: 'Multi-currency invoicing', us: true, nowpay: true, moneropay: false },
-  { feature: 'Elite PoS terminal', us: true, nowpay: false, moneropay: false },
+  { feature: 'Elite PoS with kiosk inventory & cart parking', us: true, nowpay: false, moneropay: false },
   { feature: 'Multi-user / cashier support', us: true, nowpay: false, moneropay: false },
-  { feature: 'On-chain pro subscriptions', us: true, nowpay: false, moneropay: false },
+  { feature: 'AES-encrypted local backup & restore', us: true, nowpay: false, moneropay: false },
+  { feature: 'Complete privacy mode (IndexedDB + AES-GCM)', us: true, nowpay: false, moneropay: false },
+  { feature: 'Auto node discovery & failover', us: true, nowpay: false, moneropay: false },
+  { feature: 'Exportable accounts (PDF/CSV)', us: true, nowpay: false, moneropay: false },
+  { feature: 'On-chain Pro subscriptions', us: true, nowpay: false, moneropay: false },
   { feature: 'Earn-to-unlock referrals', us: true, nowpay: false, moneropay: false },
+  { feature: 'Fully open source (MIT)', us: true, nowpay: false, moneropay: true },
+  { feature: 'Akash Network deployment', us: true, nowpay: false, moneropay: false },
 ];
 
 export default function LandingPage() {
@@ -79,15 +89,10 @@ export default function LandingPage() {
             </p>
           </FadeIn>
           <FadeIn delay={0.3}>
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center">
               <Button size="lg" className="bg-gradient-orange hover:opacity-90 glow-orange-sm text-base px-8 h-12" onClick={handleStart}>
                 Start Accepting XMR <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
-              <Link to="/invoice/inv_a1b2c3">
-                <Button variant="outline" size="lg" className="border-border hover:border-primary/50 text-base px-8 h-12">
-                  See Demo Invoice
-                </Button>
-              </Link>
             </div>
           </FadeIn>
           <FadeIn delay={0.4}>
@@ -219,7 +224,7 @@ export default function LandingPage() {
                   <span className="text-muted-foreground">/forever</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Unlimited invoices', 'Browser wallet (self-custody)', 'Basic PoS terminal', 'Multi-currency invoicing', 'Dashboard & analytics', 'Referral program access'].map(f => (
+                  {['Unlimited invoices', 'Browser wallet (self-custody)', 'Basic PoS terminal', 'Multi-currency invoicing', 'Dashboard & analytics', 'Referral program access', 'Auto node discovery & failover', 'Works on any device'].map(f => (
                     <li key={f} className="flex items-center text-sm text-muted-foreground"><Check className="w-4 h-4 text-primary mr-2 shrink-0" />{f}</li>
                   ))}
                 </ul>
@@ -238,7 +243,16 @@ export default function LandingPage() {
                 </div>
                 <p className="text-xs text-muted-foreground mb-4">Or refer 10 merchants → free forever</p>
                 <ul className="space-y-3 mb-8">
-                  {['Everything in Free', 'Elite PoS with combos & modifiers', 'Encrypted cloud backups', 'Accounting exports (PDF/CSV)', 'White-label branding', 'Priority node connections', 'Multi-user / cashier system'].map(f => (
+                  {[
+                    'Everything in Free',
+                    'Elite PoS with Kiosk Inventory, Quick Links & Cart Parking',
+                    'Encrypted local backup & restore',
+                    'Complete privacy mode (IndexedDB + AES-GCM)',
+                    'Accounting exports (PDF/CSV)',
+                    'White-label branding',
+                    'Priority node connections',
+                    'Multi-user / cashier system',
+                  ].map(f => (
                     <li key={f} className="flex items-center text-sm text-muted-foreground"><Check className="w-4 h-4 text-primary mr-2 shrink-0" />{f}</li>
                   ))}
                 </ul>
@@ -269,7 +283,7 @@ export default function LandingPage() {
       <footer className="border-t border-border py-12">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-4">
           <BrandLogo />
-          <p className="text-muted-foreground text-sm">© 2024 MoneroFlow. Privacy is a right, not a feature.</p>
+          <p className="text-muted-foreground text-sm">© 2025 MoneroFlow. Privacy is a right, not a feature.</p>
         </div>
       </footer>
     </div>
