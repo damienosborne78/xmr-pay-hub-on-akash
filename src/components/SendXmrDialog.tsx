@@ -86,7 +86,25 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const displayBalance = realUnlockedBalance ?? realBalance ?? fallbackBalance;
   const displayBalanceFiat = xmrPrice ? displayBalance * xmrPrice : null;
   const hasRealBalance = realUnlockedBalance !== null;
-  const hasCachedBalance = realBalance !== null && realUnlockedBalance === null;
+
+  // Human-readable "last checked" timestamp
+  const getRelativeTime = (ts: number | null): string => {
+    if (!ts) return '';
+    const secs = Math.floor((Date.now() - ts) / 1000);
+    if (secs < 10) return 'just now';
+    if (secs < 60) return `${secs}s ago`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ago`;
+  };
+  const [, forceUpdate] = useState(0);
+  // Tick every 10s to update relative time
+  useEffect(() => {
+    if (!cachedTimestamp) return;
+    const iv = setInterval(() => forceUpdate(n => n + 1), 10000);
+    return () => clearInterval(iv);
+  }, [cachedTimestamp]);
 
   // Load cached balance instantly + fetch real balance when dialog opens
   useEffect(() => {
