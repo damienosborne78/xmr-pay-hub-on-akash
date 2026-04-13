@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio, Settings2 } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio, Settings2, KeyRound } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -20,6 +20,7 @@ import RestoreWalletFromSeed from '@/components/RestoreWalletFromSeed';
 import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 import { isMerchantPro } from '@/lib/subscription';
 import AdvancedWalletSetup from '@/components/AdvancedWalletSetup';
+import { hashPassword } from '@/lib/hash-password';
 
 
 
