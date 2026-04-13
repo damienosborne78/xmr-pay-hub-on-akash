@@ -53,6 +53,40 @@ export default function SettingsPage() {
   const [showAdminPass, setShowAdminPass] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
+  const requireAdmin = (action: () => void) => {
+    if (adminUnlocked) { action(); return; }
+    setPendingAction(() => action);
+    if (!merchant.adminPasswordHash) {
+      setShowSetAdmin(true);
+    } else {
+      setShowUnlockAdmin(true);
+    }
+  };
+
+  const handleSetAdminAndProceed = () => {
+    if (adminPass.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    if (adminPass !== adminPassConfirm) { toast.error('Passwords do not match'); return; }
+    updateMerchant({ adminPasswordHash: hashPassword(adminPass) });
+    setShowSetAdmin(false);
+    setAdminPass('');
+    setAdminPassConfirm('');
+    setAdminUnlocked(true);
+    toast.success('Admin password set! 🔒');
+    if (pendingAction) { pendingAction(); setPendingAction(null); }
+  };
+
+  const handleUnlockAndProceed = () => {
+    if (hashPassword(unlockPass) === merchant.adminPasswordHash) {
+      setAdminUnlocked(true);
+      setShowUnlockAdmin(false);
+      setUnlockPass('');
+      toast.success('Admin unlocked');
+      if (pendingAction) { pendingAction(); setPendingAction(null); }
+    } else {
+      toast.error('Wrong admin password');
+    }
+  };
+
   const copyKey = () => {
     navigator.clipboard.writeText(merchant.apiKey);
     setCopied(true);
