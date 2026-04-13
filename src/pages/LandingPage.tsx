@@ -7,7 +7,7 @@ import { useStore } from '@/lib/store';
 import {
   Zap, Shield, ArrowRight, Check, Lock,
   Wallet, BarChart3, MonitorSmartphone, Globe, Gift,
-  Code2, HardDrive, Smartphone
+  Code2, HardDrive, Smartphone, FileSpreadsheet
 } from 'lucide-react';
 
 const features = [
@@ -20,6 +20,7 @@ const features = [
   { icon: Code2, title: 'Fully Open Source', desc: 'MIT-licensed and community-driven. Inspect every line, self-host anywhere, and contribute to the future of private payments.' },
   { icon: HardDrive, title: 'AES-Encrypted Backup & Restore', desc: 'Lightning-fast AES-GCM encrypted local backup and restore. Your data never leaves your browser.' },
   { icon: Smartphone, title: 'Works Everywhere', desc: 'Phone, tablet, desktop — runs smoothly on all of them. Just a web browser and an internet connection.' },
+  { icon: FileSpreadsheet, title: 'CSV Inventory Import', desc: 'Upload any CSV file, map columns to POS fields with smart auto-detection, preview rows, and import your entire inventory in seconds.' },
 ];
 
 const comparisons = [
@@ -36,6 +37,7 @@ const comparisons = [
   { feature: 'On-chain Pro subscriptions', us: true, nowpay: false, moneropay: false },
   { feature: 'Earn-to-unlock referrals', us: true, nowpay: false, moneropay: false },
   { feature: 'Fully open source (MIT)', us: true, nowpay: false, moneropay: true },
+  { feature: 'CSV inventory import with column mapping', us: true, nowpay: false, moneropay: false },
   { feature: 'Akash Network deployment', us: true, nowpay: false, moneropay: false },
 ];
 
@@ -85,7 +87,7 @@ export default function LandingPage() {
           <FadeIn delay={0.2}>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 leading-relaxed">
               One click to a full merchant dashboard with browser wallet, elite PoS terminal, 
-              multi-currency invoicing, and XMR referral rewards — all without giving up custody.
+              multi-currency invoicing and XMR referral rewards, all without giving up custody.
             </p>
           </FadeIn>
           <FadeIn delay={0.3}>
@@ -224,7 +226,7 @@ export default function LandingPage() {
                   <span className="text-muted-foreground">/forever</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Unlimited invoices', 'Browser wallet (self-custody)', 'Basic PoS terminal', 'Multi-currency invoicing', 'Dashboard & analytics', 'Referral program access', 'Auto node discovery & failover', 'Works on any device'].map(f => (
+                  {['Unlimited invoices', 'Browser wallet (self-custody)', 'Basic PoS terminal', 'Multi-currency invoicing', 'CSV inventory import', 'Dashboard & analytics', 'Referral program access', 'Auto node discovery & failover', 'Works on any device'].map(f => (
                     <li key={f} className="flex items-center text-sm text-muted-foreground"><Check className="w-4 h-4 text-primary mr-2 shrink-0" />{f}</li>
                   ))}
                 </ul>
