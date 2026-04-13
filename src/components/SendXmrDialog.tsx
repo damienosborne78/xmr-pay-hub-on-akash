@@ -51,11 +51,21 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [sentFee, setSentFee] = useState(0);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [sendError, setSendError] = useState('');
-  const [realBalance, setRealBalance] = useState<number | null>(null);
-  const [realUnlockedBalance, setRealUnlockedBalance] = useState<number | null>(null);
+  const [realBalance, setRealBalance] = useState<number | null>(() => {
+    const cached = getCachedBalance();
+    return cached ? cached.balance : null;
+  });
+  const [realUnlockedBalance, setRealUnlockedBalance] = useState<number | null>(() => {
+    const cached = getCachedBalance();
+    return cached ? cached.unlockedBalance : null;
+  });
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState(false);
   const [balanceSyncMsg, setBalanceSyncMsg] = useState('');
+  const [cachedTimestamp, setCachedTimestamp] = useState<number | null>(() => {
+    const cached = getCachedBalance();
+    return cached ? cached.timestamp : null;
+  });
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
