@@ -92,10 +92,12 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (!open) return;
 
-    // 1. Load cache instantly
+    // 1. Load cache instantly (in case state was cleared by seed change)
     const cached = getCachedBalance();
     if (cached) {
-      setRealBalance(cached.unlockedBalance);
+      setRealBalance(cached.balance);
+      setRealUnlockedBalance(cached.unlockedBalance);
+      setCachedTimestamp(cached.timestamp);
     }
 
     // 2. Start real balance check if seed available
@@ -112,6 +114,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         .then(({ balance, unlockedBalance }) => {
           setRealBalance(balance);
           setRealUnlockedBalance(unlockedBalance);
+          setCachedTimestamp(Date.now());
           setBalanceLoading(false);
           setBalanceSyncMsg('');
         })
@@ -122,14 +125,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         });
     }
 
-    return () => {
-      // Reset on close
-      setRealBalance(null);
-      setRealUnlockedBalance(null);
-      setBalanceLoading(false);
-      setBalanceError(false);
-      setBalanceSyncMsg('');
-    };
+    // No cleanup — keep cached values across open/close cycles
   }, [open, merchant.viewOnlySeedPhrase, effectiveNodeUrl]);
 
   // Determine if admin auth is required: only when multiple users exist
