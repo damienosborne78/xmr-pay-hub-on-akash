@@ -1,5 +1,36 @@
 import { REMOTE_NODES } from './node-manager';
 
+// ── Balance Cache ──────────────────────────────────────────────────────────
+const BALANCE_CACHE_KEY = 'mf_wallet_balance_cache';
+
+export interface BalanceCache {
+  balance: number;
+  unlockedBalance: number;
+  timestamp: number;
+}
+
+export function getCachedBalance(): BalanceCache | null {
+  try {
+    const raw = localStorage.getItem(BALANCE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BalanceCache;
+    // Expire after 30 minutes
+    if (Date.now() - parsed.timestamp > 30 * 60 * 1000) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedBalance(balance: number, unlockedBalance: number): void {
+  const cache: BalanceCache = { balance, unlockedBalance, timestamp: Date.now() };
+  localStorage.setItem(BALANCE_CACHE_KEY, JSON.stringify(cache));
+}
+
+export function clearBalanceCache(): void {
+  localStorage.removeItem(BALANCE_CACHE_KEY);
+}
+
 /**
  * Real Monero Transaction Sending Service
  *
@@ -205,6 +236,9 @@ export async function sendViaDaemonProxy(
     // Close the temporary wallet
     await wallet.close();
 
+    // Invalidate balance cache after successful send
+    clearBalanceCache();
+
     return {
       success: true,
       txHash,
@@ -294,6 +328,9 @@ export async function sendViaWasmWallet(
     const fee = Number(tx.getFee()) / 1e12;
 
     onProgress?.({ percent: 100, height: 0, targetHeight: 0, message: 'Transaction broadcast!' });
+
+    // Invalidate balance cache after successful send
+    clearBalanceCache();
 
     return { success: true, txHash, fee };
   } catch (e: any) {
