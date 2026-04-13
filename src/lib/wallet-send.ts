@@ -9,14 +9,14 @@ export interface BalanceCache {
   timestamp: number;
 }
 
-export function getCachedBalance(): BalanceCache | null {
+export function getCachedBalance(): (BalanceCache & { fresh: boolean }) | null {
   try {
     const raw = localStorage.getItem(BALANCE_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as BalanceCache;
-    // Expire after 30 minutes
-    if (Date.now() - parsed.timestamp > 30 * 60 * 1000) return null;
-    return parsed;
+    // Always return cached data — let the caller decide how to display it
+    const ageMs = Date.now() - parsed.timestamp;
+    return { ...parsed, fresh: ageMs < 2 * 60 * 1000 };
   } catch {
     return null;
   }

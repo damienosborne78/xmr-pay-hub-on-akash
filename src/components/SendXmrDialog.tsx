@@ -51,11 +51,21 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const [sentFee, setSentFee] = useState(0);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [sendError, setSendError] = useState('');
-  const [realBalance, setRealBalance] = useState<number | null>(null);
-  const [realUnlockedBalance, setRealUnlockedBalance] = useState<number | null>(null);
+  const [realBalance, setRealBalance] = useState<number | null>(() => {
+    const cached = getCachedBalance();
+    return cached ? cached.balance : null;
+  });
+  const [realUnlockedBalance, setRealUnlockedBalance] = useState<number | null>(() => {
+    const cached = getCachedBalance();
+    return cached ? cached.unlockedBalance : null;
+  });
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState(false);
   const [balanceSyncMsg, setBalanceSyncMsg] = useState('');
+  const [cachedTimestamp, setCachedTimestamp] = useState<number | null>(() => {
+    const cached = getCachedBalance();
+    return cached ? cached.timestamp : null;
+  });
   const xmrPrice = rates ? getXmrPrice(cur, rates) : null;
   const selectedFee = SEND_FEE_TIERS.find(t => t.id === feeTier) || SEND_FEE_TIERS[0];
   const parsedAmount = parseFloat(amountXmr) || 0;
@@ -76,16 +86,36 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
   const displayBalance = realUnlockedBalance ?? realBalance ?? fallbackBalance;
   const displayBalanceFiat = xmrPrice ? displayBalance * xmrPrice : null;
   const hasRealBalance = realUnlockedBalance !== null;
-  const hasCachedBalance = realBalance !== null && realUnlockedBalance === null;
+
+  // Human-readable "last checked" timestamp
+  const getRelativeTime = (ts: number | null): string => {
+    if (!ts) return '';
+    const secs = Math.floor((Date.now() - ts) / 1000);
+    if (secs < 10) return 'just now';
+    if (secs < 60) return `${secs}s ago`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ago`;
+  };
+  const [, forceUpdate] = useState(0);
+  // Tick every 10s to update relative time
+  useEffect(() => {
+    if (!cachedTimestamp) return;
+    const iv = setInterval(() => forceUpdate(n => n + 1), 10000);
+    return () => clearInterval(iv);
+  }, [cachedTimestamp]);
 
   // Load cached balance instantly + fetch real balance when dialog opens
   useEffect(() => {
     if (!open) return;
 
-    // 1. Load cache instantly
+    // 1. Load cache instantly (in case state was cleared by seed change)
     const cached = getCachedBalance();
     if (cached) {
-      setRealBalance(cached.unlockedBalance);
+      setRealBalance(cached.balance);
+      setRealUnlockedBalance(cached.unlockedBalance);
+      setCachedTimestamp(cached.timestamp);
     }
 
     // 2. Start real balance check if seed available
@@ -102,6 +132,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         .then(({ balance, unlockedBalance }) => {
           setRealBalance(balance);
           setRealUnlockedBalance(unlockedBalance);
+          setCachedTimestamp(Date.now());
           setBalanceLoading(false);
           setBalanceSyncMsg('');
         })
@@ -112,14 +143,7 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
         });
     }
 
-    return () => {
-      // Reset on close
-      setRealBalance(null);
-      setRealUnlockedBalance(null);
-      setBalanceLoading(false);
-      setBalanceError(false);
-      setBalanceSyncMsg('');
-    };
+    // No cleanup — keep cached values across open/close cycles
   }, [open, merchant.viewOnlySeedPhrase, effectiveNodeUrl]);
 
   // Determine if admin auth is required: only when multiple users exist
@@ -342,29 +366,39 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                      {hasRealBalance ? 'On-Chain Balance' : balanceLoading ? 'Checking Balance' : 'Wallet Balance'}
+                      {hasRealBalance ? 'On-Chain Balance' : balanceLoading && !realBalance ? 'Checking Balance' : 'Wallet Balance'}
                     </p>
                     {balanceLoading && (
                       <Loader2 className="w-3 h-3 animate-spin text-primary" />
                     )}
-                    {hasRealBalance && (
+                    {hasRealBalance && !balanceLoading && (
                       <Badge variant="outline" className="text-[8px] px-1 py-0 border-primary/30 text-primary">LIVE</Badge>
+                    )}
+                    {hasRealBalance && balanceLoading && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 border-muted-foreground/30 text-muted-foreground">CACHED</Badge>
                     )}
                     {balanceError && !hasRealBalance && (
                       <Badge variant="outline" className="text-[8px] px-1 py-0 border-warning/30 text-warning">ESTIMATE</Badge>
                     )}
                   </div>
-                  {balanceLoading && !realBalance && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{balanceSyncMsg || 'Connecting...'}</p>
-                  )}
-                  {(realBalance !== null || !balanceLoading) && (
+                  {/* Always show balance if we have any value */}
+                  {(realBalance !== null || realUnlockedBalance !== null || !balanceLoading) && (
                     <p className="text-sm font-bold text-foreground font-mono">{formatXMR(displayBalance)}</p>
                   )}
-                  {balanceLoading && realBalance !== null && (
+                  {/* Show sync message when loading with no cached data */}
+                  {balanceLoading && realBalance === null && realUnlockedBalance === null && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{balanceSyncMsg || 'Connecting...'}</p>
+                  )}
+                  {/* Show updating message when refreshing cached data */}
+                  {balanceLoading && (realBalance !== null || realUnlockedBalance !== null) && (
                     <p className="text-[9px] text-muted-foreground">{balanceSyncMsg || 'Updating...'}</p>
                   )}
+                  {/* Timestamp */}
+                  {cachedTimestamp && !balanceLoading && (
+                    <p className="text-[9px] text-muted-foreground mt-0.5">Last checked: {getRelativeTime(cachedTimestamp)}</p>
+                  )}
                 </div>
-                {displayBalanceFiat !== null && (realBalance !== null || !balanceLoading) && (
+                {displayBalanceFiat !== null && (realBalance !== null || realUnlockedBalance !== null || !balanceLoading) && (
                   <div className="text-right">
                     <p className="text-sm font-medium text-muted-foreground">
                       {sym}{displayBalanceFiat.toFixed(2)} {cur}
