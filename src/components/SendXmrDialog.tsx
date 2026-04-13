@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { verifyTxOutputs, getMempoolTxHashes, getTxInfo } from '@/lib/block-explorer';
 import { motion } from 'framer-motion';
-import { sendViaDaemonProxy, sendViaWasmWallet, type SyncProgress, type SendMode } from '@/lib/wallet-send';
+import { sendViaDaemonProxy, sendViaWasmWallet, checkWalletBalance, getCachedBalance, clearBalanceCache, type SyncProgress, type SendMode } from '@/lib/wallet-send';
 
 // Fee tiers for sending
 const SEND_FEE_TIERS = [
