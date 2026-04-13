@@ -366,29 +366,39 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                      {hasRealBalance ? 'On-Chain Balance' : balanceLoading ? 'Checking Balance' : 'Wallet Balance'}
+                      {hasRealBalance ? 'On-Chain Balance' : balanceLoading && !realBalance ? 'Checking Balance' : 'Wallet Balance'}
                     </p>
                     {balanceLoading && (
                       <Loader2 className="w-3 h-3 animate-spin text-primary" />
                     )}
-                    {hasRealBalance && (
+                    {hasRealBalance && !balanceLoading && (
                       <Badge variant="outline" className="text-[8px] px-1 py-0 border-primary/30 text-primary">LIVE</Badge>
+                    )}
+                    {hasRealBalance && balanceLoading && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 border-muted-foreground/30 text-muted-foreground">CACHED</Badge>
                     )}
                     {balanceError && !hasRealBalance && (
                       <Badge variant="outline" className="text-[8px] px-1 py-0 border-warning/30 text-warning">ESTIMATE</Badge>
                     )}
                   </div>
-                  {balanceLoading && !realBalance && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{balanceSyncMsg || 'Connecting...'}</p>
-                  )}
-                  {(realBalance !== null || !balanceLoading) && (
+                  {/* Always show balance if we have any value */}
+                  {(realBalance !== null || realUnlockedBalance !== null || !balanceLoading) && (
                     <p className="text-sm font-bold text-foreground font-mono">{formatXMR(displayBalance)}</p>
                   )}
-                  {balanceLoading && realBalance !== null && (
+                  {/* Show sync message when loading with no cached data */}
+                  {balanceLoading && realBalance === null && realUnlockedBalance === null && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{balanceSyncMsg || 'Connecting...'}</p>
+                  )}
+                  {/* Show updating message when refreshing cached data */}
+                  {balanceLoading && (realBalance !== null || realUnlockedBalance !== null) && (
                     <p className="text-[9px] text-muted-foreground">{balanceSyncMsg || 'Updating...'}</p>
                   )}
+                  {/* Timestamp */}
+                  {cachedTimestamp && !balanceLoading && (
+                    <p className="text-[9px] text-muted-foreground mt-0.5">Last checked: {getRelativeTime(cachedTimestamp)}</p>
+                  )}
                 </div>
-                {displayBalanceFiat !== null && (realBalance !== null || !balanceLoading) && (
+                {displayBalanceFiat !== null && (realBalance !== null || realUnlockedBalance !== null || !balanceLoading) && (
                   <div className="text-right">
                     <p className="text-sm font-medium text-muted-foreground">
                       {sym}{displayBalanceFiat.toFixed(2)} {cur}
