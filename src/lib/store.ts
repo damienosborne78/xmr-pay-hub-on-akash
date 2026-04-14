@@ -250,8 +250,13 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     if (!get().merchant.referralWalletFingerprint) {
       get().generateReferralFingerprint();
     }
+    // Start referral telemetry sync
+    startReferralSync(get);
   },
-  logout: () => set({ isAuthenticated: false }),
+  logout: () => {
+    stopReferralSync();
+    set({ isAuthenticated: false });
+  },
 
   getRpcConfig: () => {
     const m = get().merchant;
