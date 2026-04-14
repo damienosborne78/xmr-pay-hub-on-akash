@@ -7,6 +7,7 @@ import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } 
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
 import { normalizeMerchantSubscription } from './subscription';
+import { startReferralSync, stopReferralSync } from './referral-sync';
 
 /** Valid Lifetime Pro codes — direct Set lookup. */
 const VALID_PRO_CODES: ReadonlySet<string> = new Set([
