@@ -867,6 +867,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   },
 
   deleteAccount: () => {
+    stopReferralSync();
     set({
       isAuthenticated: false,
       merchant: defaultMerchant,
