@@ -2,21 +2,28 @@ import { serve, file } from 'bun';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
-// ─── Pro Codes JSON persistence ───
+// ─── Data directory ───
 const DATA_DIR = join(import.meta.dir, 'data');
 const CODES_FILE = join(DATA_DIR, 'pro-codes.json');
+const REFERRAL_FILE = join(DATA_DIR, 'referral-telemetry.json');
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 
-function loadCodes() {
-  try {
-    if (existsSync(CODES_FILE)) return JSON.parse(readFileSync(CODES_FILE, 'utf-8'));
-  } catch {}
-  return [];
+// ─── JSON helpers ───
+function loadJSON(path) {
+  try { if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf-8')); } catch {}
+  return path === REFERRAL_FILE ? {} : [];
 }
+function saveJSON(path, data) { writeFileSync(path, JSON.stringify(data, null, 2)); }
 
-function saveCodes(codes) {
-  writeFileSync(CODES_FILE, JSON.stringify(codes, null, 2));
+function loadCodes() { return loadJSON(CODES_FILE); }
+function saveCodes(codes) { saveJSON(CODES_FILE, codes); }
+function loadReferrals() { return loadJSON(REFERRAL_FILE); }
+function saveReferrals(data) { saveJSON(REFERRAL_FILE, data); }
+
+// ─── Input validation ───
+function isValidReferralCode(code) {
+  return typeof code === 'string' && /^[A-Z0-9]{4,12}$/i.test(code);
 }
 
 // ─── CORS headers ───
@@ -51,24 +58,22 @@ serve({
       return json({ ok: true, ts: Date.now() });
     }
 
-    // List all codes (used by Master Access to show codes)
+    // ── Pro Codes ──
+
     if (pathname === '/api/mf/codes' && req.method === 'GET') {
       return json(loadCodes());
     }
 
-    // Create a new pro code
     if (pathname === '/api/mf/codes/create' && req.method === 'POST') {
       const body = await req.json();
       if (!body.code) return json({ error: 'Missing code' }, 400);
       const codes = loadCodes();
-      // Prevent duplicates
       if (codes.find(c => c.code === body.code)) return json({ error: 'Duplicate' }, 409);
       codes.push({ code: body.code, createdAt: body.createdAt || new Date().toISOString(), usedBy: null });
       saveCodes(codes);
       return json({ ok: true, code: body.code });
     }
 
-    // Validate a code (check if it exists and is unused) — used by new clients
     if (pathname === '/api/mf/codes/validate' && req.method === 'POST') {
       const body = await req.json();
       const code = (body.code || '').toUpperCase();
@@ -79,7 +84,6 @@ serve({
       return json({ valid: true, code: entry.code });
     }
 
-    // Redeem a code
     if (pathname === '/api/mf/codes/redeem' && req.method === 'POST') {
       const body = await req.json();
       const code = (body.code || '').toUpperCase();
@@ -91,6 +95,52 @@ serve({
       codes[idx].redeemedAt = new Date().toISOString();
       saveCodes(codes);
       return json({ ok: true });
+    }
+
+    // ── Referral Telemetry ──
+
+    // POST /api/mf/referral/sync — upsert referral data keyed by referralCode
+    if (pathname === '/api/mf/referral/sync' && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        const code = body.referralCode;
+        if (!isValidReferralCode(code)) {
+          return json({ error: 'Invalid or missing referralCode' }, 400);
+        }
+        const db = loadReferrals();
+        db[code] = {
+          referralCode: code,
+          proCode: body.proCode || null,
+          referredBy: body.referredBy || null,
+          proStatus: body.proStatus || 'free',
+          proActivatedAt: body.proActivatedAt || null,
+          referrals: Array.isArray(body.referrals) ? body.referrals.slice(0, 500) : [],
+          referralPayouts: Array.isArray(body.referralPayouts) ? body.referralPayouts.slice(0, 500) : [],
+          lastSyncAt: body.lastSyncAt || new Date().toISOString(),
+          serverReceivedAt: new Date().toISOString(),
+        };
+        saveReferrals(db);
+        return json({ ok: true, code });
+      } catch {
+        return json({ error: 'Invalid JSON' }, 400);
+      }
+    }
+
+    // GET /api/mf/referral/sync?code=ABC123 — retrieve a user's synced data
+    if (pathname === '/api/mf/referral/sync' && req.method === 'GET') {
+      const code = url.searchParams.get('code');
+      if (!code || !isValidReferralCode(code)) {
+        return json({ error: 'Missing or invalid code param' }, 400);
+      }
+      const db = loadReferrals();
+      const entry = db[code] || null;
+      if (!entry) return json({ error: 'not_found' }, 404);
+      return json(entry);
+    }
+
+    // GET /api/mf/referral/all — list all synced referral users (admin/debug)
+    if (pathname === '/api/mf/referral/all' && req.method === 'GET') {
+      return json(loadReferrals());
     }
 
     // ─── Static file serving ───

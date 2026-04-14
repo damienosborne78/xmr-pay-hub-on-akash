@@ -7,6 +7,7 @@ import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } 
 import { findFastestNode, connectWithFailover, testNode, REMOTE_NODES, type NodeStatus } from './node-manager';
 import { getRates, fiatToXmr, getStaleCache } from './currency-service';
 import { normalizeMerchantSubscription } from './subscription';
+import { startReferralSync, stopReferralSync } from './referral-sync';
 
 /** Valid Lifetime Pro codes — direct Set lookup. */
 const VALID_PRO_CODES: ReadonlySet<string> = new Set([
@@ -249,8 +250,13 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     if (!get().merchant.referralWalletFingerprint) {
       get().generateReferralFingerprint();
     }
+    // Start referral telemetry sync
+    startReferralSync(get);
   },
-  logout: () => set({ isAuthenticated: false }),
+  logout: () => {
+    stopReferralSync();
+    set({ isAuthenticated: false });
+  },
 
   getRpcConfig: () => {
     const m = get().merchant;
@@ -861,6 +867,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   },
 
   deleteAccount: () => {
+    stopReferralSync();
     set({
       isAuthenticated: false,
       merchant: defaultMerchant,
