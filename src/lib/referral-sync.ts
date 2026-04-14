@@ -62,7 +62,7 @@ function collectPayload(get: () => any): ReferralSyncPayload | null {
     referralCode,
     proCode,
     referredBy: merchant.referredBy || null,
-    proStatus: merchant.subscription === 'pro' ? 'pro' : 'free',
+    proStatus: (merchant.proStatus === 'pro' || merchant.proStatus === 'pro_referral') ? 'pro' : 'free',
     proActivatedAt: merchant.proActivatedAt || null,
     referrals: (state.referrals || []).map((r: any) => ({
       username: r.username || r.name || '',
