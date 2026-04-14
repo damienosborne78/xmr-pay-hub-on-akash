@@ -1,0 +1,119 @@
+/**
+ * Referral Telemetry Sync
+ *
+ * Periodically sends each user's referral data to the creator server
+ * over HTTPS (port 443). Users are identified by their unique
+ * wallet-derived referral code (e.g. "J84HX3").
+ *
+ * No sensitive data (keys, seeds) is ever transmitted.
+ */
+
+import { CREATOR_SERVER_FQDN } from './mock-data';
+
+const SYNC_INTERVAL_MS = 60_000; // 60 seconds
+const SYNC_ENDPOINT = `https://${CREATOR_SERVER_FQDN}/api/mf/referral/sync`;
+
+let syncTimer: ReturnType<typeof setInterval> | null = null;
+
+export interface ReferralSyncPayload {
+  referralCode: string;
+  proCode: string | null;
+  referredBy: string | null;
+  proStatus: 'free' | 'pro';
+  proActivatedAt: string | null;
+  referrals: Array<{
+    username: string;
+    level: number;
+    commission: number;
+    status: string;
+    joinedAt: string;
+  }>;
+  referralPayouts: Array<{
+    xmrAmount: number;
+    date: string;
+    from: string;
+    level: number;
+    status: string;
+  }>;
+  lastSyncAt: string;
+}
+
+/**
+ * Collect referral telemetry from the Zustand store getter.
+ */
+function collectPayload(get: () => any): ReferralSyncPayload | null {
+  const state = get();
+  const merchant = state.merchant;
+
+  const referralCode = merchant?.referralWalletFingerprint;
+  if (!referralCode) return null; // No fingerprint yet — skip
+
+  // Determine the pro code used (lifetime code path)
+  let proCode: string | null = null;
+  if (merchant.proTxid && typeof merchant.proTxid === 'string') {
+    if (merchant.proTxid.startsWith('LIFETIME-CODE-')) {
+      proCode = merchant.proTxid.replace('LIFETIME-CODE-', '');
+    } else {
+      proCode = merchant.proTxid;
+    }
+  }
+
+  return {
+    referralCode,
+    proCode,
+    referredBy: merchant.referredBy || null,
+    proStatus: merchant.subscription === 'pro' ? 'pro' : 'free',
+    proActivatedAt: merchant.proActivatedAt || null,
+    referrals: (state.referrals || []).map((r: any) => ({
+      username: r.username || r.name || '',
+      level: r.level ?? 1,
+      commission: r.commission ?? 0,
+      status: r.status || 'active',
+      joinedAt: r.joinedAt || r.createdAt || '',
+    })),
+    referralPayouts: (state.referralPayouts || []).map((p: any) => ({
+      xmrAmount: p.xmrAmount ?? p.amount ?? 0,
+      date: p.date || p.createdAt || '',
+      from: p.from || '',
+      level: p.level ?? 1,
+      status: p.status || 'pending',
+    })),
+    lastSyncAt: new Date().toISOString(),
+  };
+}
+
+async function doSync(get: () => any): Promise<void> {
+  try {
+    const payload = collectPayload(get);
+    if (!payload) return;
+
+    await fetch(SYNC_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Fail silently — offline-tolerant
+  }
+}
+
+/**
+ * Start the periodic referral sync. Call once after login.
+ * @param get - Zustand store getter
+ */
+export function startReferralSync(get: () => any): void {
+  stopReferralSync();
+  // Immediate first sync
+  doSync(get);
+  syncTimer = setInterval(() => doSync(get), SYNC_INTERVAL_MS);
+}
+
+/**
+ * Stop the periodic sync. Call on logout / account deletion.
+ */
+export function stopReferralSync(): void {
+  if (syncTimer !== null) {
+    clearInterval(syncTimer);
+    syncTimer = null;
+  }
+}
