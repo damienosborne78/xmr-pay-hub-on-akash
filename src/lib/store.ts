@@ -757,7 +757,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 
     // --- Server-side validation (prevents cross-browser reuse) ---
     try {
-      const valResp = await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/validate`, {
+      const valResp = await fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: upperCode }),
@@ -767,7 +767,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         if (!valData.valid) return false; // Server says already used or not found
       }
       // If server validates, redeem it server-side
-      await fetch(`${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
+      await fetch(`https://${CREATOR_SERVER_FQDN}/api/mf/codes/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: upperCode, redeemedBy: get().merchant.referralWalletFingerprint || 'unknown' }),
