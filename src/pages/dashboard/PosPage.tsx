@@ -705,7 +705,9 @@ export default function PosPage() {
       <div className="flex-1 flex justify-center">
       <div className="w-full max-w-xs space-y-4">
         <div className="text-center">
-          <Badge variant="outline" className="mb-3 text-primary border-primary/20">PoS Terminal</Badge>
+          <Badge variant="outline" className="mb-3 text-primary border-primary/20">PoS Terminal
+            <HelpIcon text="Point-of-Sale terminal for in-person payments. Enter an amount, tap Charge, and show the QR code to the customer. Tap the amount display to switch between fiat and XMR input." />
+          </Badge>
           <button
             onClick={() => { if (!(isPro && cart.length > 0)) { setXmrMode(m => !m); setInput('0'); } }}
             className="group cursor-pointer block mx-auto"
