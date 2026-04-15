@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { HelpProvider } from '@/components/HelpProvider';
 import { BrandLogo } from '@/components/BrandLogo';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
@@ -195,24 +196,26 @@ function ManagedBadge() {
 
 export default function DashboardLayout() {
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <DashboardSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
-            <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-            <div className="flex items-center gap-3">
-              <SeedBackupWarning />
-              <ManagedBadge />
-              <PrivacyBanner />
-            </div>
-          </header>
-          <main className="flex-1 p-6 overflow-auto">
-            <Outlet />
-          </main>
-          <ThemeToggle />
+    <HelpProvider>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <DashboardSidebar />
+          <div className="flex-1 flex flex-col min-w-0">
+            <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
+              <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+              <div className="flex items-center gap-3">
+                <SeedBackupWarning />
+                <ManagedBadge />
+                <PrivacyBanner />
+              </div>
+            </header>
+            <main className="flex-1 p-6 overflow-auto">
+              <Outlet />
+            </main>
+            <ThemeToggle />
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </HelpProvider>
   );
 }
