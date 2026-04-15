@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { formatFiat, formatXMR, usdToXmr, PosQuickButton, CartItem, ParkedOrder } from '@/lib/mock-data';
 import { useRates } from '@/hooks/use-rates';
-import { fiatToXmr } from '@/lib/currency-service';
+import { fiatToXmr, xmrToFiat } from '@/lib/currency-service';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Delete, Check, Loader2, Lock, Plus, X, Tag, ShoppingBag,
   Search, Star, Clock, ParkingCircle, Percent, StickyNote,
-  Receipt, ChevronRight, Minus, Package, Sparkles, Zap, Settings, Trash2
+  Receipt, ChevronRight, Minus, Package, Sparkles, Zap, Settings, Trash2, ArrowUpDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -61,6 +61,7 @@ export default function PosPage() {
   };
 
   const [input, setInput] = useState('0');
+  const [xmrMode, setXmrMode] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<{ id: string; fiatAmount: number; xmrAmount: number; subaddress: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [showAddButton, setShowAddButton] = useState(false);
@@ -165,18 +166,27 @@ export default function PosPage() {
 
   const handleKey = useCallback((key: string) => {
     if (activeInvoice) return;
+    const maxDecimals = xmrMode ? 6 : 2;
     setInput(prev => {
       if (key === 'C') return '0';
       if (key === '⌫') return prev.length <= 1 ? '0' : prev.slice(0, -1);
       if (key === '.' && prev.includes('.')) return prev;
       if (prev === '0' && key !== '.') return key;
-      if (prev.includes('.') && prev.split('.')[1].length >= 2) return prev;
+      if (prev.includes('.') && prev.split('.')[1].length >= maxDecimals) return prev;
       return prev + key;
     });
-  }, [activeInvoice]);
+  }, [activeInvoice, xmrMode]);
 
   const handleCharge = async () => {
-    const amount = isPro && cart.length > 0 ? cartTotal : parseFloat(input);
+    let amount: number;
+    if (isPro && cart.length > 0) {
+      amount = cartTotal;
+    } else if (xmrMode && rates) {
+      // In XMR mode, convert entered XMR back to fiat for invoice
+      amount = xmrToFiat(parseFloat(input) || 0, cur, rates);
+    } else {
+      amount = parseFloat(input);
+    }
     if (!amount || amount <= 0) return;
     setCreating(true);
     const desc = isPro && cart.length > 0
@@ -195,6 +205,7 @@ export default function PosPage() {
   const handleNewSale = () => {
     setActiveInvoice(null);
     setInput('0');
+    setXmrMode(false);
     setCart([]);
     setOrderNote('');
     setAppliedDiscount(null);
@@ -694,12 +705,33 @@ export default function PosPage() {
       <div className="w-full max-w-xs space-y-4">
         <div className="text-center">
           <Badge variant="outline" className="mb-3 text-primary border-primary/20">PoS Terminal</Badge>
-          <div className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight tabular-nums">
-            {isPro && cart.length > 0 ? `${sym}${cartTotal.toFixed(2)}` : `${sym}${input}`}
-          </div>
-          <p className="text-muted-foreground text-sm mt-1.5 font-mono">
-            ≈ {formatXMR(toXmr(isPro && cart.length > 0 ? cartTotal : (parseFloat(input) || 0)))}
-          </p>
+          <button
+            onClick={() => { if (!(isPro && cart.length > 0)) { setXmrMode(m => !m); setInput('0'); } }}
+            className="group cursor-pointer block mx-auto"
+            title="Tap to toggle between fiat and XMR input"
+          >
+            <div className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight tabular-nums">
+              {isPro && cart.length > 0
+                ? `${sym}${cartTotal.toFixed(2)}`
+                : xmrMode
+                  ? `${parseFloat(input).toFixed(Math.min(6, (input.split('.')[1] || '').length || 0))} XMR`
+                  : `${sym}${input}`
+              }
+            </div>
+            <p className="text-muted-foreground text-sm mt-1.5 font-mono">
+              {isPro && cart.length > 0
+                ? `≈ ${formatXMR(toXmr(cartTotal))}`
+                : xmrMode
+                  ? `≈ ${sym}${rates ? xmrToFiat(parseFloat(input) || 0, cur, rates).toFixed(2) : '—'}`
+                  : `≈ ${formatXMR(toXmr(parseFloat(input) || 0))}`
+              }
+            </p>
+            {!(isPro && cart.length > 0) && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                <ArrowUpDown className="w-3 h-3" /> tap to switch
+              </span>
+            )}
+          </button>
           {appliedDiscount && (
             <div className="flex items-center justify-center gap-2 mt-1">
               <Badge className="bg-success/10 text-success border-success/20 text-[10px]">
