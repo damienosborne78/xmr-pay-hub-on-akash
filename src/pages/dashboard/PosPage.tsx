@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MoneroFeeInfo } from '@/components/MoneroFeeInfo';
 import { PaymentProgress } from '@/components/PaymentProgress';
+import { HelpIcon } from '@/components/HelpIcon';
 
 function ProLock({ label = 'Unlock Pro Sub' }: { label?: string }) {
   return (
