@@ -210,8 +210,13 @@ export interface PaymentLink {
   fiatAmount: number;
   fiatCurrency: string;
   label: string;
+  description?: string;
+  category?: string;
+  imageUrl?: string;
+  subaddress: string; // Reusable subaddress for this product
   createdAt: string;
-  uses: number;
+  totalUses: number;
+  active: boolean;
 }
 
 // Default merchant — empty, no mock data

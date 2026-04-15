@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, CREATOR_TREASURY_VIEW_KEY, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
+import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, PosQuickButton, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, CREATOR_TREASURY_VIEW_KEY, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
 import { createValidatedSubaddress, getTransfers, type RpcConfig } from './monero-rpc';
 import { scanRecentOutputs, verifyTxOutputs, getTxInfo } from './block-explorer';
 import { generateSubaddress as localGenerateSubaddress, generateBrowserWallet } from './wallet-generator';
@@ -182,7 +182,7 @@ interface AppState {
   referralPayouts: ReferralPayout[];
   login: () => void;
   logout: () => void;
-  createInvoice: (description: string, fiatAmount: number, subscriptionId?: string) => Promise<Invoice>;
+  createInvoice: (description: string, fiatAmount: number, subscriptionId?: string, preGeneratedSubaddress?: string) => Promise<Invoice>;
   simulateInvoice: (description: string, fiatAmount: number) => Promise<Invoice>;
   updateInvoice: (id: string, updates: Partial<Invoice>) => void;
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
@@ -195,6 +195,8 @@ interface AppState {
   cancelSubscription: (id: string) => void;
   createPaymentLink: (slug: string, fiatAmount: number, label: string, fiatCurrency?: string) => PaymentLink;
   deletePaymentLink: (id: string) => void;
+  importFromPos: () => Promise<number>;
+  togglePaymentLink: (id: string) => void;
   getRpcConfig: () => RpcConfig;
   autoConnectNode: () => Promise<NodeStatus | null>;
   refreshNodeStatus: () => Promise<void>;
@@ -211,6 +213,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   invoices: [],
   subscriptions: [],
   paymentLinks: [],
+  posInventory: [],
   referrals: [],
   referralPayouts: [],
 
@@ -361,12 +364,18 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     }
   },
 
-  createInvoice: async (description: string, fiatAmount: number, subscriptionId?: string) => {
+  createInvoice: async (description: string, fiatAmount: number, subscriptionId?: string, preGeneratedSubaddress?: string) => {
     const m = get().merchant;
     let subaddress = '';
     let subaddressIndex: number | undefined;
 
-    if (m.walletMode === 'viewonly' && m.viewOnlySetupComplete && m.viewOnlyViewKey && m.viewOnlyPublicSpendKey) {
+    if (preGeneratedSubaddress) {
+      // Use pre-generated subaddress (for payment links from URL)
+      subaddress = preGeneratedSubaddress;
+      // Still generate a fake index for tracking (won't be used for derivation)
+      subaddressIndex = m.viewOnlySubaddressIndex || 1;
+      console.log('[Store] Using pre-generated subaddress for payment link:', subaddress);
+    } else if (m.walletMode === 'viewonly' && m.viewOnlySetupComplete && m.viewOnlyViewKey && m.viewOnlyPublicSpendKey) {
       // Browser Wallet mode: derive subaddress locally using real Monero crypto
       const nextIndex = m.viewOnlySubaddressIndex || 1;
       try {
@@ -835,14 +844,19 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 
   createPaymentLink: (slug: string, fiatAmount: number, label: string, fiatCurrency?: string) => {
     const merchant = get().merchant;
+    // Use a base subaddress or payment address for reusable links
+    const subaddress = merchant.viewOnlyAddress || merchant.primarySubaddress || '';
+
     const link: PaymentLink = {
       id: 'pl_' + Math.random().toString(36).slice(2, 8),
       slug,
       fiatAmount,
       fiatCurrency: fiatCurrency || merchant.fiatCurrency || 'USD',
       label,
+      subaddress,
       createdAt: new Date().toISOString(),
-      uses: 0,
+      totalUses: 0,
+      active: true,
     };
     set(state => ({ paymentLinks: [link, ...state.paymentLinks] }));
     return link;
@@ -850,6 +864,43 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 
   deletePaymentLink: (id: string) => {
     set(state => ({ paymentLinks: state.paymentLinks.filter(l => l.id !== id) }));
+  },
+
+  importFromPos: async () => {
+    const merchant = get().merchant;
+    const posItems = merchant.posQuickButtons || [];
+
+    if (posItems.length === 0) {
+      throw new Error('No POS inventory items found. Add items to the POS terminal first.');
+    }
+
+    let imported = 0;
+    const existingSlugs = new Set(get().paymentLinks.map((l) => l.slug));
+
+    for (const item of posItems) {
+      const slug = item.label.toLowerCase().replace(/[^a-z0-9-]/g, '-') + `-${item.price}`;
+
+      if (existingSlugs.has(slug)) continue;
+
+      await get().createPaymentLink(
+        slug,
+        item.price,
+        item.label,
+        merchant.fiatCurrency || 'USD'
+      );
+      imported += 1;
+      existingSlugs.add(slug);
+    }
+
+    return imported;
+  },
+
+  togglePaymentLink: (id: string) => {
+    set(state => ({
+      paymentLinks: state.paymentLinks.map((l) =>
+        l.id === id ? { ...l, active: !l.active } : l
+      ),
+    }));
   },
 
   restoreFromBackup: (data: any) => {

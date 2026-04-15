@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ExternalLink, FileDown, Loader2, FlaskConical, RefreshCw, CheckCircle2, AlertCircle, Search } from 'lucide-react';
 import { FadeIn } from '@/components/FadeIn';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { toast } from 'sonner';
 import { useRates } from '@/hooks/use-rates';
 import { getXmrPrice } from '@/lib/currency-service';
@@ -141,8 +141,12 @@ export default function InvoicesPage() {
       <FadeIn>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Invoices
-              <HelpIcon text="Create and manage payment invoices. Each invoice generates a unique Monero subaddress for tracking payments on-chain." />
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              Invoices
+              <HelpTooltip
+                title="Invoices"
+                text="Create and manage payment invoices. Each invoice generates a unique Monero subaddress for tracking payments on-chain."
+              />
             </h1>
             <p className="text-muted-foreground text-sm">
               Create and manage payment invoices
@@ -150,21 +154,46 @@ export default function InvoicesPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Verify All Pending */}
             {pendingCount > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleVerifyAll}
-                disabled={verifyingAll}
-                className="border-primary/30 hover:border-primary/50 text-primary"
-              >
-                {verifyingAll ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-                Verify Pending ({pendingCount})
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleVerifyAll}
+                  disabled={verifyingAll}
+                  className="border-primary/30 hover:border-primary/50 text-primary"
+                >
+                  {verifyingAll ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                  Verify Pending ({pendingCount})
+                </Button>
+                <HelpTooltip
+                  title="Verify Pending"
+                  text="Check all pending invoices against the blockchain to confirm payments. This uses the TX hashes stored with each invoice."
+                />
+              </div>
             )}
 
             {/* User filter */}
+            {users.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Select value={filterUser} onValueChange={setFilterUser}>
+                  <SelectTrigger className="w-[140px] h-9 bg-background border-border text-sm">
+                    <SelectValue placeholder="All users" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="all">All Users</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <HelpTooltip
+                  title="Filter by User"
+                  text="Filter invoices to show only those created by a specific POS user. Useful for tracking individual sales performance."
+                />
+              </div>
+            )}
             {users.length > 0 && (
               <Select value={filterUser} onValueChange={setFilterUser}>
                 <SelectTrigger className="w-[140px] h-9 bg-background border-border text-sm">
@@ -182,6 +211,17 @@ export default function InvoicesPage() {
 
             {/* Simulate Invoice (admin only) */}
             {adminPasswordSet && adminVerified && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setShowSimulate(true)} className="border-border hover:border-warning/50 text-warning">
+                  <FlaskConical className="w-4 h-4 mr-1" /> Simulate
+                </Button>
+                <HelpTooltip
+                  title="Simulate Payment"
+                  text="Create a fake 'paid' invoice with a simulated transaction hash for testing purposes. Useful for testing accounting, payouts, and reporting."
+                />
+              </div>
+            )}
+            {adminPasswordSet && adminVerified && (
               <Button variant="outline" onClick={() => setShowSimulate(true)} className="border-border hover:border-warning/50 text-warning">
                 <FlaskConical className="w-4 h-4 mr-1" /> Simulate
               </Button>
@@ -193,10 +233,11 @@ export default function InvoicesPage() {
               </div>
             )}
 
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-orange hover:opacity-90"><Plus className="w-4 h-4 mr-2" /> New Invoice</Button>
-              </DialogTrigger>
+            <div className="flex items-center gap-2">
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-gradient-orange hover:opacity-90"><Plus className="w-4 h-4 mr-2" /> New Invoice</Button>
+                </DialogTrigger>
               <DialogContent className="bg-card border-border">
                 <DialogHeader><DialogTitle className="text-foreground">Create Invoice</DialogTitle></DialogHeader>
                 <div className="space-y-4 mt-2">
@@ -215,6 +256,11 @@ export default function InvoicesPage() {
                 </div>
               </DialogContent>
             </Dialog>
+              <HelpTooltip
+                title="Create Invoice"
+                text="Generate a new payment invoice with a unique Monero subaddress. Each invoice tracks its own payment on-chain separately."
+              />
+            </div>
           </div>
         </div>
       </FadeIn>

@@ -11,7 +11,7 @@ import { useRates } from '@/hooks/use-rates';
 import { getXmrPrice } from '@/lib/currency-service';
 import { Switch } from '@/components/ui/switch';
 import { useHelp } from '@/components/HelpProvider';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 
 export default function DashboardOverview() {
   const invoices = useStore(s => s.invoices);
@@ -111,14 +111,14 @@ export default function DashboardOverview() {
     <div className="space-y-6">
       <FadeIn>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3">
             <MoneroLogo size={28} />
             <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Info className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Help</span>
-            <Switch checked={helpEnabled} onCheckedChange={setHelpEnabled} />
+          <div className="flex items-center gap-3 bg-card/50 px-3 py-1.5 rounded-lg border border-border/50">
+            <Info className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs text-muted-foreground font-medium">Help</span>
+            <Switch checked={helpEnabled} onCheckedChange={setHelpEnabled} size="sm" />
           </div>
         </div>
         <p className="text-muted-foreground text-sm">Your MoneroFlow merchant overview</p>
@@ -142,7 +142,10 @@ export default function DashboardOverview() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-foreground">Wallet Status</span>
-                  <HelpIcon text="Shows whether your wallet is connected to a Monero node. Green = online and synced. You can reconnect or switch nodes in Settings." />
+                  <HelpTooltip
+                    title="Wallet Status"
+                    text="Shows whether your wallet is connected to a Monero node. Green = online and synced. You can reconnect or switch nodes in Settings."
+                  />
                   <Badge variant="outline" className={`${currentStatus.color} text-[10px] gap-1`}>
                     {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <StatusIcon className="w-3 h-3" />}
                     {isLoading ? 'Connecting...' : currentStatus.label}
@@ -210,12 +213,15 @@ export default function DashboardOverview() {
             <div className="p-5 rounded-xl bg-card border border-border hover:border-primary/20 transition-colors">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-muted-foreground text-sm">{s.label}</span>
-                <HelpIcon text={
-                  s.label === 'Total Received' ? 'The total amount you\'ve been paid across all confirmed invoices, shown in your local currency and XMR.' :
-                  s.label === 'XMR Rate' ? 'The current live exchange rate for 1 XMR in your local fiat currency.' :
-                  s.label === 'Total Invoices' ? 'The total number of invoices you\'ve created, including paid, pending, and expired.' :
-                  'The number of invoices currently awaiting payment from customers.'
-                } />
+                <HelpTooltip
+                  title={s.label}
+                  text={
+                    s.label === 'Total Received' ? 'The total amount you\'ve been paid across all confirmed invoices, shown in your local currency and XMR.' :
+                    s.label === 'XMR Rate' ? 'The current live exchange rate for 1 XMR in your local fiat currency.' :
+                    s.label === 'Total Invoices' ? 'The total number of invoices you\'ve created, including paid, pending, and expired.' :
+                    'The number of invoices currently awaiting payment from customers.'
+                  }
+                />
                 <s.icon className={`w-4 h-4 ${s.color}`} />
               </div>
               <p className="text-2xl font-bold text-foreground">{s.value}</p>
@@ -229,8 +235,12 @@ export default function DashboardOverview() {
         <FadeIn delay={0.25}>
           <div className="p-6 rounded-xl bg-card border border-border">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-foreground">Revenue
-                <HelpIcon text="Revenue chart showing your earnings over time. Toggle between daily, weekly, and monthly views. Only includes confirmed (paid) invoices." />
+              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                Revenue
+                <HelpTooltip
+                  title="Revenue Chart"
+                  text="Revenue chart showing your earnings over time. Toggle between daily, weekly, and monthly views. Only includes confirmed (paid) invoices."
+                />
               </h2>
               <div className="flex rounded-lg border border-border overflow-hidden">
                 {(['daily', 'weekly', 'monthly'] as const).map(tf => (
@@ -270,8 +280,12 @@ export default function DashboardOverview() {
 
       <FadeIn delay={0.3}>
         <div className="p-6 rounded-xl bg-card border border-border">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Recent Invoices
-            <HelpIcon text="Your most recent invoices across all statuses. Click through to the Invoices page for full details and management." />
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            Recent Invoices
+            <HelpTooltip
+              title="Recent Invoices"
+              text="Your most recent invoices across all statuses. Click through to the Invoices page for full details and management."
+            />
           </h2>
           {invoices.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">No invoices yet. Create one from the Invoices page.</p>

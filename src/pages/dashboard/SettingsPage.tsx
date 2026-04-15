@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
 import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio, Settings2, KeyRound } from 'lucide-react';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -211,7 +211,11 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-2xl">
       <FadeIn>
         <h1 className="text-2xl font-bold text-foreground">Settings
-          <HelpIcon text="Configure your merchant account — wallet connection, privacy mode, fee tiers, admin lock, and more." />
+          
+                <HelpTooltip
+                  title="Settings"
+                  text="Configure your merchant account — wallet connection, privacy mode, fee tiers, admin lock, and more."
+                />
         </h1>
         <p className="text-muted-foreground text-sm">Configure your merchant account</p>
       </FadeIn>
@@ -222,7 +226,11 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2">
             <Server className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Wallet & Node
-              <HelpIcon text="Choose how MoneroFlow connects to the Monero network. In-Browser Wallet is recommended for easy self-custody. Full Self-Custody lets you run your own monero-wallet-rpc." />
+              
+                <HelpTooltip
+                  title="Wallet & Node"
+                  text="Choose how MoneroFlow connects to the Monero network. In-Browser Wallet is recommended for easy self-custody. Full Self-Custody lets you run your own monero-wallet-rpc."
+                />
             </h2>
             <Dialog open={showRpcHelp} onOpenChange={setShowRpcHelp}>
               <DialogTrigger asChild>

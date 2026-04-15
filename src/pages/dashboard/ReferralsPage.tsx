@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FadeIn } from '@/components/FadeIn';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { Copy, Check, Users, TrendingUp, Coins, Gift, Zap, Crown, Shield, QrCode, Wallet, AlertTriangle, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -180,7 +180,10 @@ export default function ReferralsPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Gift className="w-6 h-6 text-primary" /> Referral Program
-              <HelpIcon text="Earn XMR by referring merchants. Your referral code is derived from your wallet — no signup needed. Multi-level commissions paid on-chain." />
+              <HelpTooltip
+                title="Referral Program"
+                text="Earn XMR by referring merchants. Your referral code is derived from your wallet — no signup needed. Multi-level commissions paid on-chain."
+              />
             </h1>
             <p className="text-muted-foreground text-sm">Earn XMR by referring merchants — decentralized, on-chain, forever.</p>
           </div>
@@ -351,7 +354,11 @@ export default function ReferralsPage() {
       <FadeIn delay={0.06}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Your Referral Code
-            <HelpIcon text="Your unique code derived from your wallet. Share it with other merchants — when they subscribe to Pro, you earn XMR commissions." />
+            
+                <HelpTooltip
+                  title="Your Referral Code"
+                  text="Your unique code derived from your wallet. Share it with other merchants — when they subscribe to Pro, you earn XMR commissions."
+                />
           </h2>
           <p className="text-xs text-muted-foreground">
             Your code is derived from your wallet — no signup needed. Share it with other merchants to earn XMR.

@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
 import { HardDrive, Cloud, Lock, Download, Upload, Loader2, ShieldCheck, Clock, Check, ExternalLink } from 'lucide-react';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { exportEncryptedBackup, importEncryptedBackup } from '@/lib/crypto-store';
@@ -410,7 +410,11 @@ export default function BackupsPage() {
     <div className="space-y-8 max-w-3xl">
       <FadeIn>
         <h1 className="text-2xl font-bold text-foreground">Backups
-          <HelpIcon text="Download or restore complete backups of your wallet, invoices, subscriptions, and all settings. Supports encrypted backups (Pro) and cloud sync." />
+          
+                <HelpTooltip
+                  title="Backups"
+                  text="Download or restore complete backups of your wallet, invoices, subscriptions, and all settings. Supports encrypted backups (Pro) and cloud sync."
+                />
         </h1>
         <p className="text-muted-foreground text-sm">Protect your data with local and cloud backups</p>
       </FadeIn>

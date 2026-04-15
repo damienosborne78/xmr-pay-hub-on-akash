@@ -3,7 +3,7 @@ import { formatXMR, formatFiat } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FadeIn } from '@/components/FadeIn';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState } from 'react';
 import { Send, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
@@ -39,7 +39,11 @@ export default function PaymentsPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Payment History
-              <HelpIcon text="All confirmed XMR payments — both received and sent. Filter by type or user. Click a TX hash to view it on the blockchain explorer." />
+              
+                <HelpTooltip
+                  title="Payment History"
+                  text="All confirmed XMR payments — both received and sent. Filter by type or user. Click a TX hash to view it on the blockchain explorer."
+                />
             </h1>
             <p className="text-muted-foreground text-sm">All confirmed XMR payments</p>
           </div>

@@ -1,5 +1,5 @@
 import { FadeIn } from '@/components/FadeIn';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,11 @@ export default function WhiteLabelPage() {
     <div className="space-y-8 max-w-3xl">
       <FadeIn>
         <h1 className="text-2xl font-bold text-foreground">White-Label & Embeds
-          <HelpIcon text="Customize checkout branding with your logo, colors, and custom domain. Generate embeddable checkout widgets and payment buttons for any website." />
+          
+                <HelpTooltip
+                  title="White-Label & Embeds"
+                  text="Customize checkout branding with your logo, colors, and custom domain. Generate embeddable checkout widgets and payment buttons for any website."
+                />
         </h1>
         <p className="text-muted-foreground text-sm">Customize branding, embed checkout widgets, and create payment buttons</p>
       </FadeIn>

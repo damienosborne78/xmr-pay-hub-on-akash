@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { HelpProvider } from '@/components/HelpProvider';
+import { HelpDialog } from '@/components/HelpDialog';
 import { BrandLogo } from '@/components/BrandLogo';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
@@ -216,6 +217,7 @@ export default function DashboardLayout() {
           </div>
         </div>
       </SidebarProvider>
+      <HelpDialog />
     </HelpProvider>
   );
 }

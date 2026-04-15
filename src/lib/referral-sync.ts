@@ -14,6 +14,7 @@ const SYNC_INTERVAL_MS = 60_000; // 60 seconds
 const SYNC_ENDPOINT = `https://${CREATOR_SERVER_FQDN}/api/mf/referral/sync`;
 
 let syncTimer: ReturnType<typeof setInterval> | null = null;
+let isFirstSyncDone = false;
 
 export interface ReferralSyncPayload {
   referralCode: string;
@@ -36,6 +37,7 @@ export interface ReferralSyncPayload {
     status: string;
   }>;
   lastSyncAt: string;
+  isFirstSync: boolean; // Backend uses this to count new signups vs returning users
 }
 
 /**
@@ -87,11 +89,20 @@ async function doSync(get: () => any): Promise<void> {
     const payload = collectPayload(get);
     if (!payload) return;
 
+    const syncPayload = {
+      ...payload,
+      isFirstSync: !isFirstSyncDone,
+    };
+
     await fetch(SYNC_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(syncPayload),
     });
+
+    if (!isFirstSyncDone) {
+      isFirstSyncDone = true;
+    }
   } catch {
     // Fail silently — offline-tolerant
   }
@@ -105,6 +116,7 @@ export function startReferralSync(get: () => any): void {
   stopReferralSync();
   // Immediate first sync
   doSync(get);
+  // Periodic sync (every 60s)
   syncTimer = setInterval(() => doSync(get), SYNC_INTERVAL_MS);
 }
 
@@ -116,4 +128,5 @@ export function stopReferralSync(): void {
     clearInterval(syncTimer);
     syncTimer = null;
   }
+  isFirstSyncDone = false;
 }

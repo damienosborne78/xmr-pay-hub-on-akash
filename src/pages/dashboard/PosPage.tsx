@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MoneroFeeInfo } from '@/components/MoneroFeeInfo';
 import { PaymentProgress } from '@/components/PaymentProgress';
-import { HelpIcon } from '@/components/HelpIcon';
+import { HelpTooltip } from '@/components/HelpTooltip';
 
 function ProLock({ label = 'Unlock Pro Sub' }: { label?: string }) {
   return (
@@ -705,9 +705,13 @@ export default function PosPage() {
       <div className="flex-1 flex justify-center">
       <div className="w-full max-w-xs space-y-4">
         <div className="text-center">
-          <Badge variant="outline" className="mb-3 text-primary border-primary/20">PoS Terminal
-            <HelpIcon text="Point-of-Sale terminal for in-person payments. Enter an amount, tap Charge, and show the QR code to the customer. Tap the amount display to switch between fiat and XMR input." />
-          </Badge>
+          <div className="mb-3">
+            <Badge variant="outline" className="text-primary border-primary/20 mr-2">PoS Terminal</Badge>
+            <HelpTooltip
+              title="PoS Terminal"
+              text="Point-of-Sale terminal for in-person payments. Enter an amount, tap Charge, and show the QR code to the customer. Tap the amount display to switch between fiat and XMR input."
+            />
+          </div>
           <button
             onClick={() => { if (!(isPro && cart.length > 0)) { setXmrMode(m => !m); setInput('0'); } }}
             className="group cursor-pointer block mx-auto"
