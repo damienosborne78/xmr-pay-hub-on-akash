@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { Plus, Copy, Trash2, ExternalLink, Link2, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -55,7 +56,9 @@ export default function PaymentLinksPage() {
       <FadeIn>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Payment Links</h1>
+            <h1 className="text-2xl font-bold text-foreground">Payment Links
+              <HelpIcon text="Create shareable payment links — no code required. Share a URL and customers get a Monero checkout page instantly." />
+            </h1>
             <p className="text-muted-foreground text-sm">Shareable links — no code required</p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>

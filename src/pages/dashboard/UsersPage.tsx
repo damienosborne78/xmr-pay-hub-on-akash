@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Users, ShieldCheck, Plus, Trash2, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
@@ -89,6 +90,7 @@ export default function UsersPage() {
       <FadeIn>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Users className="w-6 h-6 text-primary" /> Users & Access
+          <HelpIcon text="Manage your admin password and PoS cashier users. Each cashier has a name and PIN, and their sales are tracked separately." />
         </h1>
         <p className="text-muted-foreground text-sm">Manage admin password and PoS cashier users</p>
       </FadeIn>
@@ -99,7 +101,9 @@ export default function UsersPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">Admin Password</h2>
+              <h2 className="text-lg font-semibold text-foreground">Admin Password
+                <HelpIcon text="The admin password protects destructive actions like deleting items, exporting data, restoring backups, and managing users." />
+              </h2>
             </div>
             <Badge variant="outline" className={adminPasswordSet ? 'bg-success/10 text-success border-success/20' : 'bg-destructive/10 text-destructive border-destructive/20'}>
               {adminPasswordSet ? 'Set' : 'Not Set'}

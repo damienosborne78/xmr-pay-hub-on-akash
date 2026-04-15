@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingUp, DollarSign, BarChart3, Users } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { useMemo, useState } from 'react';
 import { useRates } from '@/hooks/use-rates';
 import { getXmrPrice } from '@/lib/currency-service';
@@ -97,7 +98,9 @@ export default function AnalyticsPage() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <BarChart3 className="w-7 h-7 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+              <h1 className="text-2xl font-bold text-foreground">Analytics
+                <HelpIcon text="Revenue tracking and sales overview. View totals, charts, and per-user performance breakdowns. Toggle between daily, weekly, and monthly views." />
+              </h1>
             </div>
             <p className="text-muted-foreground text-sm">Revenue tracking, XMR price monitoring, and sales overview</p>
           </div>

@@ -1,4 +1,5 @@
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -65,7 +66,9 @@ export default function LocalizationPage() {
   return (
     <div className="space-y-8 max-w-3xl">
       <FadeIn>
-        <h1 className="text-2xl font-bold text-foreground">Localization</h1>
+        <h1 className="text-2xl font-bold text-foreground">Localization
+          <HelpIcon text="Configure checkout languages, local currency display, and tax/VAT compliance rules for different regions." />
+        </h1>
         <p className="text-muted-foreground text-sm">Multi-language checkout, local currencies, and regional compliance</p>
       </FadeIn>
 
