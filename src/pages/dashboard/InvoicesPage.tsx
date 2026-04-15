@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ExternalLink, FileDown, Loader2, FlaskConical, RefreshCw, CheckCircle2, AlertCircle, Search } from 'lucide-react';
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { toast } from 'sonner';
 import { useRates } from '@/hooks/use-rates';
 import { getXmrPrice } from '@/lib/currency-service';
@@ -140,7 +141,9 @@ export default function InvoicesPage() {
       <FadeIn>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
+            <h1 className="text-2xl font-bold text-foreground">Invoices
+              <HelpIcon text="Create and manage payment invoices. Each invoice generates a unique Monero subaddress for tracking payments on-chain." />
+            </h1>
             <p className="text-muted-foreground text-sm">
               Create and manage payment invoices
               {xmrPrice && <span className="ml-2 text-primary font-mono text-xs">XMR: {formatFiat(xmrPrice, sym, cur)}</span>}

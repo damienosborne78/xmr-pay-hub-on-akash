@@ -1,4 +1,5 @@
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,7 +92,9 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-8 max-w-4xl">
       <FadeIn>
-        <h1 className="text-2xl font-bold text-foreground">Integrations</h1>
+        <h1 className="text-2xl font-bold text-foreground">Integrations
+          <HelpIcon text="Connect MoneroFlow to your store platform (Shopify, WooCommerce) and automate workflows with Zapier, Make, or n8n." />
+        </h1>
         <p className="text-muted-foreground text-sm">Connect MoneroFlow to your store platform and automate workflows</p>
       </FadeIn>
 

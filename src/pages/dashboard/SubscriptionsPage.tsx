@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { isMerchantPro } from '@/lib/subscription';
 import { Plus, RefreshCw, Pause, Play, X, Crown, Zap, Shield, Check, Copy, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
@@ -98,7 +99,9 @@ export default function SubscriptionsPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-semibold text-foreground">Pro Plan</h2>
+                  <h2 className="text-lg font-semibold text-foreground">Pro Plan
+                    <HelpIcon text="Upgrade to Pro to unlock Privacy Mode, multiple PoS users, white-label branding, and priority support. Pay with XMR or earn it via referrals." />
+                  </h2>
                   <Badge variant="outline" className={isPro ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted-foreground'}>
                     {isPro ? (merchant.proUnlockedViaReferrals ? 'Referral Pro' : merchant.proStatus === 'pro_referral' ? 'Lifetime' : 'Active') : 'Free Plan'}
                   </Badge>
@@ -212,7 +215,9 @@ export default function SubscriptionsPage() {
       <FadeIn delay={0.05}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Subscriptions</h1>
+            <h1 className="text-2xl font-bold text-foreground">Subscriptions
+              <HelpIcon text="Recurring XMR payments auto-invoiced on schedule. Create weekly or monthly subscriptions for your customers." />
+            </h1>
             <p className="text-muted-foreground text-sm">Recurring XMR payments — auto-invoiced on schedule</p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>

@@ -1,4 +1,5 @@
 import { FadeIn } from '@/components/FadeIn';
+import { HelpIcon } from '@/components/HelpIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -261,7 +262,9 @@ export default function PayoutsPage() {
   return (
     <div className="space-y-8 max-w-3xl">
       <FadeIn>
-        <h1 className="text-2xl font-bold text-foreground">Payouts & Accounting</h1>
+        <h1 className="text-2xl font-bold text-foreground">Payouts & Accounting
+          <HelpIcon text="Export your transaction history for tax reporting. Supports CSV, QuickBooks IIF, Xero CSV, and PDF reports. Pro feature." />
+        </h1>
         <p className="text-muted-foreground text-sm">Settlements and accounting exports</p>
       </FadeIn>
 
