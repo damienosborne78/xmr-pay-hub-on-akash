@@ -205,6 +205,10 @@ interface AppState {
   activateProSubscription: (txid: string) => Promise<{ success: boolean; error?: string }>;
   checkReferralProUnlock: () => boolean;
   generateReferralFingerprint: () => string;
+  // Cold wallet auto-sweep functions
+  calculateCumulativeReceived: () => number;
+  runSweepCheck: () => Promise<{ success: boolean; sweptAmount: number; txHash?: string; error?: string }>;
+  resetSweepCounter: () => void;
 }
 
 export const useStore = create<AppState>()(persist((set, get) => ({
@@ -554,36 +558,6 @@ export const useStore = create<AppState>()(persist((set, get) => ({
           }),
         }).catch(() => {});
       }
-
-      // Auto-sweep to cold wallet or settlement address after payment
-      if (newStatus === 'paid' && !wasPaid) {
-        const sweepAddress = m.autoSweepEnabled && m.coldWalletAddress
-          ? m.coldWalletAddress
-          : m.settlementAddress || null;
-
-        if (sweepAddress && m.viewOnlySetupComplete && m.viewOnlySeedPhrase) {
-          const threshold = m.autoSweepEnabled ? m.autoSweepThreshold : 0;
-          const amountToSweep = invoice.xmrAmount;
-
-          if (amountToSweep >= threshold) {
-            import('./wallet-send').then(async ({ sendViaDaemonProxy }) => {
-              try {
-                const mNow = get().merchant;
-                const nodeUrl = mNow.connectedNodeUrl || mNow.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
-                console.log(`[AutoSweep] Sweeping ${amountToSweep} XMR to ${sweepAddress.slice(0, 12)}...`);
-                const result = await sendViaDaemonProxy(
-                  mNow.viewOnlySeedPhrase!,
-                  nodeUrl,
-                  { recipientAddress: sweepAddress, amountXmr: amountToSweep, priority: 1, note: `Auto-sweep invoice ${invoiceId}` },
-                );
-                console.log(`[AutoSweep] Success — txHash: ${result.txHash}, fee: ${result.fee}`);
-              } catch (err) {
-                console.error('[AutoSweep] Failed:', err);
-              }
-            });
-          }
-        }
-      }
     };
 
     // ── Strategy 1: Block Explorer scan (works for ALL wallet modes) ──
@@ -847,6 +821,9 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     // Use a base subaddress or payment address for reusable links
     const subaddress = merchant.viewOnlyAddress || merchant.primarySubaddress || '';
 
+    // Generate unique identifier to avoid clashes across users on same domain
+    const uniqueId = Math.random().toString(36).slice(2, 12);
+
     const link: PaymentLink = {
       id: 'pl_' + Math.random().toString(36).slice(2, 8),
       slug,
@@ -854,6 +831,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       fiatCurrency: fiatCurrency || merchant.fiatCurrency || 'USD',
       label,
       subaddress,
+      uniqueId,
       createdAt: new Date().toISOString(),
       totalUses: 0,
       active: true,
@@ -1039,6 +1017,182 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       return true;
     }
     return false;
+  },
+
+  // ─── Cold Wallet Auto-Sweep Functions ───
+
+  /**
+   * Calculate cumulative received XMR from all paid invoices.
+   * Excludes sent transactions (withdrawals) and already swept amounts.
+   */
+  calculateCumulativeReceived: () => {
+    const state = get();
+    const paidReceived = state.invoices
+      .filter((inv) => inv.status === 'paid' && inv.type !== 'sent')
+      .reduce((sum, inv) => sum + inv.xmrAmount, 0);
+
+    return paidReceived;
+  },
+
+  /**
+   * Run a sweep check and execute if real wallet balance exceeds threshold.
+   * Returns success status, swept amount, tx hash (if successful), or error.
+   */
+  runSweepCheck: async () => {
+    const { merchant } = get();
+
+    if (!merchant.autoSweepEnabled || !merchant.coldWalletAddress) {
+      return { success: false, sweptAmount: 0, error: 'Auto-sweep not enabled or no cold wallet address' };
+    }
+
+    if (!merchant.viewOnlySetupComplete || !merchant.viewOnlySeedPhrase) {
+      return { success: false, sweptAmount: 0, error: 'Wallet not set up for spending' };
+    }
+
+    const alreadySwept = merchant.totalSweptXmr || 0;
+    const threshold = merchant.autoSweepThreshold || 0.5;
+
+    try {
+      const { checkWalletBalance, sendViaDaemonProxy, SyncProgress } = await import('./wallet-send');
+      const nodeUrl = merchant.connectedNodeUrl || merchant.viewOnlyNodeUrl || 'xmr-node.cakewallet.com:18081';
+
+      get().updateMerchant({ activeSweepFlag: true, activeSweepMessage: 'Checking wallet balance...' });
+
+      console.log(`[SweepCheck] Checking real wallet balance against threshold: ${threshold} XMR`);
+
+      // Check real on-chain wallet balance (with optimized restore height)
+      const balanceResult = await checkWalletBalance(
+        merchant.viewOnlySeedPhrase,
+        nodeUrl,
+        merchant.viewOnlyAddress,
+        merchant.viewOnlyViewKey,
+        (progress: SyncProgress) => {
+          get().updateMerchant({ activeSweepMessage: progress.message });
+        },
+      );
+
+      const realUnlockedBalance = balanceResult.unlockedBalance;
+
+      // Only sweep if REAL balance exceeds threshold
+      if (realUnlockedBalance < threshold) {
+        get().updateMerchant({ activeSweepFlag: false, activeSweepMessage: '' });
+        console.log(`[SweepCheck] Balance ${realUnlockedBalance.toFixed(6)} XMR below threshold ${threshold} XMR - skipping sweep`);
+        return {
+          success: false,
+          sweptAmount: 0,
+          error: `Wallet balance below threshold. Threshold: ${threshold} XMR`,
+        };
+      }
+
+      if (realUnlockedBalance < 0.001) {
+        get().updateMerchant({ activeSweepFlag: false, activeSweepMessage: '' });
+        return {
+          success: false,
+          sweptAmount: 0,
+          error: `Balance too small to sweep`,
+        };
+      }
+
+      // Estimate fee (use a small percentage of balance to be safe)
+      const estimatedFee = Math.max(0.0001, realUnlockedBalance * 0.002);
+      const amountToSweep = Math.max(0, realUnlockedBalance - estimatedFee);
+
+      if (amountToSweep < 0.0001) {
+        get().updateMerchant({ activeSweepFlag: false, activeSweepMessage: '' });
+        return {
+          success: false,
+          sweptAmount: 0,
+          error: `Balance too low after estimated fee`,
+        };
+      }
+
+      get().updateMerchant({ activeSweepMessage: `Sweeping to cold wallet...` });
+      console.log(`[SweepCheck] Real balance: ${realUnlockedBalance.toFixed(6)} XMR > threshold: ${threshold} XMR - Sweeping: ${amountToSweep.toFixed(6)} XMR`);
+
+      // Sweep the entire real wallet balance (minus estimated fees)
+      const sendResult = await sendViaDaemonProxy(
+        merchant.viewOnlySeedPhrase,
+        nodeUrl,
+        {
+          recipientAddress: merchant.coldWalletAddress,
+          amountXmr: amountToSweep,
+          priority: 1,
+          note: 'Auto-sweep to cold wallet',
+        },
+        (progress: SyncProgress) => {
+          get().updateMerchant({ activeSweepMessage: progress.message });
+        },
+      );
+
+      if (sendResult.success && sendResult.txHash) {
+        get().updateMerchant({
+          totalSweptXmr: alreadySwept + amountToSweep,
+          lastSweepDate: new Date().toISOString(),
+          activeSweepFlag: false,
+          activeSweepMessage: '',
+        });
+
+        // Add sweep transaction to payments history as a sent payment
+        const state = get();
+        const fiatCurrency = merchant.fiatCurrency || 'USD';
+
+        let fiatAmount = 0;
+        try {
+          const { getRates, xmrToFiat } = await import('./currency-service');
+          const rates = await getRates();
+          fiatAmount = xmrToFiat(amountToSweep, fiatCurrency, rates);
+        } catch (err) {
+          console.warn('[SweepCheck] Could not fetch conversion rates:', err);
+        }
+
+        const sweepInvoice: Invoice = {
+          id: `sweep_${Date.now()}`,
+          fiatAmount,
+          fiatCurrency,
+          xmrAmount: amountToSweep,
+          subaddress: '',
+          status: 'paid',
+          confirmations: 0,
+          createdAt: new Date().toISOString(),
+          paidAt: new Date().toISOString(),
+          description: `Auto-sweep to cold wallet`,
+          expiresAt: new Date(Date.now() + 3600000).toISOString(),
+          txid: sendResult.txHash,
+          type: 'sent',
+          createdBy: 'admin',
+          recipientAddress: merchant.coldWalletAddress,
+          feeXmr: sendResult.fee || estimatedFee,
+          note: `Auto-sweep to cold wallet`,
+        };
+        set({ invoices: [sweepInvoice, ...state.invoices] });
+
+        console.log(`[SweepCheck] Success — txHash: ${sendResult.txHash}, fee: ${sendResult.fee}`);
+
+        return {
+          success: true,
+          sweptAmount: amountToSweep,
+          txHash: sendResult.txHash,
+          fee: sendResult.fee,
+        };
+      } else {
+        get().updateMerchant({ activeSweepFlag: false, activeSweepMessage: '' });
+        return { success: false, sweptAmount: 0, error: sendResult.error || 'Sweep transaction failed' };
+      }
+    } catch (err: any) {
+      get().updateMerchant({ activeSweepFlag: false, activeSweepMessage: '' });
+      console.error('[SweepCheck] Failed:', err);
+      return { success: false, sweptAmount: 0, error: err?.message || 'Sweep failed unexpectedly' };
+    }
+  },
+
+  /**
+   * Reset sweep counter (for testing or manual override).
+   */
+  resetSweepCounter: () => {
+    get().updateMerchant({
+      totalSweptXmr: 0,
+      lastSweepDate: null,
+    });
   },
 }), {
   name: 'moneroflow-state',

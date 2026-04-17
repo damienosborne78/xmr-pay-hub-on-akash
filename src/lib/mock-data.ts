@@ -82,6 +82,7 @@ export interface Merchant {
   createdAt: string;
   autoSweepEnabled: boolean;
   autoSweepThreshold: number;
+  autoSweepCheckFrequency: number; // Minutes between wallet balance checks
   coldWalletAddress: string;
   fiatHedgePercent: number;
   privacyModeEnabled: boolean;
@@ -157,6 +158,12 @@ export interface Merchant {
   // Treasury / Creator server (creatorServerFqdn removed — hardcoded as CREATOR_SERVER_FQDN)
   lifetimeProCodes: { code: string; createdAt: string; usedBy?: string }[];
   devBypassReferrals: boolean;
+  // Cold Wallet Auto-Sweep tracking
+  cumulativeReceivedXmr: number; // Total received (not yet swept)
+  totalSweptXmr: number; // Total swept to cold wallet
+  lastSweepDate: string | null; // Timestamp of last successful sweep
+  activeSweepFlag: boolean; // Show sweeping banner when true
+  activeSweepMessage: string; // Current sweep step message to display
 }
 
 // Pro subscription constants
@@ -214,6 +221,7 @@ export interface PaymentLink {
   category?: string;
   imageUrl?: string;
   subaddress: string; // Reusable subaddress for this product
+  uniqueId: string; // Unique identifier for URL to avoid cross-user clashes
   createdAt: string;
   totalUses: number;
   active: boolean;
@@ -284,6 +292,7 @@ export const defaultMerchant: Merchant = {
   createdAt: new Date().toISOString(),
   autoSweepEnabled: false,
   autoSweepThreshold: 0.5,
+  autoSweepCheckFrequency: 240, // 4 hours in minutes
   coldWalletAddress: '',
   fiatHedgePercent: 0,
   privacyModeEnabled: false,
@@ -347,6 +356,11 @@ export const defaultMerchant: Merchant = {
   sendMode: 'proxy',
   lifetimeProCodes: [],
   devBypassReferrals: false,
+  cumulativeReceivedXmr: 0,
+  totalSweptXmr: 0,
+  lastSweepDate: null,
+  activeSweepFlag: false,
+  activeSweepMessage: '',
 };
 
 export const formatXMR = (amount: number) => amount.toFixed(6) + ' XMR';

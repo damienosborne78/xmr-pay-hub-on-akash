@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { FadeIn } from '@/components/FadeIn';
-import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio, Settings2, KeyRound } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Shield, ShieldCheck, Lock, Upload, Download, Server, Wifi, WifiOff, HelpCircle, Loader2, Cloud, Globe, Monitor, ChevronDown, Info, Smartphone, RefreshCw, Radio, Settings2, KeyRound, Send } from 'lucide-react';
 import { HelpTooltip } from '@/components/HelpTooltip';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
@@ -64,6 +64,18 @@ export default function SettingsPage() {
   const [showAdminPass, setShowAdminPass] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
+  // Sweep state
+  const [sweeping, setSweeping] = useState(false);
+  const [sweepResult, setSweepResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Helper function to format frequency
+  const formatFrequency = (minutes: number): string => {
+    if (minutes < 60) return `${minutes} minutes`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours} hours`;
+  };
+
   const requireAdmin = (action: () => void) => {
     if (adminUnlocked) { action(); return; }
     setPendingAction(() => action);
@@ -95,6 +107,34 @@ export default function SettingsPage() {
       if (pendingAction) { pendingAction(); setPendingAction(null); }
     } else {
       toast.error('Wrong admin password');
+    }
+  };
+
+  const handleSweepNow = async () => {
+    if (!merchant.coldWalletAddress) {
+      toast.error('Please set a cold wallet address first');
+      return;
+    }
+
+    setSweeping(true);
+    setSweepResult(null);
+
+    try {
+      const runSweepCheck = useStore.getState().runSweepCheck;
+      const result = await runSweepCheck();
+
+      if (result.success) {
+        toast.success(`Swept ${result.sweptAmount.toFixed(6)} XMR to cold wallet!`);
+        setSweepResult({ success: true, message: `Successfully swept ${result.sweptAmount.toFixed(6)} XMR. TX: ${result.txHash?.slice(0, 12)}...` });
+      } else {
+        toast.error(result.error || 'Sweep failed');
+        setSweepResult({ success: false, message: result.error || 'Sweep failed' });
+      }
+    } catch (err) {
+      toast.error('Sweep failed unexpectedly');
+      setSweepResult({ success: false, message: 'Unexpected error occurred' });
+    } finally {
+      setSweeping(false);
     }
   };
 
@@ -845,14 +885,12 @@ export default function SettingsPage() {
             <h2 className="text-lg font-semibold text-foreground">Cold Wallet Auto-Sweep</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            {merchant.nativeRpcEnabled
-              ? 'Uses native RPC transfer to sweep funds to your cold wallet automatically.'
-              : 'Automatically sweep funds to your cold wallet when balance exceeds threshold.'}
+            Automatically sweep funds to your cold wallet when accumulated payments exceed threshold.
           </p>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-foreground">Enable Auto-Sweep</p>
-              <p className="text-xs text-muted-foreground">Instant sweep upon payment confirmation</p>
+              <p className="text-xs text-muted-foreground">Auto-sweep when accumulated balance exceeds threshold</p>
             </div>
             <Switch checked={merchant.autoSweepEnabled} onCheckedChange={v => updateMerchant({ autoSweepEnabled: v })} />
           </div>
@@ -862,14 +900,90 @@ export default function SettingsPage() {
                 <Label className="text-foreground">Cold Wallet Address</Label>
                 <Input value={merchant.coldWalletAddress} onChange={e => updateMerchant({ coldWalletAddress: e.target.value })} className="bg-background border-border font-mono text-xs" placeholder="Your XMR cold wallet address" />
               </div>
+
+              {/* Sweep Stats - Live from store */}
+              {(() => {
+                const cumulativeReceived = useStore.getState().calculateCumulativeReceived();
+                const availableToSweep = cumulativeReceived - (merchant.totalSweptXmr || 0);
+                const threshold = merchant.autoSweepThreshold || 0.5;
+
+                return (
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-[10px] text-muted-foreground mb-2">Sweep Statistics</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Received</p>
+                        <p className="text-sm font-mono text-foreground">{cumulativeReceived.toFixed(6)} XMR</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Swept</p>
+                        <p className="text-sm font-mono text-foreground">{(merchant.totalSweptXmr || 0).toFixed(6)} XMR</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Threshold</p>
+                        <p className="text-sm font-mono text-primary">{threshold.toFixed(2)} XMR</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-foreground">Sweep Threshold</Label>
                   <span className="text-sm font-mono text-primary">{merchant.autoSweepThreshold} XMR</span>
                 </div>
                 <Slider value={[merchant.autoSweepThreshold]} onValueChange={v => updateMerchant({ autoSweepThreshold: v[0] })} min={0.01} max={10} step={0.01} className="py-2" />
-                <p className="text-xs text-muted-foreground">Sweep when balance exceeds this amount</p>
+                <p className="text-xs text-muted-foreground">Minimum wallet balance required before auto-sweep</p>
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-foreground">Sweep Check Frequency</Label>
+                  <span className="text-sm font-mono text-primary">{formatFrequency(merchant.autoSweepCheckFrequency || 240)}</span>
+                </div>
+                <Slider
+                  value={[merchant.autoSweepCheckFrequency || 240]}
+                  onValueChange={v => updateMerchant({ autoSweepCheckFrequency: v[0] })}
+                  min={1}
+                  max={720}
+                  step={1}
+                  className="py-2"
+                />
+                <div className="flex justify-between text-[9px] text-muted-foreground">
+                  <span>1m</span>
+                  <span>1h</span>
+                  <span className="text-primary font-bold">4h</span>
+                  <span>8h</span>
+                  <span>12h</span>
+                </div>
+                <p className="text-xs text-muted-foreground">How often to check wallet balance (recommended: 4 hours)</p>
+              </div>
+
+              {/* Sweep Now Button */}
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Manual Sweep</p>
+                  <p className="text-xs text-muted-foreground">Trigger sweep immediately if above threshold</p>
+                </div>
+                <Button
+                  onClick={handleSweepNow}
+                  disabled={sweeping || !merchant.coldWalletAddress}
+                  className="bg-gradient-orange hover:opacity-90 gap-2"
+                >
+                  {sweeping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {sweeping ? 'Sweeping...' : 'Sweep Now'}
+                </Button>
+              </div>
+
+              {/* Sweep Result */}
+              {sweepResult && (
+                <div className={`p-3 rounded-lg text-sm ${
+                  sweepResult.success ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                }`}>
+                  {sweepResult.message}
+                </div>
+              )}
             </div>
           )}
         </div>

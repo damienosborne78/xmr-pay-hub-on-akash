@@ -45,9 +45,18 @@ const comparisons = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const login = useStore(s => s.login);
+  const updateMerchant = useStore(s => s.updateMerchant);
 
   const handleStart = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref')?.toUpperCase().trim();
+
     login();
+
+    if (refCode && refCode.length >= 4) {
+      updateMerchant({ referredBy: refCode });
+    }
+
     navigate('/dashboard');
   };
 
@@ -57,14 +66,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 z-50 w-full bg-surface-glass backdrop-blur-xl border-b border-border/50">
         <div className="container flex h-16 items-center justify-between">
           <BrandLogo />
-          <div className="flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">Log in</Button>
-            </Link>
-            <Button size="sm" className="bg-gradient-orange hover:opacity-90" onClick={handleStart}>
-              Get Started Free
-            </Button>
-          </div>
+          {/* Buttons removed - auto-onboard via hero CTA */}
         </div>
       </nav>
 

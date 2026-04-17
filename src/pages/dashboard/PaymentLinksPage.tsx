@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FadeIn } from '@/components/FadeIn';
 import { HelpTooltip } from '@/components/HelpTooltip';
-import { Plus, Copy, Trash2, ExternalLink, Download, Upload, Power, PowerOff, ShoppingBag } from 'lucide-react';
+import { Plus, Copy, Trash2, ExternalLink, Upload, Power, PowerOff, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -33,7 +33,6 @@ export default function PaymentLinksPage() {
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
   const [importing, setImporting] = useState(false);
-  const [qrOpens, setQrOpens] = useState<Record<string, boolean>>({});
 
   const baseUrl = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -43,7 +42,7 @@ export default function PaymentLinksPage() {
   }, [fqdn]);
 
   const buildPayUrl = (link) => {
-    const url = new URL(`${baseUrl}/pay/${link.fiatAmount}/${encodeURIComponent(link.slug)}`);
+    const url = new URL(`${baseUrl}/pay/${link.uniqueId}/${link.fiatAmount}/${link.slug}`);
     if (payoutAddress) {
       url.searchParams.set('address', payoutAddress);
     }
@@ -53,7 +52,7 @@ export default function PaymentLinksPage() {
   };
 
   const handleCreate = async () => {
-    if (!slug || !amount || !label || Number.isNaN(Number(amount))) {
+    if (!label || Number.isNaN(Number(amount))) {
       return;
     }
     if (!payoutAddress) {
@@ -61,8 +60,9 @@ export default function PaymentLinksPage() {
       return;
     }
     try {
-      await createPaymentLink(slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'), Number(amount), label, cur);
-      toast.success('Payment link created!');
+      const userSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : label.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      await createPaymentLink(userSlug, Number(amount), label, cur);
+      toast.success('Full permanent link copied!');
       setOpen(false);
       setSlug('');
       setAmount('');
@@ -87,41 +87,41 @@ export default function PaymentLinksPage() {
     }
   };
 
-  const copyLink = (link) => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(buildPayUrl(link));
-      toast.success('Link copied!');
-    }
-  };
-
-  const toggleQr = (id) => {
-    setQrOpens((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const downloadQr = (link) => {
-    if (typeof document === 'undefined') return;
-    const svgElement = document.getElementById(`qr-${link.id}`);
-    if (!svgElement) return;
-
+  const copyLink = async (link) => {
+    const fullUrl = buildPayUrl(link);
     try {
-      // Serialize SVG to string
-      const svgData = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-      
-      // Create download link for SVG
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${link.slug}-qr.svg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast.success('QR code downloaded!');
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Failed to download QR';
-      toast.error(message);
+      // Try modern clipboard API first
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('Payment link copied to clipboard!');
+        return;
+      }
+
+      // Fallback to execCommand for non-secure contexts
+      if (typeof document !== 'undefined') {
+        const textArea = document.createElement('textarea');
+        textArea.value = fullUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+
+        if (success) {
+          toast.success('Payment link copied to clipboard!');
+        } else {
+          throw new Error('execCommand copy failed');
+        }
+        return;
+      }
+
+      toast.error('Clipboard not available');
+    } catch (e) {
+      console.error('Failed to copy link:', e);
+      toast.error('Failed to copy link. Please select and copy the URL manually.');
     }
   };
 
@@ -222,11 +222,8 @@ export default function PaymentLinksPage() {
                             {buildPayUrl(link)}
                           </code>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => toggleQr(link.id)}>
-                          {qrOpens[link.id] ? 'Hide QR' : 'Show QR'}
-                        </Button>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <Button variant="outline" size="sm" onClick={() => copyLink(link)}>
                           <Copy className="w-4 h-4" />
                         </Button>
@@ -247,30 +244,6 @@ export default function PaymentLinksPage() {
                         </Button>
                       </div>
                     </div>
-                    {qrOpens[link.id] && (
-                      <FadeIn className="mt-4 pt-4 border-t border-border/50">
-                        <div className="flex flex-col sm:flex-row items-center gap-6">
-                          <div className="bg-white p-4 rounded-lg">
-                            <QRCodeSVG
-                              id={`qr-${link.id}`}
-                              value={buildPayUrl(link)}
-                              size={200}
-                              level="M"
-                              includeMargin
-                            />
-                          </div>
-                          <div className="flex flex-col gap-3">
-                            <Button onClick={() => downloadQr(link)}>
-                              <Download className="w-4 h-4 mr-2" />
-                              Download QR Code
-                            </Button>
-                            <p className="text-sm text-muted-foreground max-w-xs">
-                              Add this QR code to your product checkout page. Customers can scan it multiple times to pay for this product.
-                            </p>
-                          </div>
-                        </div>
-                      </FadeIn>
-                    )}
                   </div>
                 </FadeIn>
               ))}

@@ -6,6 +6,7 @@ import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { PrivacyBanner } from '@/components/PrivacyBanner';
 import { SeedBackupWarning } from '@/components/SeedBackupWarning';
+import { SweepChecker } from '@/components/SweepChecker';
 import { useStore } from '@/lib/store';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -13,7 +14,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const THEMES = [
@@ -195,15 +196,85 @@ function ManagedBadge() {
   );
 }
 
+/**
+ * Component to show sweep status indicator in header.
+ * Alternates between yellow and green every 250ms when active.
+ * Shows real-time progress messages from sweep process.
+ */
+function SweepStatusBanner() {
+  const merchant = useStore(s => s.merchant);
+  const [visible, setVisible] = useState(false);
+  const [isYellow, setIsYellow] = useState(false);
+
+  // Handle visibility timer
+  useEffect(() => {
+    if (merchant.activeSweepFlag) {
+      setVisible(true);
+      const timer = setTimeout(() => setVisible(false), 10000);
+      return () => clearTimeout(timer);
+    }
+
+    if (merchant.lastSweepDate) {
+      const sweepTime = new Date(merchant.lastSweepDate).getTime();
+      const timeSinceSweep = Date.now() - sweepTime;
+      if (timeSinceSweep < 5000) {
+        setVisible(true);
+        const timer = setTimeout(() => setVisible(false), 5000 - timeSinceSweep);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [merchant.activeSweepFlag, merchant.lastSweepDate]);
+
+  // Handle color alternating when sweep is active
+  useEffect(() => {
+    if (!merchant.activeSweepFlag) {
+      setIsYellow(false);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setIsYellow((prev) => !prev);
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [merchant.activeSweepFlag]);
+
+  if (!visible) return null;
+
+  // Match Browser Wallet badge style with color alternation when active
+  // Show progress message when sweep is active
+  const activeColor = isYellow ? 'warning' : 'success';
+  let bannerText = 'Cold Storage Sweep Complete';
+
+  if (merchant.activeSweepFlag) {
+    bannerText = merchant.activeSweepMessage || 'Cold Storage Sweep Activated';
+  }
+
+  return (
+    <Badge variant="outline" className={`${
+      merchant.activeSweepFlag
+        ? `bg-${activeColor}/10 text-${activeColor} border-${activeColor}/20`
+        : 'bg-success/10 text-success border-success/20'
+    } text-xs gap-1.5 cursor-help`}>
+      <Zap className="w-3 h-3" />
+      {bannerText}
+    </Badge>
+  );
+}
+
 export default function DashboardLayout() {
   return (
     <HelpProvider>
       <SidebarProvider>
         <div className="min-h-screen flex w-full bg-background">
           <DashboardSidebar />
+          <SweepChecker enabled />
           <div className="flex-1 flex flex-col min-w-0">
             <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
-              <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+              <div className="flex items-center gap-3">
+                <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+                <SweepStatusBanner />
+              </div>
               <div className="flex items-center gap-3">
                 <SeedBackupWarning />
                 <ManagedBadge />

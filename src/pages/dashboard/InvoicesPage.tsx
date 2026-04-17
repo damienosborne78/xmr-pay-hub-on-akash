@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { formatXMR, formatFiat } from '@/lib/mock-data';
@@ -43,6 +43,29 @@ export default function InvoicesPage() {
   const [txHashInput, setTxHashInput] = useState('');
   const [verifyingInvoiceId, setVerifyingInvoiceId] = useState<string | null>(null);
   const [verifyingSingle, setVerifyingSingle] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+
+  // Auto-refresh invoices every 10 seconds AND when localStorage changes from other tabs
+  useEffect(() => {
+    // Poll for updates (refreshes store from localStorage)
+    const interval = setInterval(() => {
+      setLastUpdated(Date.now()); // Trigger re-render by updating state
+      console.log('[InvoicesPage] Auto-refreshing invoices...');
+    }, 10000);
+
+    // Listen for localStorage changes from other tabs (e.g., payment links)
+    const handleStorageChange = () => {
+      setLastUpdated(Date.now()); // Force component update
+      console.log('[InvoicesPage] Storage changed - refreshing invoices...');
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   const hashPassword = (pw: string) => {
     let hash = 0;
@@ -329,6 +352,7 @@ export default function InvoicesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium">Created</th>
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium">Invoice</th>
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium">Description</th>
                     <th className="text-right py-3 px-4 text-muted-foreground font-medium">Amount ({cur})</th>
@@ -344,6 +368,11 @@ export default function InvoicesPage() {
                     const isPending = inv.status === 'pending' || inv.status === 'seen_on_chain' || inv.status === 'confirming';
                     return (
                       <tr key={inv.id} className="border-b border-border/50 hover:bg-muted/10 transition-colors">
+                        <td className="py-3 px-4 text-xs text-muted-foreground">
+                          {inv.paidAt 
+                            ? new Date(inv.paidAt).toLocaleString()
+                            : new Date(inv.createdAt).toLocaleString()}
+                        </td>
                         <td className="py-3 px-4 font-mono text-xs text-muted-foreground">{inv.id}</td>
                         <td className="py-3 px-4 text-foreground">
                           {inv.description}

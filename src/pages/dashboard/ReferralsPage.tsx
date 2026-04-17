@@ -87,10 +87,38 @@ export default function ReferralsPage() {
 
   const proPaymentId = fingerprint.padEnd(16, '0').slice(0, 16);
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(fingerprint);
-    setCopied(true);
-    toast.success('Referral code copied!');
+  const copyCode = async () => {
+    const baseUrl = window.location.origin;
+    const referralUrl = `${baseUrl}/?ref=${fingerprint}`;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(referralUrl);
+        setCopied(true);
+        toast.success('Referral link copied to clipboard!');
+      } else if (typeof document !== 'undefined') {
+        const textArea = document.createElement('textarea');
+        textArea.value = referralUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (success) {
+          setCopied(true);
+          toast.success('Referral link copied to clipboard!');
+        } else {
+          throw new Error('execCommand copy failed');
+        }
+      } else {
+        toast.error('Clipboard not available');
+      }
+    } catch (e) {
+      console.error('Failed to copy referral link:', e);
+      toast.error('Failed to copy link. Please select and copy it manually.');
+    }
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -350,23 +378,22 @@ export default function ReferralsPage() {
         </div>
       </FadeIn>
 
-      {/* Your Referral Identity — code only, no URL */}
+      {/* Your Referral Identity — referral link */}
       <FadeIn delay={0.06}>
         <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Your Referral Code
-            
-                <HelpTooltip
-                  title="Your Referral Code"
-                  text="Your unique code derived from your wallet. Share it with other merchants — when they subscribe to Pro, you earn XMR commissions."
-                />
+          <h2 className="text-lg font-semibold text-foreground">Share Your Referral Link
+            <HelpTooltip
+              title="Your Referral Link"
+              text="Share this link with other merchants — when they sign up, your referral code is automatically credited. You earn XMR commissions when they upgrade to Pro."
+            />
           </h2>
           <p className="text-xs text-muted-foreground">
-            Your code is derived from your wallet — no signup needed. Share it with other merchants to earn XMR.
+            When someone clicks your link, they get auto-onboarded with a new browser wallet and your referral code is automatically credited to their account.
             {!isEligibleForReferrals && (
-              <span className="text-warning ml-1 font-medium">⚠ Code inactive — meet eligibility requirements above first.</span>
+              <span className="text-warning ml-1 font-medium">⚠ Link inactive — meet eligibility requirements above first.</span>
             )}
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <span className="text-4xl sm:text-5xl font-black font-mono text-primary tracking-[0.2em] select-all">
               {fingerprint}
             </span>
@@ -380,7 +407,7 @@ export default function ReferralsPage() {
           </Button>
           {showQR && (
             <div className="flex justify-center p-4 bg-white rounded-lg w-fit mx-auto">
-              <QRCodeSVG value={`moneroflow:ref:${fingerprint}`} size={160} />
+              <QRCodeSVG value={`${window.location.origin}/?ref=${fingerprint}`} size={160} />
             </div>
           )}
         </div>

@@ -58,7 +58,7 @@ const App = () => (
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="/invoice/:id" element={<InvoicePage />} />
-          <Route path="/pay/:amount/:label" element={<PayPage />} />
+          <Route path="/pay/:uniqueId/:amount/:label" element={<PayPage />} />
           <Route path="/pay/:amount" element={<PayPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -13,13 +13,12 @@ import { PaymentProgress } from '@/components/PaymentProgress';
 import { fiatToXmr, getRates, getStaleCache, getXmrPrice } from '@/lib/currency-service';
 
 export default function PayPage() {
-  const { amount, label } = useParams();
+  const { uniqueId, amount, label } = useParams();
   const fiatAmount = parseFloat(amount || '0');
   const search = new URLSearchParams(window.location.search);
-  const directAddress = search.get('address') || '';
   const displayCurrency = (search.get('currency') || 'USD').toUpperCase();
   const displaySymbol = search.get('symbol') || (displayCurrency === 'USD' ? '$' : `${displayCurrency} `);
-  
+
   const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
   const createInvoice = useStore(s => s.createInvoice);
   const updateInvoice = useStore(s => s.updateInvoice);
@@ -40,11 +39,10 @@ export default function PayPage() {
   const confirming = invoice?.status === 'confirming';
   const seenOnChain = invoice?.status === 'seen_on_chain';
   const failed = (invoice?.status === 'expired' || invoice?.status === 'cancelled');
-  const directLinkMode = Boolean(directAddress);
 
-  // Check if this is an inactive payment link
-  const paymentLink = directLinkMode && label && amount
-    ? paymentLinks.find(pl => pl.slug === label && pl.fiatAmount === Number(amount))
+  // Find payment link by uniqueId (prevents clashes across users)
+  const paymentLink = uniqueId
+    ? paymentLinks.find(pl => pl.uniqueId === uniqueId)
     : null;
   const isInactivePaymentLink = paymentLink && !paymentLink.active;
 
@@ -81,37 +79,46 @@ export default function PayPage() {
       return;
     }
 
+    let cancelled = false;
+
     const init = async () => {
       try {
         const invoiceDescription = label
           ? `Payment Link: ${decodeURIComponent(label).replace(/-/g, ' ')}`
           : 'Payment Link';
 
-        // For payment links with embedded address, pass it directly to avoid RPC calls
-        const inv = await createInvoice(
-          invoiceDescription,
-          fiatAmount,
-          undefined,
-          directAddress || undefined // Pass address from URL to skip RPC
-        );
-        
-        // Link to payment link for analytics
+        // Creates new invoice with unique subaddress (same as POS)
+        const inv = await createInvoice(invoiceDescription, fiatAmount);
+
+        // Check if cancelled before setting state
+        if (cancelled) return;
+
+        // Link invoice to payment link for analytics
         if (paymentLink?.id) {
           updateInvoice(inv.id, {
             description: invoiceDescription,
           });
         }
-        
+
         setSubaddress(inv.subaddress);
         setInvoiceId(inv.id);
       } catch (e) {
-        setError((e as Error).message || 'Failed to create payment address. Check RPC connection.');
+        if (!cancelled) {
+          setError((e as Error).message || 'Failed to create payment address. Check RPC connection.');
+        }
       }
-      setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+      }
     };
 
     init();
-  }, [createInvoice, updateInvoice, fiatAmount, label, paymentLink]);
+
+    // Cleanup function to cancel if effect re-runs
+    return () => {
+      cancelled = true;
+    };
+  }, [createInvoice, updateInvoice, fiatAmount, uniqueId, paymentLink]);
 
   // Poll for payment confirmation (more frequent for payment links)
   useEffect(() => {
@@ -122,13 +129,13 @@ export default function PayPage() {
     return () => clearInterval(interval);
   }, [invoiceId, paid]);
 
-  // Countdown only for regular invoices (not payment links)
+  // Countdown timer
   useEffect(() => {
-    if (directLinkMode || paid) return;
+    if (paid) return;
     if (timeLeft <= 0) return;
     const t = setInterval(() => setTimeLeft(v => v - 1), 1000);
     return () => clearInterval(t);
-  }, [paid, timeLeft, directLinkMode]);
+  }, [paid, timeLeft]);
 
   const copyAddr = () => {
     navigator.clipboard.writeText(subaddress);
@@ -196,7 +203,7 @@ export default function PayPage() {
                 <Check className="w-10 h-10 text-success" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">Payment Confirmed!</h2>
-              <p className="text-muted-foreground">{formattedFiatAmount} received — thank you!</p>
+              <p className="text-muted-foreground">{formattedFiatAmount} received - thank you!</p>
               {invoice?.txid && (
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>

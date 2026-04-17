@@ -127,6 +127,8 @@ export function SendXmrDialog({ open, onOpenChange }: Props) {
       checkWalletBalance(
         merchant.viewOnlySeedPhrase,
         effectiveNodeUrl,
+        merchant.viewOnlyAddress,
+        merchant.viewOnlyViewKey,
         (p) => setBalanceSyncMsg(p.message),
       )
         .then(({ balance, unlockedBalance }) => {
