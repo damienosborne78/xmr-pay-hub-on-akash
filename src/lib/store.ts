@@ -1196,6 +1196,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   },
 }), {
   name: 'moneroflow-state',
+  version: 1,
   storage: createJSONStorage(() => createIDBStorage()),
   partialize: (state) => ({
     isAuthenticated: state.isAuthenticated,
@@ -1206,4 +1207,11 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     referrals: state.referrals,
     referralPayouts: state.referralPayouts,
   }),
+  migrate: (persistedState: any, version: number) => {
+    // Ensure sendMode defaults to 'proxy' for legacy storage
+    if (persistedState.merchant && typeof persistedState.merchant.sendMode === 'undefined') {
+      persistedState.merchant.sendMode = 'proxy';
+    }
+    return persistedState;
+  },
 }));
