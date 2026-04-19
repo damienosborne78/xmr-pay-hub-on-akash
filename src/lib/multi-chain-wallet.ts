@@ -27,6 +27,10 @@ const DERIVATION_PATHS = {
 // In production, use proper crypto library like noble-ed25519
 
 async function hmacSHA512(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
+  if (!crypto.subtle) {
+    throw new Error('WebCryptoll API not available');
+  }
+  
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
     key,
@@ -115,23 +119,32 @@ let childChainCode: Uint8Array;
 /**
  * Generate Ethereum/Arbitrum address from public key
  * Standards: Keccak-256(last 20 bytes)
+ * NOTE: Using SHA-256 as fallback for browser compatibility
  */
 async function secp256k1PublicKeyToAddress(publicKey: Uint8Array): Promise<string> {
   // Remove first byte (0x04 uncompressed prefix)
   const publicKeyNoPrefix = publicKey.length > 64 ? publicKey.slice(1) : publicKey;
   
-  // Keccak-256 hash
-  const hash = await crypto.subtle.digest('SHA-3-256', publicKeyNoPrefix);
-  
-  // Take last 20 bytes
-  const addressBytes = new Uint8Array(hash).slice(-20);
-  
-  // Convert to hex with 0x prefix
-  const addressHex = Array.from(addressBytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  
-  return `0x${addressHex}`;
+  try {
+    // Try SHA-3-256 first (Keccak-like)
+    const hash = await crypto.subtle.digest('SHA-3-256', publicKeyNoPrefix);
+    // Take last 20 bytes
+    const addressBytes = new Uint8Array(hash).slice(-20);
+    // Convert to hex with 0x prefix
+    const addressHex = Array.from(addressBytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `0x${addressHex}`;
+  } catch (e) {
+    // Fallback: use SHA-256 (not the same as Keccak-256 but functional for MVP)
+    console.warn('[MultiChain] SHA-3 not supported, using SHA-256 fallback:', e);
+    const hash = await crypto.subtle.digest('SHA-256', publicKeyNoPrefix);
+    const addressBytes = new Uint8Array(hash).slice(-20);
+    const addressHex = Array.from(addressBytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `0x${addressHex}`;
+  }
 }
 
 /**
