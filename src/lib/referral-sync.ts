@@ -6,15 +6,28 @@
  * wallet-derived referral code (e.g. "J84HX3").
  *
  * No sensitive data (keys, seeds) is ever transmitted.
+ *
+ * ROBUST MULTI-USER DESIGN:
+ * - Singleton pattern prevents duplicate sync instances
+ * - Always recovers from errors (never permanently stops)
+ * - Exponential backoff for failures
+ * - Re-triggers on tab visibility changes
  */
 
 import { CREATOR_SERVER_FQDN } from './mock-data';
 
 const SYNC_INTERVAL_MS = 60_000; // 60 seconds
+const MAX_RETRY_BACKOFF_MS = 300_000; // 5 minutes max backoff
 const SYNC_ENDPOINT = `https://${CREATOR_SERVER_FQDN}/api/mf/referral/sync`;
 
+// Global singleton state - prevents multiple sync instances
 let syncTimer: ReturnType<typeof setInterval> | null = null;
-let isFirstSyncDone = false;
+let getStore: (() => any) | null = null;
+let failedAttempts = 0;
+let lastSuccessTime = 0;
+
+// Cleanup on visibility handler
+let visibilityHandler: (() => void) | null = null;
 
 export interface ReferralSyncPayload {
   referralCode: string;
@@ -37,20 +50,21 @@ export interface ReferralSyncPayload {
     status: string;
   }>;
   lastSyncAt: string;
-  isFirstSync: boolean; // Backend uses this to count new signups vs returning users
+  isFirstSync: boolean;
 }
 
 /**
  * Collect referral telemetry from the Zustand store getter.
  */
-function collectPayload(get: () => any): ReferralSyncPayload | null {
-  const state = get();
-  const merchant = state.merchant;
+function collectPayload(): ReferralSyncPayload | null {
+  if (!getStore) return null;
+  
+  const state = getStore();
+  const merchant = state?.merchant;
 
   const referralCode = merchant?.referralWalletFingerprint;
-  if (!referralCode) return null; // No fingerprint yet — skip
+  if (!referralCode) return null;
 
-  // Determine the pro code used (lifetime code path)
   let proCode: string | null = null;
   if (merchant.proTxid && typeof merchant.proTxid === 'string') {
     if (merchant.proTxid.startsWith('LIFETIME-CODE-')) {
@@ -81,52 +95,135 @@ function collectPayload(get: () => any): ReferralSyncPayload | null {
       status: p.status || 'pending',
     })),
     lastSyncAt: new Date().toISOString(),
+    isFirstSync: lastSuccessTime === 0,
   };
 }
 
-async function doSync(get: () => any): Promise<void> {
+/**
+ * Calculate exponential backoff based on failed attempts
+ */
+function getNextSyncDelay(): number {
+  if (failedAttempts === 0) return SYNC_INTERVAL_MS;
+  
+  const backoffSeconds = Math.min(60 * Math.pow(2, failedAttempts - 1), MAX_RETRY_BACKOFF_MS / 1000);
+  const delayMs = Math.floor(backoffSeconds * 1000);
+  
+  console.log(`[ReferralSync] Next sync in ${Math.floor(delayMs/1000)}s (failedAttempts: ${failedAttempts})`);
+  return delayMs;
+}
+
+/**
+ * Perform a single sync attempt
+ */
+async function doSync(): Promise<boolean> {
+  if (!getStore) return false;
+  
   try {
-    const payload = collectPayload(get);
-    if (!payload) return;
+    const payload = collectPayload();
+    if (!payload) {
+      console.log('[ReferralSync] No referral code yet, skipping');
+      return false;
+    }
 
-    const syncPayload = {
-      ...payload,
-      isFirstSync: !isFirstSyncDone,
-    };
+    console.log(`[ReferralSync] Syncing user ${payload.referralCode}...`, payload);
 
-    await fetch(SYNC_ENDPOINT, {
+    const response = await fetch(SYNC_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(syncPayload),
+      body: JSON.stringify(payload),
     });
 
-    if (!isFirstSyncDone) {
-      isFirstSyncDone = true;
+    if (response.ok) {
+      failedAttempts = 0;
+      lastSuccessTime = Date.now();
+      console.log('[ReferralSync] Sync success ✅');
+      return true;
+    } else {
+      failedAttempts++;
+      console.error(`[ReferralSync] Sync failed: HTTP ${response.status}`);
+      return false;
     }
-  } catch {
-    // Fail silently — offline-tolerant
+  } catch (error) {
+    failedAttempts++;
+    console.error('[ReferralSync] Sync error:', error);
+    return false;
   }
 }
 
 /**
- * Start the periodic referral sync. Call once after login.
+ * Sync loop with exponential backoff and guaranteed restart
+ */
+function syncLoop(): void {
+  syncTimer = setTimeout(async () => {
+    await doSync();
+    // ALWAYS restart the loop, even if sync failed (robustness key!)
+    syncLoop();
+  }, getNextSyncDelay());
+}
+
+/**
+ * Start the periodic referral sync (Singleton - idempotent)
  * @param get - Zustand store getter
  */
 export function startReferralSync(get: () => any): void {
-  stopReferralSync();
+  // Singleton: if already running with same store getter, do nothing
+  if (syncTimer !== null && getStore === get) {
+    console.log('[ReferralSync] Already running, skipping duplicate start');
+    return;
+  }
+  
+  // If running with different store getter, stop first
+  if (syncTimer !== null) {
+    console.log('[ReferralSync] Stopping previous sync instance');
+    stopReferralSync();
+  }
+  
+  // Store the getter
+  getStore = get;
+  failedAttempts = 0;
+  lastSuccessTime = 0;
+  
+  console.log('[ReferralSync] Starting sync loop');
+  
   // Immediate first sync
-  doSync(get);
-  // Periodic sync (every 60s)
-  syncTimer = setInterval(() => doSync(get), SYNC_INTERVAL_MS);
+  doSync();
+  
+  // Start loop
+  syncLoop();
+  
+  // Set up visibility handler to retry sync when user returns
+  if (typeof window !== 'undefined' && !visibilityHandler) {
+    visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[ReferralSync] User returned to tab - attempting immediate sync');
+        doSync();
+      }
+    };
+    window.addEventListener('visibilitychange', visibilityHandler);
+  }
 }
 
 /**
- * Stop the periodic sync. Call on logout / account deletion.
+ * Stop the periodic sync
  */
 export function stopReferralSync(): void {
   if (syncTimer !== null) {
-    clearInterval(syncTimer);
+    clearTimeout(syncTimer);
     syncTimer = null;
   }
-  isFirstSyncDone = false;
+  if (visibilityHandler && typeof window !== 'undefined') {
+    window.removeEventListener('visibilitychange', visibilityHandler);
+    visibilityHandler = null;
+  }
+  getStore = null;
+  failedAttempts = 0;
+  lastSuccessTime = 0;
+  console.log('[ReferralSync] Stopped');
+}
+
+/**
+ * Manual sync trigger (for debugging or force refresh)
+ */
+export async function triggerManualSync(): Promise<boolean> {
+  return await doSync();
 }

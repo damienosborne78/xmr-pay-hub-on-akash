@@ -7,7 +7,7 @@ import { useStore } from '@/lib/store';
 import {
   Zap, Shield, ArrowRight, Check, Lock,
   Wallet, BarChart3, MonitorSmartphone, Globe, Gift,
-  Code2, HardDrive, Smartphone, FileSpreadsheet
+  Code2, HardDrive, Smartphone, FileSpreadsheet, Send, Link2
 } from 'lucide-react';
 import ArchitectureDiagram from '@/components/ArchitectureDiagram';
 
@@ -22,6 +22,8 @@ const features = [
   { icon: HardDrive, title: 'AES-Encrypted Backup & Restore', desc: 'Lightning-fast AES-GCM encrypted local backup and restore. Your data never leaves your browser.' },
   { icon: Smartphone, title: 'Works Everywhere', desc: 'Phone, tablet, desktop — runs smoothly on all of them. Just a web browser and an internet connection.' },
   { icon: FileSpreadsheet, title: 'CSV Inventory Import', desc: 'Upload any CSV file, map columns to POS fields with smart auto-detection, preview rows, and import your entire inventory in seconds.' },
+  { icon: Send, title: 'Cold Wallet Auto Sweep', desc: 'Auto-sweep accumulated payments to your cold wallet when threshold is reached. Near-zero merchant risk with automated security.' },
+  { icon: Link2, title: 'Anonymous Payment Links', desc: 'Generate permanent payment links for your website. Instant CSV import for rapid deployment. Expand to accept anonymous payments anywhere.' },
 ];
 
 const comparisons = [

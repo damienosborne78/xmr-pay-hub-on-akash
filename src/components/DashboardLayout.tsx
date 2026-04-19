@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/sidebar';
 import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { startReferralSync } from '@/lib/referral-sync';
 
 const THEMES = [
   { id: 'dark', label: 'Dark', swatch: '24 100% 50%' },
@@ -263,6 +264,27 @@ function SweepStatusBanner() {
 }
 
 export default function DashboardLayout() {
+  // Start referral sync if user is already authenticated (singleton - idempotent)
+  // Only runs once per authentication state, handles multi-user robustly
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedAuth = localStorage.getItem('mf-storage');
+      if (storedAuth) {
+        try {
+          const parsed = JSON.parse(storedAuth);
+          const isAuth = parsed?.state?.isAuthenticated;
+          if (isAuth) {
+            console.log('[DashboardLayout] User authenticated, starting sync');
+            // startReferralSync is idempotent - safe to call multiple times
+            startReferralSync(() => JSON.parse(stored).state);
+          }
+        } catch (e) {
+          console.error('[DashboardLayout] Failed to check auth from storage', e);
+        }
+      }
+    }
+  }, []); // Only run on mount
+
   return (
     <HelpProvider>
       <SidebarProvider>
