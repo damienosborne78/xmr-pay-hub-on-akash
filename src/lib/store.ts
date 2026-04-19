@@ -190,6 +190,15 @@ interface AppState {
   pollInvoicePayment: (invoiceId: string) => Promise<void>;
   verifyInvoiceTxHash: (invoiceId: string, txHash: string) => Promise<{ success: boolean; error?: string }>;
   verifyAllPendingInvoices: () => Promise<{ verified: number; failed: number }>;
+  
+  // TRX payment methods
+  createTrxInvoice: (description: string, fiatAmount: number) => Promise<Invoice>;
+  monitorTrxInvoice: (invoiceId: string) => Promise<void>;
+  getTrxBalance: () => Promise<{ address: string; balanceTrx: string; balanceUsd: number }>;
+  startTrxPolling: (invoiceId: string) => void;
+  stopTrxPolling: (invoiceId: string) => void;
+  isTrxPollingActive: (invoiceId: string) => boolean;
+  
   activateProWithCode: (code: string) => Promise<boolean>;
   updateMerchant: (updates: Partial<Merchant>) => void;
   createSubscription: (sub: Omit<Subscription, 'id' | 'createdAt' | 'invoiceCount' | 'status' | 'nextBillingDate'> & { interval: Subscription['interval'] }) => Subscription;
@@ -222,6 +231,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   posInventory: [],
   referrals: [],
   referralPayouts: [],
+  trxPollingIntervals: {}, // TRX polling state (not persisted)
 
   login: async () => {
     set({ isAuthenticated: true });
@@ -741,6 +751,114 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     }
     
     return { verified, failed };
+  },
+
+  // ─── TRX Payment Methods ───
+
+  createTrxInvoice: async (description: string, fiatAmount: number) => {
+    const state = get();
+    const merchant = state.merchant;
+    
+    if (!merchant.tronAddress) {
+      throw new Error('TRX wallet not found. Enable multi-chain wallet in settings.');
+    }
+    
+    try {
+      const manager = getTrxPaymentManager();
+      const invoice: Partial<Invoice> = await manager.createTrxInvoice(
+        merchant.tronAddress,
+        fiatAmount,
+        merchant.fiatCurrency,
+        description
+      );
+      
+      // Add to state
+      set((prev) => ({
+        invoices: [...prev.invoices, invoice as Invoice],
+      }));
+      
+      return invoice as Invoice;
+    } catch (error) {
+      console.error('[Store] Failed to create TRX invoice:', error);
+      throw error;
+    }
+  },
+
+  monitorTrxInvoice: async (invoiceId: string) => {
+    const state = get();
+    const invoice = state.invoices.find(i => i.id === invoiceId);
+    
+    if (!invoice || invoice.chainType !== 'trx') {
+      return;
+    }
+    
+    try {
+      const manager = getTrxPaymentManager();
+      const updated = await manager.monitorTrxInvoice(invoice);
+      
+      // Update invoice in state
+      get().updateInvoice(invoiceId, updated);
+    } catch (error) {
+      console.error(`[Store] Failed to monitor TRX invoice ${invoiceId}:`, error);
+    }
+  },
+
+  getTrxBalance: async () => {
+    const state = get();
+    const merchant = state.merchant;
+    
+    if (!merchant.tronAddress) {
+      return { address: '', balanceTrx: '0', balanceUsd: 0 };
+    }
+    
+    try {
+      const manager = getTrxPaymentManager();
+      return await manager.getMerchantBalance(merchant.tronAddress);
+    } catch (error) {
+      console.error('[Store] Failed to get TRX balance:', error);
+      return { address: merchant.tronAddress, balanceTrx: '0', balanceUsd: 0 };
+    }
+  },
+
+  startTrxPolling: (invoiceId: string) => {
+    const state = get();
+    
+    if (state.trxPollingIntervals[invoiceId]) {
+      return; // Already polling
+    }
+    
+    // Check every 10 seconds (Tron has fast block times: 3 seconds)
+    const interval = setInterval(() => {
+      get().monitorTrxInvoice(invoiceId);
+    }, 10000);
+    
+    set((prev) => ({
+      trxPollingIntervals: {
+        ...prev.trxPollingIntervals,
+        [invoiceId]: interval,
+      },
+    }));
+    
+    console.log(`[Store] Started TRX polling for invoice ${invoiceId}`);
+  },
+
+  stopTrxPolling: (invoiceId: string) => {
+    const state = get();
+    const interval = state.trxPollingIntervals[invoiceId];
+    
+    if (interval) {
+      clearInterval(interval);
+      set((prev) => {
+        const newIntervals = { ...prev.trxPollingIntervals };
+        delete newIntervals[invoiceId];
+        return { trxPollingIntervals: newIntervals };
+      });
+      console.log(`[Store] Stopped TRX polling for invoice ${invoiceId}`);
+    }
+  },
+
+  isTrxPollingActive: (invoiceId: string) => {
+    return !!get().trxPollingIntervals[invoiceId];
   },
 
   activateProWithCode: async (code: string): Promise<boolean> => {
