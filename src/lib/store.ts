@@ -1,3 +1,4 @@
+import { getTrxPaymentManager } from './tron-payments';
 import { generateMultiChainWallet } from './multi-chain-wallet';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';

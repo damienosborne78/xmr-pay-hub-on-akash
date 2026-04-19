@@ -26,6 +26,21 @@ export interface Invoice {
   feeTier?: string; // Fee tier used for sent payments
   feeXmr?: number; // Fee amount for sent payments
   note?: string; // Optional note for sent payments
+
+  // Multi-chain support
+  chainType?: 'xmr' | 'eth' | 'trx' | 'arb';
+  
+  // TRX-specific fields
+  trxAddress?: string;
+  trxAmount?: number;
+  trxTxID?: string;
+  trxConfirmations?: number;
+  
+  // ETH/ARB-specific fields
+  ethAddress?: string;
+  ethAmount?: number;
+  ethTxHash?: string;
+  ethConfirmations?: number;
 }
 
 export interface PosQuickButton {
@@ -238,6 +253,15 @@ export interface PaymentLink {
   createdAt: string;
   totalUses: number;
   active: boolean;
+
+  // Multi-chain support
+  chainType?: 'xmr' | 'eth' | 'trx' | 'arb';
+
+  // TRX-specific
+  trxAddress?: string;
+
+  // ETH/ARB-specific
+  ethAddress?: string;
 }
 
 // Default merchant — empty, no mock data
