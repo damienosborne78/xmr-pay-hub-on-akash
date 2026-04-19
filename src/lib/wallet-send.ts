@@ -398,7 +398,7 @@ export async function checkWalletBalance(
     const { daemonUrl, daemonHeight } = await connectToReachableDaemon(moneroTs, nodeUrl);
 
     // Optimization 1: Peek at recent TXs via explorer for optimal restore height
-    let optimalRestoreHeight = Math.max(0, daemonHeight - 500); // Default: 500 blocks (~8 hours)
+    let optimalRestoreHeight = Math.max(0, daemonHeight - 5000); // Default: 5000 blocks (~80 hours)
 
     if (viewAddress && viewKey) {
       try {
