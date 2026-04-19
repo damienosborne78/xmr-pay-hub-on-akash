@@ -32,6 +32,7 @@ export default function PaymentLinksPage() {
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
+  const [chainType, setChainType] = useState<'xmr' | 'trx'>('xmr');
   const [importing, setImporting] = useState(false);
 
   const baseUrl = useMemo(() => {
@@ -166,6 +167,37 @@ export default function PaymentLinksPage() {
                   <div className="space-y-2">
                     <Label className="text-foreground">Price ({cur})</Label>
                     <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="29.99" className="bg-background border-border" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-foreground">Accept Payments In</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setChainType('xmr')}
+                        className={`p-3 rounded-lg border-2 transition-all ${
+                          chainType === 'xmr'
+                            ? 'border-primary bg-primary/10 text-foreground font-medium'
+                            : 'border-border bg-background text-muted-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                          <span>Monero</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setChainType('trx')}
+                        className={`p-3 rounded-lg border-2 transition-all ${
+                          chainType === 'trx'
+                            ? 'border-primary bg-primary/10 text-foreground font-medium'
+                            : 'border-border bg-background text-muted-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <span>TRX</span>
+                        </div>
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-foreground">URL Slug</Label>
