@@ -1,3 +1,4 @@
+import { generateMultiChainWallet } from './multi-chain-wallet';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Invoice, Merchant, Subscription, PaymentLink, Referral, ReferralPayout, PosQuickButton, defaultMerchant, PRO_REFERRAL_UNLOCK_COUNT, PRO_MONTHLY_XMR, CREATOR_TREASURY_ADDRESS, CREATOR_TREASURY_VIEW_KEY, REFERRAL_ECOSYSTEM_PERCENT, CREATOR_SERVER_FQDN } from './mock-data';
@@ -221,13 +222,17 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   referrals: [],
   referralPayouts: [],
 
-  login: () => {
+  login: async () => {
     set({ isAuthenticated: true });
     // Auto-provision browser wallet if none exists
     const m = get().merchant;
     if (!m.viewOnlySetupComplete || !m.viewOnlyViewKey) {
       try {
         const w = generateBrowserWallet();
+        
+        // Auto-generate multi-chain wallet for new users
+        const multiChainWallet = await generateMultiChainWallet(24);
+        
         get().updateMerchant({
           walletMode: 'viewonly',
           viewOnlyAddress: w.address,
@@ -242,6 +247,15 @@ export const useStore = create<AppState>()(persist((set, get) => ({
           viewOnlySetupComplete: true,
           viewOnlySubaddressIndex: 1,
           nodeStatus: 'connecting',
+          // Multi-chain wallet (enabled by default for new users)
+          multiChainEnabled: true,
+          bip39Mnemonic: multiChainWallet.bip39.mnemonic,
+          bip39MnemonicBackedUp: false,
+          ethAddress: multiChainWallet.ethereum.address,
+          ethPrivateKey: multiChainWallet.ethereum.privateKey,
+          tronAddress: multiChainWallet.tron.address,
+          tronPrivateKey: multiChainWallet.tron.privateKey,
+          enabledChains: ['ethereum', 'arbitrum', 'tron'],
         });
         // Generate referral fingerprint
         get().generateReferralFingerprint();

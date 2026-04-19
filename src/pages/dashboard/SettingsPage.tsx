@@ -22,6 +22,7 @@ import { REMOTE_NODES, findFastestNode } from '@/lib/node-manager';
 import { isMerchantPro } from '@/lib/subscription';
 import AdvancedWalletSetup from '@/components/AdvancedWalletSetup';
 import CsvInventoryImport from '@/components/CsvInventoryImport';
+import { MultiChainOptIn } from '@/components/MultiChainOptIn';
 /** Simple hash for local admin password lock */
 function hashPassword(pw: string): string {
   let hash = 0;
@@ -601,6 +602,98 @@ export default function SettingsPage() {
                   Configure how real Monero transactions are constructed and broadcast
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Multi-Chain Wallet */}
+          {walletMode === 'viewonly' && merchant.viewOnlySetupComplete && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Multi-Chain Wallet</h3>
+              </div>
+              <MultiChainOptIn />
+              
+              {/* Show multi-chain addresses if enabled */}
+              {merchant.multiChainEnabled && (
+                <div className="space-y-2 p-4 rounded-lg bg-card border border-border">
+                  {merchant.ethAddress && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                        ETH / ARB Address
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-[10px] text-foreground bg-background border border-border rounded p-2 flex-1 break-all">{merchant.ethAddress}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-6 w-6"
+                          onClick={() => {
+                            navigator.clipboard.writeText(merchant.ethAddress || '');
+                            toast.success('ETH/ARB address copied');
+                          }}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {merchant.tronAddress && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground">
+                        TRX Address
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-[10px] text-foreground bg-background border border-border rounded p-2 flex-1 break-all">{merchant.tronAddress}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-6 w-6"
+                          onClick={() => {
+                            navigator.clipboard.writeText(merchant.tronAddress || '');
+                            toast.success('TRX address copied');
+                          }}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* BIP-39 Backup Reminder */}
+ {!merchant.bip39MnemonicBackedUp && merchant.bip39Mnemonic && (
+                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ShieldAlert className="w-3 h-3 text-destructive" />
+                        <p className="text-xs font-semibold text-destructive">Back up multi-chain seed phrase</p>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mb-2">
+                        Your 24-word BIP-39 seed phrase controls your ETH/ARB/TRX wallets. Write it down now.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive/30 text-destructive hover:bg-destructive/10 text-xs"
+                        onClick={() => requireAdmin(() => {
+                          navigator.clipboard.writeText(merchant.bip39Mnemonic || '');
+                          toast.success('BIP-39 seed phrase copied — store it safely!');
+                        })}
+                      >
+                        <Copy className="w-3 h-3 mr-1" /> Copy Seed Phrase
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="ml-2 bg-gradient-orange text-xs"
+                        onClick={() => {
+                          updateMerchant({ bip39MnemonicBackedUp: true });
+                          toast.success('BIP-39 seed phrase marked as backed up');
+                        }}
+                      >
+                        <Check className="w-3 h-3 mr-1" /> I've saved it
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

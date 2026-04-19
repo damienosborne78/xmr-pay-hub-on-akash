@@ -114,6 +114,19 @@ export interface Merchant {
   viewOnlySpendKey: string;
   viewOnlyPublicSpendKey: string;
   viewOnlyPublicViewKey: string;
+  // Multi-chain wallet fields (optional - backward compatible)
+  multiChainEnabled?: boolean;
+  // BIP-39 wallet for multi-chain (Ethereum, Tron, Arbitrum)
+  bip39Mnemonic?: string; // 24-word seed phrase
+  bip39MnemonicBackedUp?: boolean;
+  // Ethereum / Arbitrum (same key, different chain)
+  ethAddress?: string; // 0x-prefixed, 42 chars
+  ethPrivateKey?: string; // 0x-prefixed hex
+  // Tron (different key)
+  tronAddress?: string; // Base58, 34 chars
+  tronPrivateKey?: string; // hex
+  // Multi-chain preferences
+  enabledChains?: ('ethereum' | 'arbitrum' | 'tron')[];
   // Node connection state
   connectedNodeLabel: string;
   connectedNodeUrl: string;
