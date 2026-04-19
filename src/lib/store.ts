@@ -949,16 +949,25 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     }));
   },
 
-  createPaymentLink: (slug: string, fiatAmount: number, label: string, fiatCurrency?: string) => {
+  createPaymentLink: (slug: string, fiatAmount: number, label: string, fiatCurrency?: string, chainType: 'xmr' | 'trx' = 'xmr') => {
     const merchant = get().merchant;
-    // Use a base subaddress or payment address for reusable links
-    const subaddress = merchant.viewOnlyAddress || merchant.primarySubaddress || '';
+    
+    // Use appropriate address based on chain type
+    let subaddress = '';
+    if (chainType === 'xmr') {
+      subaddress = merchant.viewOnlyAddress || merchant.primarySubaddress || '';
+    } else if (chainType === 'trx') {
+      if (!merchant.tronAddress) {
+        throw new Error('TRX wallet not enabled. Enable multi-chain wallet in Settings.');
+      }
+      subaddress = merchant.tronAddress;
+    }
 
     // Generate unique identifier to avoid clashes across users on same domain
     const uniqueId = Math.random().toString(36).slice(2, 12);
 
     const link: PaymentLink = {
-      id: 'pl_' + Math.random().toString(36).slice(2, 8),
+      id: `pl_${Math.random().toString(36).slice(2, 8)}`,
       slug,
       fiatAmount,
       fiatCurrency: fiatCurrency || merchant.fiatCurrency || 'USD',
@@ -968,6 +977,9 @@ export const useStore = create<AppState>()(persist((set, get) => ({
       createdAt: new Date().toISOString(),
       totalUses: 0,
       active: true,
+      chainType,
+      trxAddress: chainType === 'trx' ? subaddress : undefined,
+      ethAddress: chainType === 'eth' ? subaddress : undefined,
     };
     set(state => ({ paymentLinks: [link, ...state.paymentLinks] }));
     return link;
