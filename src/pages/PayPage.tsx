@@ -2,7 +2,8 @@
 
 import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { formatUSD, formatXMR, usdToXmr, XMR_USD_RATE } from '@/lib/mock-data';
+import { formatUSD, formatXMR, usdToXmr, XMR_USD_RATE, usdToTrx } from '@/lib/mock-data';
+import { usdToTrx } from '@/lib/mock-data';
 import { useStore } from '@/lib/store';
 import { QRCodeSVG } from 'qrcode.react';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import { Check, Clock, Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PaymentProgress } from '@/components/PaymentProgress';
 import { fiatToXmr, getRates, getStaleCache, getXmrPrice } from '@/lib/currency-service';
+import { TrxQRCode } from '@/components/TrxQRCode';
 
 export default function PayPage() {
   const { uniqueId, amount, label } = useParams();

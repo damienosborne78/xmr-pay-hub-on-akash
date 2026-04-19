@@ -1,5 +1,6 @@
 // XMR exchange rate — in production, fetch from a live API (e.g. CoinGecko)
 export const XMR_USD_RATE = 167.42;
+export const TRX_USD_RATE = 0.12;
 
 export interface Invoice {
   id: string;
@@ -407,3 +408,4 @@ export const formatFiat = (amount: number, symbol: string = '$', code: string = 
   return symbol + amount.toFixed(2);
 };
 export const usdToXmr = (usd: number) => usd / XMR_USD_RATE;
+export const usdToTrx = (usd: number) => usd / TRX_USD_RATE; export const trxToUsd = (trx: number) => trx * TRX_USD_RATE;
