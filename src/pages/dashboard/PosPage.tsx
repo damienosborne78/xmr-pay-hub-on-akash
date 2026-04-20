@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MoneroFeeInfo } from '@/components/MoneroFeeInfo';
+import { TrxQRCode } from '@/components/TrxQRCode';
+import { TrxPaymentProgress } from '@/components/TrxPaymentProgress';
 import { PaymentProgress } from '@/components/PaymentProgress';
 import { HelpTooltip } from '@/components/HelpTooltip';
 
@@ -40,6 +42,7 @@ function ProBadge() {
 
 export default function PosPage() {
   const createInvoice = useStore(s => s.createInvoice);
+  const createTrxInvoice = useStore(s => s.createTrxInvoice);
   const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
   const invoices = useStore(s => s.invoices);
   const merchant = useStore(s => s.merchant);
@@ -65,10 +68,31 @@ export default function PosPage() {
   const [input, setInput] = useState('0');
   const [selectedChain, setSelectedChain] = useState<'xmr' | 'trx'>('xmr');
   const [xmrMode, setXmrMode] = useState(false);
-  const [activeInvoice, setActiveInvoice] = useState<{ id: string; fiatAmount: number; xmrAmount: number; subaddress: string } | null>(null);
+  const [activeInvoice, setActiveInvoice] = useState<{ id: string; fiatAmount: number; xmrAmount: number; trxAmount: number; subaddress: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [showAddButton, setShowAddButton] = useState(false);
   const [newBtnLabel, setNewBtnLabel] = useState('');
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (selectedChain === 'trx') {
+      // Save current theme before applying TRON
+      const currentTheme = root.classList.contains('dark') ? 'dark' : Array.from(root.classList).find(c => c.startsWith('theme-')) || 'dark';
+      localStorage.setItem('mf-previous-theme', currentTheme);
+      root.classList.remove('dark', 'theme-light', 'theme-rose', 'theme-lavender', 'theme-mint', 'theme-peach');
+      root.classList.add('theme-tron');
+    } else {
+      // Restore the theme that was active before TRON
+      const previousTheme = localStorage.getItem('mf-previous-theme') || 'dark';
+      root.classList.remove('theme-tron');
+      if (previousTheme === 'dark') {
+        root.classList.add('dark');
+      } else if (previousTheme.startsWith('theme-')) {
+        root.classList.add(previousTheme);
+      }
+    }
+  }, [selectedChain]);
   const [newBtnPrice, setNewBtnPrice] = useState('');
   const [newBtnCategory, setNewBtnCategory] = useState('Products');
   const [newBtnStock, setNewBtnStock] = useState('');
@@ -197,8 +221,13 @@ export default function PosPage() {
       : 'PoS Sale';
     const note = orderNote ? ` [Note: ${orderNote}]` : '';
     try {
-      const inv = await createInvoice(desc + note, amount);
-      setActiveInvoice({ id: inv.id, fiatAmount: inv.fiatAmount, xmrAmount: inv.xmrAmount, subaddress: inv.subaddress });
+      if (selectedChain === 'trx') {
+        const inv = await createTrxInvoice(desc + note, amount);
+        setActiveInvoice({ id: inv.id, fiatAmount: inv.fiatAmount, xmrAmount: 0, trxAmount: inv.trxAmount || 0, subaddress: inv.trxAddress || '' });
+      } else {
+        const inv = await createInvoice(desc + note, amount);
+        setActiveInvoice({ id: inv.id, fiatAmount: inv.fiatAmount, xmrAmount: inv.xmrAmount, trxAmount: 0, subaddress: inv.subaddress });
+      }
     } catch (e) {
       toast.error((e as Error).message || 'Failed to create invoice.');
     }
@@ -480,30 +509,40 @@ export default function PosPage() {
 
   // ── QR code screen with smart confirmation ──
   if (activeInvoice) {
+    const isTrxInvoice = activeInvoice.trxAmount > 0;
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
         <div className="text-center space-y-5 max-w-sm w-full">
           <div>
             <p className="text-muted-foreground text-sm mb-1">Customer owes</p>
             <h2 className="text-4xl font-bold text-foreground">{formatFiat(activeInvoice.fiatAmount, sym, cur)}</h2>
-            <p className="text-primary font-mono mt-1">{formatXMR(activeInvoice.xmrAmount)}</p>
+            <p className={`font-mono mt-1 ${isTrxInvoice ? 'text-orange-500' : 'text-primary'}`}>
+              {isTrxInvoice ? `${activeInvoice.trxAmount.toFixed(2)} USDT` : formatXMR(activeInvoice.xmrAmount)}
+            </p>
           </div>
-          <div className="bg-white rounded-2xl p-6 inline-block">
-            <QRCodeSVG value={`monero:${activeInvoice.subaddress}?tx_amount=${activeInvoice.xmrAmount.toFixed(6)}`} size={220} />
-          </div>
-          <p className="text-muted-foreground text-xs font-mono break-all px-4">{activeInvoice.subaddress.slice(0, 20)}...{activeInvoice.subaddress.slice(-10)}</p>
-          
-          {/* Fee estimation */}
-          <MoneroFeeInfo compact />
-          
-          {/* Smart confirmation progress */}
-          <PaymentProgress
-            invoiceId={activeInvoice.id}
-            fiatAmount={activeInvoice.fiatAmount}
-            xmrAmount={activeInvoice.xmrAmount}
-            subaddress={activeInvoice.subaddress}
-          />
-          
+          {isTrxInvoice ? (
+            <TrxQRCode address={activeInvoice.trxAddress || activeInvoice.subaddress} amount={activeInvoice.trxAmount} />
+          ) : (
+            <div className="bg-white rounded-2xl p-6 inline-block">
+              <QRCodeSVG value={`monero:${activeInvoice.subaddress}?tx_amount=${activeInvoice.xmrAmount.toFixed(6)}`} size={220} />
+            </div>
+          )}
+          <p className="text-muted-foreground text-xs font-mono break-all px-4">
+            {isTrxInvoice
+              ? (activeInvoice.trxAddress || activeInvoice.subaddress).slice(0, 20) + '...' + (activeInvoice.trxAddress || activeInvoice.subaddress).slice(-10)
+              : activeInvoice.subaddress.slice(0, 20) + '...' + activeInvoice.subaddress.slice(-10)
+            }
+          </p>
+
+          {isTrxInvoice ? (
+            <TrxPaymentProgress invoiceId={activeInvoice.id} fiatAmount={activeInvoice.fiatAmount} trxAmount={activeInvoice.trxAmount || 0} address={activeInvoice.trxAddress || activeInvoice.subaddress} />
+          ) : (
+            <>
+              <MoneroFeeInfo compact />
+              <PaymentProgress invoiceId={activeInvoice.id} fiatAmount={activeInvoice.fiatAmount} xmrAmount={activeInvoice.xmrAmount} subaddress={activeInvoice.subaddress} />
+            </>
+          )}
+
           <Button variant="outline" onClick={handleNewSale} className="border-border">Cancel</Button>
         </div>
       </div>
@@ -536,6 +575,16 @@ export default function PosPage() {
           </Badge>
         </div>
       )}
+      {/* ═══ Payment Chain Toggle ═══ */}
+      <div className="flex items-center gap-3 bg-card border border-border rounded-lg px-3 py-2">
+        <span className={`text-xs font-medium ${selectedChain === 'xmr' ? 'text-primary' : 'text-muted-foreground'}`}>XMR</span>
+        <Switch
+          checked={selectedChain === 'trx'}
+          onCheckedChange={(checked) => setSelectedChain(checked ? 'trx' : 'xmr')}
+          className="bg-muted data-[state=checked]:bg-orange-500"
+        />
+        <span className={`text-xs font-medium ${selectedChain === 'trx' ? 'text-orange-500' : 'text-muted-foreground'}`}>TRX/USDT</span>
+      </div>
       <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center min-h-[70vh] gap-4 lg:gap-6">
       {/* ═══ LEFT: Product Grid (Pro) ═══ */}
       {(quickButtons.length > 0 || isPro) && (

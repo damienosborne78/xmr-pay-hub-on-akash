@@ -1,4 +1,5 @@
-import { getTrxPaymentManager } from './tron-payments';
+import { getTrxPaymentManager } from './tron-payments'; // Legacy TRX - kept for compatibility
+import { getUsdtPaymentManager } from './usdt-payments'; // USDT-TRC20 integration
 import { generateMultiChainWallet } from './multi-chain-wallet';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -753,33 +754,34 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     return { verified, failed };
   },
 
-  // ─── TRX Payment Methods ───
+  // ─── USDT-TRC20 Payment Methods ───
 
   createTrxInvoice: async (description: string, fiatAmount: number) => {
     const state = get();
     const merchant = state.merchant;
-    
+
     if (!merchant.tronAddress) {
       throw new Error('TRX wallet not found. Enable multi-chain wallet in settings.');
     }
-    
+
     try {
-      const manager = getTrxPaymentManager();
-      const invoice: Partial<Invoice> = await manager.createTrxInvoice(
+      // Use USDT payment manager (1:1 pegged to USD)
+      const manager = getUsdtPaymentManager();
+      const invoice: Partial<Invoice> = await manager.createUsdtInvoice(
         merchant.tronAddress,
         fiatAmount,
         merchant.fiatCurrency,
         description
       );
-      
+
       // Add to state
       set((prev) => ({
         invoices: [...prev.invoices, invoice as Invoice],
       }));
-      
+
       return invoice as Invoice;
     } catch (error) {
-      console.error('[Store] Failed to create TRX invoice:', error);
+      console.error('[Store] Failed to create USDT invoice:', error);
       throw error;
     }
   },
@@ -787,14 +789,15 @@ export const useStore = create<AppState>()(persist((set, get) => ({
   monitorTrxInvoice: async (invoiceId: string) => {
     const state = get();
     const invoice = state.invoices.find(i => i.id === invoiceId);
-    
+
     if (!invoice || invoice.chainType !== 'trx') {
       return;
     }
-    
+
     try {
-      const manager = getTrxPaymentManager();
-      const updated = await manager.monitorTrxInvoice(invoice);
+      // Use USDT payment manager
+      const manager = getUsdtPaymentManager();
+      const updated = await manager.monitorUsdtInvoice(invoice);
       
       // Update invoice in state
       get().updateInvoice(invoiceId, updated);
@@ -1001,18 +1004,37 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     const existingSlugs = new Set(get().paymentLinks.map((l) => l.slug));
 
     for (const item of posItems) {
-      const slug = item.label.toLowerCase().replace(/[^a-z0-9-]/g, '-') + `-${item.price}`;
+      const baseSlug = item.label.toLowerCase().replace(/[^a-z0-9-]/g, '-') + `-${item.price}`;
 
-      if (existingSlugs.has(slug)) continue;
+      // Create XMR link
+      const xmrSlug = `${baseSlug}-xmr`;
+      if (!existingSlugs.has(xmrSlug)) {
+        await get().createPaymentLink(
+          xmrSlug,
+          item.price,
+          item.label,
+          merchant.fiatCurrency || 'USD',
+          undefined,
+          'xmr'
+        );
+        imported += 1;
+        existingSlugs.add(xmrSlug);
+      }
 
-      await get().createPaymentLink(
-        slug,
-        item.price,
-        item.label,
-        merchant.fiatCurrency || 'USD'
-      );
-      imported += 1;
-      existingSlugs.add(slug);
+      // Create TRX link
+      const trxSlug = `${baseSlug}-trx`;
+      if (!existingSlugs.has(trxSlug)) {
+        await get().createPaymentLink(
+          trxSlug,
+          item.price,
+          item.label,
+          merchant.fiatCurrency || 'USD',
+          undefined,
+          'trx'
+        );
+        imported += 1;
+        existingSlugs.add(trxSlug);
+      }
     }
 
     return imported;
