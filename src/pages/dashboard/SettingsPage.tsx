@@ -471,10 +471,10 @@ export default function SettingsPage() {
                     )}
                     {merchant.tronAddress && (
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">TRX Address</label>
+                        <label className="text-[10px] font-medium text-muted-foreground">TRON (USDT-TRC20) Address</label>
                         <div className="flex items-center gap-2">
                           <p className="font-mono text-[10px] text-foreground bg-background border border-border rounded p-2 flex-1 break-all">{merchant.tronAddress}</p>
-                          <Button variant="ghost" size="icon" className="shrink-0 h-6 w-6" onClick={() => { navigator.clipboard.writeText(merchant.tronAddress || ''); toast.success('TRX address copied'); }}>
+                          <Button variant="ghost" size="icon" className="shrink-0 h-6 w-6" onClick={() => { navigator.clipboard.writeText(merchant.tronAddress || ''); toast.success('USDT-TRC20 address copied'); }}>
                             <Copy className="w-3 h-3" />
                           </Button>
                         </div>

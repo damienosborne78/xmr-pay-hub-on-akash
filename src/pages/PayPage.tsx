@@ -232,9 +232,9 @@ export default function PayPage() {
     );
   }
 
-  const chainName = isTrxPayment ? 'TRON (TRX)' : 'Monero (XMR)';
+  const chainName = isTrxPayment ? 'TRON (USDT)' : 'Monero (XMR)';
   const cryptoAmount = isTrxPayment ? trxAmount : xmrAmount;
-  const rateLabel = isTrxPayment ? '1 TRX' : '1 XMR';
+  const rateLabel = isTrxPayment ? '1 USDT' : '1 XMR';
   const address = isTrxPayment ? trxAddress : subaddress;
 
   return (
@@ -246,12 +246,7 @@ export default function PayPage() {
             <h1 className="text-xl font-bold text-foreground mt-3">
               {label ? decodeURIComponent(label).replace(/-/g, ' ') : 'Payment'}
             </h1>
-            <p className="text-muted-foreground text-sm mt-1">Pay with TRON (USDT {isTrxPayment ? '/ TRX' : ''})</p>
-            {isTrxPayment && (
-              <Badge variant="outline" className="mt-2 bg-primary/10 text-primary border-primary/20 text-xs">
-                Multi-chain
-              </Badge>
-            )}
+            <p className="text-muted-foreground text-sm mt-1">{isTrxPayment ? 'Pay with TRON (USDT)' : 'Pay with Monero (XMR)'}</p>
           </div>
 
           {paid ? (
