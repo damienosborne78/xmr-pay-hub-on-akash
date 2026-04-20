@@ -8,7 +8,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRates } from '@/hooks/use-rates';
-import { getXmrPrice } from '@/lib/currency-service';
+import { getXmrPrice, getTrxPrice } from '@/lib/currency-service';
 import { Switch } from '@/components/ui/switch';
 import { useHelp } from '@/components/HelpProvider';
 import { HelpTooltip } from '@/components/HelpTooltip';
@@ -26,6 +26,30 @@ export default function DashboardOverview() {
   const totalFiat = paid.reduce((s, i) => s + i.fiatAmount, 0);
   const totalXMR = paid.reduce((s, i) => s + i.xmrAmount, 0);
   const pending = invoices.filter(i => i.status === 'pending').length;
+
+  // TRX balance tracking
+  const [trxBalance, setTrxBalance] = useState<{ address: string; balanceTrx: string; balanceUsd: number } | null>(null);
+  const [trxLoading, setTrxLoading] = useState(false);
+
+  // Load TRX balance on mount and refresh
+  useEffect(() => {
+    const loadTrxBalance = async () => {
+      try {
+        setTrxLoading(true);
+        const balance = await useStore.getState().getTrxBalance();
+        setTrxBalance(balance);
+      } catch {
+        // TRX wallet not initialized or error - silently ignore
+      } finally {
+        setTrxLoading(false);
+      }
+    };
+
+    loadTrxBalance();
+    // Refresh TRX balance every 30 seconds
+    const interval = setInterval(loadTrxBalance, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const [refreshing, setRefreshing] = useState(false);
   const [autoConnecting, setAutoConnecting] = useState(false);
@@ -87,6 +111,15 @@ export default function DashboardOverview() {
   const stats = [
     { label: 'Total Received', value: formatFiat(totalFiat, sym, cur), sub: formatXMR(totalXMR), icon: DollarSign, color: 'text-primary' },
     { label: 'XMR Rate', value: xmrPrice ? formatFiat(xmrPrice, sym, cur) : 'Loading...', sub: `1 XMR in ${cur}`, icon: TrendingUp, color: 'text-primary' },
+    ...(rates ? [
+      {
+        label: 'TRX Balance',
+        value: trxBalance ? `${trxBalance.balanceTrx} TRX` : '0.00 TRX',
+        sub: trxBalance ? formatFiat(trxBalance.balanceUsd, sym, cur) : `${sym}0.00`,
+        icon: DollarSign,
+        color: 'text-primary'
+      }
+    ] : []),
     { label: 'Total Invoices', value: invoices.length.toString(), sub: `${paid.length} paid`, icon: FileText, color: 'text-primary' },
     { label: 'Pending', value: pending.toString(), sub: 'awaiting payment', icon: Clock, color: 'text-warning' },
   ];

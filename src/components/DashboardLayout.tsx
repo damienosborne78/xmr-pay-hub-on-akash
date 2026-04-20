@@ -15,7 +15,8 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
 import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon, Zap } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useStore } from '@/lib/store';
 import { startReferralSync } from '@/lib/referral-sync';
 
 const THEMES = [
@@ -264,26 +265,25 @@ function SweepStatusBanner() {
 }
 
 export default function DashboardLayout() {
-  // Start referral sync if user is already authenticated (singleton - idempotent)
-  // Only runs once per authentication state, handles multi-user robustly
+  // Use ref to keep stable reference to store getter
+  // Prevents multiple sync instances on re-renders
+  const syncStartedRef = useRef(false);
+  
+  // Start referral sync only ONCE on mount (singleton - idempotent)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedAuth = localStorage.getItem('mf-storage');
-      if (storedAuth) {
-        try {
-          const parsed = JSON.parse(storedAuth);
-          const isAuth = parsed?.state?.isAuthenticated;
-          if (isAuth) {
-            console.log('[DashboardLayout] User authenticated, starting sync');
-            // startReferralSync is idempotent - safe to call multiple times
-            startReferralSync(() => JSON.parse(stored).state);
-          }
-        } catch (e) {
-          console.error('[DashboardLayout] Failed to check auth from storage', e);
-        }
-      }
+    if (syncStartedRef.current) {
+      console.log('[DashboardLayout] Sync already started, skipping');
+      return;
     }
-  }, []); // Only run on mount
+    
+    console.log('[DashboardLayout] Starting referral sync on mount');
+    syncStartedRef.current = true;
+    startReferralSync(useStore.getState);
+    
+    return () => {
+      syncStartedRef.current = false;
+    };
+  }, []); // Empty deps = only run on mount
 
   return (
     <HelpProvider>

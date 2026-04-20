@@ -16,18 +16,42 @@
 
 import { CREATOR_SERVER_FQDN } from './mock-data';
 
-const SYNC_INTERVAL_MS = 60_000; // 60 seconds
+const SYNC_INTERVAL_MS = 60_000; // 60 seconds base interval
 const MAX_RETRY_BACKOFF_MS = 300_000; // 5 minutes max backoff
 const SYNC_ENDPOINT = `https://${CREATOR_SERVER_FQDN}/api/mf/referral/sync`;
+const JITTER_MS = 5000; // 5 second random jitter prevents thundering herd
 
 // Global singleton state - prevents multiple sync instances
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 let getStore: (() => any) | null = null;
 let failedAttempts = 0;
 let lastSuccessTime = 0;
+let SyncQueue: Array<() => void> = []; // Request queue for rate limiting
+let isProcessing = false;
+let queueProcessingScheduled = false;
 
 // Cleanup on visibility handler
 let visibilityHandler: (() => void) | null = null;
+
+// STORE timers globally in window for cross-instance cleanup
+// This allows new code to kill old sync instances from previous versions
+declare global {
+  interface Window {
+    moneroflowReferralSyncTimers?: ReturnType<typeof setTimeout>[];
+  }
+}
+
+// Kill any existing sync timers from previous instances (runs on script load)
+if (typeof window !== 'undefined' && window.moneroflowReferralSyncTimers) {
+  console.log('[ReferralSync] Killing old sync timers from previous instance', window.moneroflowReferralSyncTimers.length);
+  window.moneroflowReferralSyncTimers.forEach(timer => clearTimeout(timer));
+  window.moneroflowReferralSyncTimers = [];
+}
+
+// Initialize global timer storage
+if (typeof window !== 'undefined') {
+  window.moneroflowReferralSyncTimers = window.moneroflowReferralSyncTimers || [];
+}
 
 export interface ReferralSyncPayload {
   referralCode: string;
@@ -100,6 +124,15 @@ function collectPayload(): ReferralSyncPayload | null {
 }
 
 /**
+ * Add random jitter to delay to prevent thundering herd
+ * When thousands of users start simultaneously, spread out requests
+ */
+function addJitter(delayMs: number): number {
+  const jitter = Math.random() * JITTER_MS - (JITTER_MS / 2); // -2.5s to +2.5s
+  return Math.max(SYNC_INTERVAL_MS / 2, delayMs + jitter); // Minimum 30s interval
+}
+
+/**
  * Calculate exponential backoff based on failed attempts
  */
 function getNextSyncDelay(): number {
@@ -109,7 +142,7 @@ function getNextSyncDelay(): number {
   const delayMs = Math.floor(backoffSeconds * 1000);
   
   console.log(`[ReferralSync] Next sync in ${Math.floor(delayMs/1000)}s (failedAttempts: ${failedAttempts})`);
-  return delayMs;
+  return addJitter(delayMs);
 }
 
 /**
@@ -151,14 +184,27 @@ async function doSync(): Promise<boolean> {
 }
 
 /**
- * Sync loop with exponential backoff and guaranteed restart
+ * Sync loop with exponential backoff, jitter, and guaranteed restart
+ * Handles thousands of concurrent users gracefully
  */
 function syncLoop(): void {
+  const delay = getNextSyncDelay();
   syncTimer = setTimeout(async () => {
-    await doSync();
+    try {
+      await doSync();
+    } catch (error) {
+      console.error('[ReferralSync] Sync loop error:', error);
+      failedAttempts++;
+    }
     // ALWAYS restart the loop, even if sync failed (robustness key!)
     syncLoop();
-  }, getNextSyncDelay());
+  }, delay);
+  
+  // Store timer globally for cleanup
+  if (typeof window !== 'undefined' && syncTimer) {
+    window.moneroflowReferralSyncTimers = window.moneroflowReferralSyncTimers || [];
+    window.moneroflowReferralSyncTimers.push(syncTimer);
+  }
 }
 
 /**
@@ -183,20 +229,23 @@ export function startReferralSync(get: () => any): void {
   failedAttempts = 0;
   lastSuccessTime = 0;
   
-  console.log('[ReferralSync] Starting sync loop');
+  // Add startup jitter to prevent thundering herd when app boots
+  const startupDelay = Math.random() * 10000; // 0-10s delay on first sync
+  console.log(`[ReferralSync] Starting sync loop (startup jitter: ${Math.floor(startupDelay/1000)}s)`);
   
-  // Immediate first sync
-  doSync();
-  
-  // Start loop
-  syncLoop();
+  // Schedule first sync with startup jitter
+  setTimeout(() => {
+    doSync();
+    syncLoop();
+  }, startupDelay);
   
   // Set up visibility handler to retry sync when user returns
   if (typeof window !== 'undefined' && !visibilityHandler) {
     visibilityHandler = () => {
       if (document.visibilityState === 'visible') {
         console.log('[ReferralSync] User returned to tab - attempting immediate sync');
-        doSync();
+        // Don't spam - add 1-3s jitter before sync attempt
+        setTimeout(() => doSync(), 1000 + Math.random() * 2000);
       }
     };
     window.addEventListener('visibilitychange', visibilityHandler);

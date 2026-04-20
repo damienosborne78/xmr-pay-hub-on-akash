@@ -2,6 +2,7 @@
 
 interface CachedRates {
   xmrUsd: number;
+  trxUsd: number;
   fiatRates: Record<string, number>; // rates relative to USD
   fetchedAt: number;
 }
@@ -36,6 +37,31 @@ async function fetchXmrUsd(): Promise<number> {
     } catch { /* try next */ }
   }
   throw new Error('All XMR price sources failed');
+}
+
+// ── Fetch TRX/USD from multiple sources with fallback ──
+async function fetchTrxUsd(): Promise<number> {
+  const sources = [
+    async () => {
+      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tron&vs_currencies=usd', { signal: AbortSignal.timeout(5000) });
+      const d = await r.json();
+      return d.tron?.usd;
+    },
+    async () => {
+      const r = await fetch('https://min-api.cryptocompare.com/data/price?fsym=TRX&tsyms=USD', { signal: AbortSignal.timeout(5000) });
+      const d = await r.json();
+      return d.USD;
+    },
+  ];
+
+  for (const src of sources) {
+    try {
+      const price = await src();
+      if (price && price > 0) return price;
+    } catch { /* try next */ }
+  }
+  // Fallback static rate
+  return 0.12;
 }
 
 // ── Fetch fiat exchange rates relative to USD ──
@@ -91,8 +117,8 @@ export async function getRates(): Promise<CachedRates> {
 
   fetchPromise = (async () => {
     try {
-      const [xmrUsd, fiatRates] = await Promise.all([fetchXmrUsd(), fetchFiatRates()]);
-      const rates: CachedRates = { xmrUsd, fiatRates, fetchedAt: Date.now() };
+      const [xmrUsd, trxUsd, fiatRates] = await Promise.all([fetchXmrUsd(), fetchTrxUsd(), fetchFiatRates()]);
+      const rates: CachedRates = { xmrUsd, trxUsd, fiatRates, fetchedAt: Date.now() };
       setCache(rates);
       return rates;
     } finally {
@@ -131,4 +157,24 @@ export function xmrToFiat(xmrAmount: number, fiatCurrency: string, rates: Cached
 export function getXmrPrice(fiatCurrency: string, rates: CachedRates): number {
   const fiatRate = rates.fiatRates[fiatCurrency] || 1;
   return rates.xmrUsd * fiatRate;
+}
+
+/** Convert fiat amount to TRX using live rates */
+export function fiatToTrx(fiatAmount: number, fiatCurrency: string, rates: CachedRates): number {
+  const fiatToUsd = fiatCurrency === 'USD' ? 1 : (1 / (rates.fiatRates[fiatCurrency] || 1));
+  const usdAmount = fiatAmount * fiatToUsd;
+  return usdAmount / rates.trxUsd;
+}
+
+/** Convert TRX to fiat using live rates */
+export function trxFiat(trxAmount: number, fiatCurrency: string, rates: CachedRates): number {
+  const usdAmount = trxAmount * rates.trxUsd;
+  const fiatRate = rates.fiatRates[fiatCurrency] || 1;
+  return usdAmount * fiatRate;
+}
+
+/** Get TRX price in a specific fiat currency */
+export function getTrxPrice(fiatCurrency: string, rates: CachedRates): number {
+  const fiatRate = rates.fiatRates[fiatCurrency] || 1;
+  return rates.trxUsd * fiatRate;
 }

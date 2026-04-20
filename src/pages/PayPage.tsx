@@ -2,8 +2,7 @@
 
 import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { formatUSD, formatXMR, usdToXmr, XMR_USD_RATE, usdToTrx } from '@/lib/mock-data';
-import { usdToTrx } from '@/lib/mock-data';
+import { formatXMR, XMR_USD_RATE } from '@/lib/mock-data';
 import { useStore } from '@/lib/store';
 import { QRCodeSVG } from 'qrcode.react';
 import { Badge } from '@/components/ui/badge';
@@ -11,8 +10,9 @@ import { MoneroLogo } from '@/components/BrandLogo';
 import { Check, Clock, Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PaymentProgress } from '@/components/PaymentProgress';
-import { fiatToXmr, getRates, getStaleCache, getXmrPrice } from '@/lib/currency-service';
+import { TrxPaymentProgress } from '@/components/TrxPaymentProgress';
 import { TrxQRCode } from '@/components/TrxQRCode';
+import { fiatToXmr, fiatToTrx, getRates, getStaleCache, getXmrPrice, getTrxPrice } from '@/lib/currency-service';
 
 export default function PayPage() {
   const { uniqueId, amount, label } = useParams();
@@ -20,20 +20,24 @@ export default function PayPage() {
   const search = new URLSearchParams(window.location.search);
   const displayCurrency = (search.get('currency') || 'USD').toUpperCase();
   const displaySymbol = search.get('symbol') || (displayCurrency === 'USD' ? '$' : `${displayCurrency} `);
+  const chainType = (search.get('chain') || 'xmr') as 'xmr' | 'trx' | 'eth' | 'arb';
 
   const pollInvoicePayment = useStore(s => s.pollInvoicePayment);
   const createInvoice = useStore(s => s.createInvoice);
+  const createTrxInvoice = useStore(s => s.createTrxInvoice);
   const updateInvoice = useStore(s => s.updateInvoice);
   const invoices = useStore(s => s.invoices);
   const paymentLinks = useStore(s => s.paymentLinks);
 
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [subaddress, setSubaddress] = useState('');
+  const [trxAddress, setTrxAddress] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [timeLeft, setTimeLeft] = useState(3600);
   const [copied, setCopied] = useState(false);
-  const [xmrAmount, setXmrAmount] = useState(usdToXmr(fiatAmount));
+  const [xmrAmount, setXmrAmount] = useState(0);
+  const [trxAmount, setTrxAmount] = useState(0);
   const [referenceRate, setReferenceRate] = useState(XMR_USD_RATE);
 
   const invoice = invoices.find(i => i.id === invoiceId);
@@ -49,6 +53,7 @@ export default function PayPage() {
   const isInactivePaymentLink = paymentLink && !paymentLink.active;
 
   const formattedFiatAmount = `${displaySymbol}${fiatAmount.toFixed(2)}${displayCurrency === 'USD' ? '' : ` ${displayCurrency}`}`;
+  const isTrxPayment = chainType === 'trx';
 
   // Fetch live rates
   useEffect(() => {
@@ -58,20 +63,31 @@ export default function PayPage() {
       try {
         const rates = await getRates();
         if (!active) return;
-        setXmrAmount(fiatToXmr(fiatAmount, displayCurrency, rates));
-        setReferenceRate(getXmrPrice(displayCurrency, rates));
+
+        if (isTrxPayment) {
+          setTrxAmount(fiatToTrx(fiatAmount, displayCurrency, rates));
+          setReferenceRate(getTrxPrice(displayCurrency, rates));
+        } else {
+          setXmrAmount(fiatToXmr(fiatAmount, displayCurrency, rates));
+          setReferenceRate(getXmrPrice(displayCurrency, rates));
+        }
       } catch {
         const stale = getStaleCache();
         if (stale && active) {
-          setXmrAmount(fiatToXmr(fiatAmount, displayCurrency, stale));
-          setReferenceRate(getXmrPrice(displayCurrency, stale));
+          if (isTrxPayment) {
+            setTrxAmount(fiatToTrx(fiatAmount, displayCurrency, stale));
+            setReferenceRate(getTrxPrice(displayCurrency, stale));
+          } else {
+            setXmrAmount(fiatToXmr(fiatAmount, displayCurrency, stale));
+            setReferenceRate(getXmrPrice(displayCurrency, stale));
+          }
         }
       }
     };
 
     if (fiatAmount > 0) loadQuote();
     return () => { active = false; };
-  }, [displayCurrency, fiatAmount]);
+  }, [displayCurrency, fiatAmount, isTrxPayment]);
 
   // Create NEW invoice on each payment link visit
   // The payment link URL stays the same, but each session gets unique subaddress/invoice
@@ -89,8 +105,15 @@ export default function PayPage() {
           ? `Payment Link: ${decodeURIComponent(label).replace(/-/g, ' ')}`
           : 'Payment Link';
 
-        // Creates new invoice with unique subaddress (same as POS)
-        const inv = await createInvoice(invoiceDescription, fiatAmount);
+        let inv;
+
+        if (isTrxPayment) {
+          // Create TRX invoice
+          inv = await createTrxInvoice(invoiceDescription, fiatAmount);
+        } else {
+          // Create XMR invoice
+          inv = await createInvoice(invoiceDescription, fiatAmount);
+        }
 
         // Check if cancelled before setting state
         if (cancelled) return;
@@ -102,7 +125,11 @@ export default function PayPage() {
           });
         }
 
-        setSubaddress(inv.subaddress);
+        if (isTrxPayment) {
+          setTrxAddress(inv.trxAddress || '');
+        } else {
+          setSubaddress(inv.subaddress);
+        }
         setInvoiceId(inv.id);
       } catch (e) {
         if (!cancelled) {
@@ -120,7 +147,7 @@ export default function PayPage() {
     return () => {
       cancelled = true;
     };
-  }, [createInvoice, updateInvoice, fiatAmount, uniqueId, paymentLink]);
+  }, [createInvoice, createTrxInvoice, updateInvoice, fiatAmount, uniqueId, paymentLink, isTrxPayment]);
 
   // Poll for payment confirmation (more frequent for payment links)
   useEffect(() => {
@@ -140,9 +167,10 @@ export default function PayPage() {
   }, [paid, timeLeft]);
 
   const copyAddr = () => {
-    navigator.clipboard.writeText(subaddress);
+    const addr = isTrxPayment ? trxAddress : subaddress;
+    navigator.clipboard.writeText(addr);
     setCopied(true);
-    toast.success('Address copied!');
+    toast.success(isTrxPayment ? 'TRX address copied!' : 'XMR address copied!');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -187,6 +215,11 @@ export default function PayPage() {
     );
   }
 
+  const chainName = isTrxPayment ? 'TRON (TRX)' : 'Monero (XMR)';
+  const cryptoAmount = isTrxPayment ? trxAmount : xmrAmount;
+  const rateLabel = isTrxPayment ? '1 TRX' : '1 XMR';
+  const address = isTrxPayment ? trxAddress : subaddress;
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -196,7 +229,12 @@ export default function PayPage() {
             <h1 className="text-xl font-bold text-foreground mt-3">
               {label ? decodeURIComponent(label).replace(/-/g, ' ') : 'Payment'}
             </h1>
-            <p className="text-muted-foreground text-sm mt-1">Pay with Monero (XMR)</p>
+            <p className="text-muted-foreground text-sm mt-1">Pay with {chainName}</p>
+            {isTrxPayment && (
+              <Badge variant="outline" className="mt-2 bg-primary/10 text-primary border-primary/20 text-xs">
+                Multi-chain
+              </Badge>
+            )}
           </div>
 
           {paid ? (
@@ -206,10 +244,10 @@ export default function PayPage() {
               </div>
               <h2 className="text-2xl font-bold text-foreground">Payment Confirmed!</h2>
               <p className="text-muted-foreground">{formattedFiatAmount} received - thank you!</p>
-              {invoice?.txid && (
+              {(invoice?.txid || invoice?.trxTxID) && (
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-[10px] text-muted-foreground mb-1">Transaction ID</p>
-                  <p className="font-mono text-[10px] text-foreground break-all">{invoice.txid}</p>
+                  <p className="font-mono text-[10px] text-foreground break-all">{invoice?.txid || invoice?.trxTxID}</p>
                 </div>
               )}
             </div>
@@ -218,7 +256,9 @@ export default function PayPage() {
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
               <h2 className="text-xl font-bold text-foreground">Confirming Payment...</h2>
               <p className="text-muted-foreground text-sm">
-                Your payment is being confirmed on the blockchain. This usually takes 2-5 minutes.
+                {isTrxPayment
+                  ? 'Your payment is being confirmed on the TRON network. This usually takes ~1 minute.'
+                  : 'Your payment is being confirmed on the blockchain. This usually takes 2-5 minutes.'}
               </p>
             </div>
           ) : seenOnChain ? (
@@ -242,36 +282,55 @@ export default function PayPage() {
             <>
               <div className="text-center">
                 <p className="text-4xl font-bold text-foreground">{formattedFiatAmount}</p>
-                <p className="text-primary font-mono mt-1">{formatXMR(xmrAmount)}</p>
-                <p className="text-muted-foreground text-xs mt-1">1 XMR = {displaySymbol}{referenceRate.toFixed(2)} {displayCurrency}</p>
+                <p className="text-primary font-mono mt-1">
+                  {isTrxPayment ? `${trxAmount.toFixed(2)} TRX` : formatXMR(xmrAmount)}
+                </p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  {rateLabel} = {displaySymbol}{referenceRate.toFixed(2)} {displayCurrency}
+                </p>
               </div>
 
-              <div className="flex justify-center">
-                <div className="bg-white rounded-2xl p-5">
-                  <QRCodeSVG value={`monero:${subaddress}?tx_amount=${xmrAmount.toFixed(12)}`} size={200} />
-                </div>
-              </div>
+              {isTrxPayment ? (
+                <TrxQRCode address={trxAddress} amount={trxAmount} onCopy={copyAddr} />
+              ) : (
+                <>
+                  <div className="flex justify-center">
+                    <div className="bg-white rounded-2xl p-5">
+                      <QRCodeSVG value={`monero:${subaddress}?tx_amount=${xmrAmount.toFixed(12)}`} size={200} />
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground text-center">Send exactly to this address:</p>
-                <button onClick={copyAddr} className="w-full p-3 rounded-lg bg-muted/30 border border-border text-xs font-mono text-muted-foreground break-all hover:border-primary/30 transition-colors text-left">
-                  {subaddress}
-                </button>
-                <div className="flex items-center justify-between">
-                  <button onClick={copyAddr} className="text-xs text-primary hover:underline flex items-center gap-1">
-                    <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy address'}
-                  </button>
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground text-center">Send exactly to this address:</p>
+                    <button onClick={copyAddr} className="w-full p-3 rounded-lg bg-muted/30 border border-border text-xs font-mono text-muted-foreground break-all hover:border-primary/30 transition-colors text-left">
+                      {subaddress}
+                    </button>
+                    <div className="flex items-center justify-between">
+                      <button onClick={copyAddr} className="text-xs text-primary hover:underline flex items-center gap-1">
+                        <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy address'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
-              {/* Payment progress (show same as POS) */}
-              {invoiceId && subaddress && (
-                <PaymentProgress
-                  invoiceId={invoiceId}
-                  fiatAmount={fiatAmount}
-                  xmrAmount={xmrAmount}
-                  subaddress={subaddress}
-                />
+              {/* Payment progress */}
+              {invoiceId && (
+                isTrxPayment ? (
+                  <TrxPaymentProgress
+                    invoiceId={invoiceId}
+                    fiatAmount={fiatAmount}
+                    trxAmount={trxAmount}
+                    address={trxAddress}
+                  />
+                ) : (
+                  <PaymentProgress
+                    invoiceId={invoiceId}
+                    fiatAmount={fiatAmount}
+                    xmrAmount={xmrAmount}
+                    subaddress={subaddress}
+                  />
+                )
               )}
             </>
           )}
