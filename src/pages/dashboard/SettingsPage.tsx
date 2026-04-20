@@ -525,9 +525,32 @@ export default function SettingsPage() {
                           variant="outline"
                           className="border-border text-xs"
                           onClick={() => {
-                            const textToCopy = [merchant.viewOnlySeedPhrase, merchant.multiChainEnabled ? merchant.bip39Mnemonic : null].filter(Boolean).join('\n\n--- MULTI-CHAIN SEED ---\n\n');
-                            navigator.clipboard.writeText(textToCopy);
-                            toast.success('Seed phrases copied — store them safely!');
+                            try {
+                              const seeds = [];
+                              if (merchant.viewOnlySeedPhrase) {
+                                seeds.push(merchant.viewOnlySeedPhrase);
+                              }
+                              if (merchant.multiChainEnabled && merchant.bip39Mnemonic) {
+                                seeds.push(merchant.bip39Mnemonic);
+                              }
+                              const textToCopy = seeds.join('\n\n--- MULTI-CHAIN SEED ---\n\n');
+                              navigator.clipboard.writeText(textToCopy)
+                                .then(() => toast.success('Seed phrases copied — store them safely!'))
+                                .catch(() => {
+                                  // Fallback: create temporary textarea
+                                  const textarea = document.createElement('textarea');
+                                  textarea.value = textToCopy;
+                                  textarea.style.position = 'fixed';
+                                  textarea.style.opacity = '0';
+                                  document.body.appendChild(textarea);
+                                  textarea.select();
+                                  document.execCommand('copy');
+                                  document.body.removeChild(textarea);
+                                  toast.success('Seed phrases copied — store them safely! (fallback)');
+                                });
+                            } catch {
+                              toast.error('Failed to copy seed phrases');
+                            }
                           }}
                         >
                           <Copy className="w-3 h-3 mr-1.5" /> Copy All
