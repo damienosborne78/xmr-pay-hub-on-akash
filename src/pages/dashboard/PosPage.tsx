@@ -5,6 +5,7 @@ import { useRates } from '@/hooks/use-rates';
 import { fiatToXmr, xmrToFiat } from '@/lib/currency-service';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -62,6 +63,7 @@ export default function PosPage() {
   };
 
   const [input, setInput] = useState('0');
+  const [selectedChain, setSelectedChain] = useState<'xmr' | 'trx'>('xmr');
   const [xmrMode, setXmrMode] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<{ id: string; fiatAmount: number; xmrAmount: number; subaddress: string } | null>(null);
   const [creating, setCreating] = useState(false);

@@ -445,7 +445,7 @@ export default function SettingsPage() {
                 <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Primary Address</label>
                 <div className="flex items-center gap-2">
                   <p className="font-mono text-[11px] text-foreground bg-background border border-border rounded-lg p-3 flex-1 break-all leading-relaxed">{merchant.viewOnlyAddress}</p>
-                  <Button variant="outline" size="icon" className="shrink-0 border-border hover:border-primary/50 h-8 w-8" onClick={() => { navigator.clipboard.writeText(merchant.viewOnlyAddress); toast.success('Address copied'); }}>
+                  <Button variant="outline" size="icon" className="shrink-0 border-border hover:border-primary/50 h-8 w-8" onClick={() => { try { navigator.clipboard.writeText(merchant.viewOnlyAddress).then(() => toast.success("Address copied")).catch(() => { const t = document.createElement("textarea"); t.value = merchant.viewOnlyAddress; t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select(); document.execCommand("copy"); document.body.removeChild(t); toast.success("Address copied"); }); } catch { toast.error("Failed to copy"); } }}>
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>

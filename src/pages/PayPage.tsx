@@ -168,10 +168,27 @@ export default function PayPage() {
 
   const copyAddr = () => {
     const addr = isTrxPayment ? trxAddress : subaddress;
-    navigator.clipboard.writeText(addr);
-    setCopied(true);
-    toast.success(isTrxPayment ? 'TRX address copied!' : 'XMR address copied!');
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      navigator.clipboard.writeText(addr).then(() => {
+        setCopied(true);
+        toast.success(isTrxPayment ? 'TRX address copied!' : 'XMR address copied!');
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => {
+        const t = document.createElement('textarea');
+        t.value = addr;
+        t.style.position = 'fixed';
+        t.style.opacity = '0';
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        document.body.removeChild(t);
+        setCopied(true);
+        toast.success(isTrxPayment ? 'TRX address copied!' : 'XMR address copied!');
+        setTimeout(() => setCopied(false), 2000);
+      });
+    } catch {
+      toast.error('Failed to copy address');
+    }
   };
 
   if (!fiatAmount || fiatAmount <= 0) {
@@ -229,7 +246,7 @@ export default function PayPage() {
             <h1 className="text-xl font-bold text-foreground mt-3">
               {label ? decodeURIComponent(label).replace(/-/g, ' ') : 'Payment'}
             </h1>
-            <p className="text-muted-foreground text-sm mt-1">Pay with {chainName}</p>
+            <p className="text-muted-foreground text-sm mt-1">Pay with TRON (USDT {isTrxPayment ? '/ TRX' : ''})</p>
             {isTrxPayment && (
               <Badge variant="outline" className="mt-2 bg-primary/10 text-primary border-primary/20 text-xs">
                 Multi-chain
@@ -283,10 +300,10 @@ export default function PayPage() {
               <div className="text-center">
                 <p className="text-4xl font-bold text-foreground">{formattedFiatAmount}</p>
                 <p className="text-primary font-mono mt-1">
-                  {isTrxPayment ? `${trxAmount.toFixed(2)} TRX` : formatXMR(xmrAmount)}
+                  {isTrxPayment ? `${fiatAmount.toFixed(2)} USDT` : formatXMR(xmrAmount)}
                 </p>
                 <p className="text-muted-foreground text-xs mt-1">
-                  {rateLabel} = {displaySymbol}{referenceRate.toFixed(2)} {displayCurrency}
+                  {rateLabel} = {isTrxPayment ? '1 USDT' : `${displaySymbol}${referenceRate.toFixed(2)} ${displayCurrency}`}
                 </p>
               </div>
 

@@ -14,7 +14,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon, Zap } from 'lucide-react';
+import { LayoutDashboard, FileText, Clock, Settings, LogOut, RefreshCw, MonitorSmartphone, BarChart3, Link2, Plug, Globe, Paintbrush, Landmark, Gift, Server, Shield, HardDrive, Users, Sun, Moon, Zap, Book, ExternalLink } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { startReferralSync } from '@/lib/referral-sync';
@@ -111,6 +111,7 @@ const configNav = [
   { title: 'White-Label', url: '/dashboard/white-label', icon: Paintbrush },
   { title: 'Backups', url: '/dashboard/backups', icon: HardDrive },
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
+  { title: 'Help/Docs', url: 'https://docs.moneroflow.com/wiki.html', icon: Book, external: true },
 ];
 
 function DashboardSidebar() {
@@ -122,22 +123,36 @@ function DashboardSidebar() {
 
   const closeMobile = () => { if (isMobile) setOpenMobile(false); };
 
-  const renderNav = (items: typeof mainNav) => (
+  const renderNav = (items: typeof any[]) => (
     <SidebarMenu>
       {items.map(item => (
         <SidebarMenuItem key={item.title}>
-          <SidebarMenuButton asChild>
-            <NavLink
-              to={item.url}
-              end={item.url === '/dashboard'}
+          {item.external ? (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={closeMobile}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-              activeClassName="bg-sidebar-accent text-primary font-medium"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:underline transition-colors w-full"
             >
               <item.icon className="w-4 h-4 shrink-0" />
               {!collapsed && <span>{item.title}</span>}
-            </NavLink>
-          </SidebarMenuButton>
+              {!collapsed && <ExternalLink className="w-3 h-3 opacity-60" />}
+            </a>
+          ) : (
+            <SidebarMenuButton asChild>
+              <NavLink
+                to={item.url}
+                end={item.url === '/dashboard'}
+                onClick={closeMobile}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                activeClassName="bg-sidebar-accent text-primary font-medium"
+              >
+                <item.icon className="w-4 h-4 shrink-0" />
+                {!collapsed && <span>{item.title}</span>}
+              </NavLink>
+            </SidebarMenuButton>
+          )}
         </SidebarMenuItem>
       ))}
     </SidebarMenu>

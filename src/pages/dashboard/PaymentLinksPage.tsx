@@ -49,6 +49,7 @@ export default function PaymentLinksPage() {
     }
     url.searchParams.set('currency', link.fiatCurrency || cur);
     url.searchParams.set('symbol', sym);
+    url.searchParams.set('chain', link.chainType || 'xmr');
     return url.toString();
   };
 
@@ -62,15 +63,19 @@ export default function PaymentLinksPage() {
     }
     try {
       const userSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : label.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      await createPaymentLink(userSlug, Number(amount), label, cur);
-      toast.success('Full permanent link copied!');
+      
+      // Generate BOTH XMR and USDT payment links
+      await createPaymentLink(userSlug, Number(amount), label, cur, undefined, 'xmr');
+      await createPaymentLink(userSlug, Number(amount), label, cur, undefined, 'trx');
+      
+      toast.success('Both XMR and USDT payment links created!');
       setOpen(false);
       setSlug('');
       setAmount('');
       setLabel('');
       setDescription('');
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Failed to create payment link';
+      const message = e instanceof Error ? e.message : 'Failed to create payment links';
       toast.error(message);
     }
   };
@@ -168,36 +173,14 @@ export default function PaymentLinksPage() {
                     <Label className="text-foreground">Price ({cur})</Label>
                     <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="29.99" className="bg-background border-border" />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-foreground">Accept Payments In</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setChainType('xmr')}
-                        className={`p-3 rounded-lg border-2 transition-all ${
-                          chainType === 'xmr'
-                            ? 'border-primary bg-primary/10 text-foreground font-medium'
-                            : 'border-border bg-background text-muted-foreground'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                          <span>Monero</span>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => setChainType('trx')}
-                        className={`p-3 rounded-lg border-2 transition-all ${
-                          chainType === 'trx'
-                            ? 'border-primary bg-primary/10 text-foreground font-medium'
-                            : 'border-border bg-background text-muted-foreground'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                          <span>TRX</span>
-                        </div>
-                      </button>
+                  <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                      <span className="text-sm font-medium">Monero (XMR) + TRON (USDT)</span>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      This will create two separate payment links — one for Monero and one for USDT on the TRON network.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-foreground">URL Slug</Label>

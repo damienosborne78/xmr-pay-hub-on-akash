@@ -178,3 +178,16 @@ export function getTrxPrice(fiatCurrency: string, rates: CachedRates): number {
   const fiatRate = rates.fiatRates[fiatCurrency] || 1;
   return rates.trxUsd * fiatRate;
 }
+
+export function usdToUsdt(usdAmount: number): number {
+  return usdAmount; // 1 USD = 1 USDT (pegged)
+}
+
+export function usdtToFiat(usdtAmount: number): number {
+  return usdtAmount; // 1 USDT = 1 USD (pegged)
+}
+
+export function getUsdtPrice(fiatCurrency: string, rates: CachedRates): number {
+  const fiatRate = rates.fiatRates[fiatCurrency] || 1;
+  return fiatRate; // USDT mirrors USD rate for other currencies
+}

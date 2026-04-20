@@ -149,7 +149,13 @@ export default function DashboardOverview() {
             <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           </div>
           <div className="flex items-center gap-3 bg-card/50 px-3 py-1.5 rounded-lg border border-border/50">
-            <Info className="w-3.5 h-3.5 text-primary" />
+            <button
+              onClick={() => window.open('https://docs.moneroflow.com/wiki.html', '_blank')}
+              className="flex items-center justify-center hover:opacity-70 transition-opacity"
+              title="Open documentation"
+            >
+              <Info className="w-3.5 h-3.5 text-primary" />
+            </button>
             <span className="text-xs text-muted-foreground font-medium">Help</span>
             <Switch checked={helpEnabled} onCheckedChange={setHelpEnabled} size="sm" />
           </div>
