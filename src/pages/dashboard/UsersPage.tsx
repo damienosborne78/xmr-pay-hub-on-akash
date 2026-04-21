@@ -36,17 +36,26 @@ export default function UsersPage() {
 
   const adminPasswordSet = !!merchant.adminPasswordHash;
   const users = merchant.posUsers || [];
+  const [currentPass, setCurrentPass] = useState(''); // For verifying current password when changing
 
 
   const handleSetAdminPassword = () => {
+    // If password is already set, verify current password first
+    if (adminPasswordSet) {
+      if (!currentPass || hashPassword(currentPass) !== merchant.adminPasswordHash) {
+        toast.error('Current password is incorrect');
+        return;
+      }
+    }
+    
     if (adminPass.length < 6) { toast.error('Password must be at least 6 characters'); return; }
     if (adminPass !== adminPassConfirm) { toast.error('Passwords do not match'); return; }
     updateMerchant({ adminPasswordHash: hashPassword(adminPass) });
     setShowSetAdmin(false);
     setAdminPass('');
     setAdminPassConfirm('');
-    setAdminUnlocked(true);
-    toast.success('Admin password set! 🔒');
+    setCurrentPass('');
+    toast.success(adminPasswordSet ? 'Password updated! 🔒' : 'Admin password set! 🔒');
   };
 
   const handleUnlockAdmin = () => {
@@ -122,32 +131,9 @@ export default function UsersPage() {
           </p>
 
           {!adminPasswordSet ? (
-            <>
-              <Button onClick={() => setShowSetAdmin(true)} className="bg-gradient-orange hover:opacity-90">
-                <KeyRound className="w-4 h-4 mr-2" /> Set Admin Password
-              </Button>
-              <Dialog open={showSetAdmin} onOpenChange={setShowSetAdmin}>
-                <DialogContent className="bg-card border-border">
-                  <DialogHeader><DialogTitle className="text-foreground">Set Admin Password</DialogTitle></DialogHeader>
-                  <div className="space-y-4 mt-2">
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Password (min 6 chars)</Label>
-                      <div className="relative">
-                        <Input type={showPass ? 'text' : 'password'} value={adminPass} onChange={e => setAdminPass(e.target.value)} className="bg-background border-border pr-10" />
-                        <button onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                          {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Confirm Password</Label>
-                      <Input type="password" value={adminPassConfirm} onChange={e => setAdminPassConfirm(e.target.value)} className="bg-background border-border" />
-                    </div>
-                    <Button onClick={handleSetAdminPassword} className="w-full bg-gradient-orange hover:opacity-90">Save Admin Password</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </>
+            <Button onClick={() => setShowSetAdmin(true)} className="bg-gradient-orange hover:opacity-90">
+              <KeyRound className="w-4 h-4 mr-2" /> Set Admin Password
+            </Button>
           ) : adminUnlocked ? (
             <div className="flex items-center gap-2">
               <Badge className="bg-success/10 text-success border-success/20"><Lock className="w-3 h-3 mr-1" /> Unlocked</Badge>
@@ -260,6 +246,35 @@ export default function UsersPage() {
           </div>
         </div>
       </FadeIn>
+
+      {/* Password Dialog - shared for Set and Change */}
+      <Dialog open={showSetAdmin} onOpenChange={setShowSetAdmin}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="text-foreground">{adminPasswordSet ? 'Change Admin Password' : 'Set Admin Password'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            {adminPasswordSet && (
+              <div className="space-y-2">
+                <Label className="text-foreground">Current Password</Label>
+                <Input type="password" value={currentPass} onChange={e => setCurrentPass(e.target.value)} placeholder="Enter current password" className="bg-background border-border" />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label className="text-foreground">{adminPasswordSet ? 'New Password (min 6 chars)' : 'Password (min 6 chars)'}</Label>
+              <div className="relative">
+                <Input type={showPass ? 'text' : 'password'} value={adminPass} onChange={e => setAdminPass(e.target.value)} className="bg-background border-border pr-10" />
+                <button onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">{adminPasswordSet ? 'Confirm New Password' : 'Confirm Password'}</Label>
+              <Input type="password" value={adminPassConfirm} onChange={e => setAdminPassConfirm(e.target.value)} className="bg-background border-border" />
+            </div>
+            <Button onClick={handleSetAdminPassword} className="w-full bg-gradient-orange hover:opacity-90">{adminPasswordSet ? 'Update Password' : 'Save Admin Password'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
